@@ -24,19 +24,16 @@ const COST_RATES_DATE = '2026-05-11';
 
 function modelRates(model) {
   const m = (model || '').toLowerCase();
-  // Rates per million tokens: [input, cacheWrite, cacheRead, output]
-  if (m.includes('opus'))  return { inRate: 15,   cacheWrite: 18.75, cacheRead: 1.50, outRate: 75  };
-  if (m.includes('haiku')) return { inRate: 0.80, cacheWrite: 1.00,  cacheRead: 0.08, outRate: 4   };
-  return                          { inRate: 3,    cacheWrite: 3.75,  cacheRead: 0.30, outRate: 15  }; // sonnet
+  if (m.includes('opus'))  return { inRate: 15,   outRate: 75 };
+  if (m.includes('haiku')) return { inRate: 0.80, outRate: 4  };
+  return                          { inRate: 3,    outRate: 15 }; // sonnet
 }
 
-function estimateCost(model, inputTokens, cacheWriteTokens, cacheReadTokens, outputTokens) {
+function estimateCost(model, inputTokens, outputTokens) {
   const r = modelRates(model);
   const cost = (
-    (inputTokens      || 0) * r.inRate     +
-    (cacheWriteTokens || 0) * r.cacheWrite +
-    (cacheReadTokens  || 0) * r.cacheRead  +
-    (outputTokens     || 0) * r.outRate
+    (inputTokens  || 0) * r.inRate  +
+    (outputTokens || 0) * r.outRate
   ) / 1_000_000;
   return cost > 0 ? cost : null;
 }
@@ -203,7 +200,7 @@ function renderStats(round) {
   const m = round.metrics || {};
   const statsRow = document.getElementById('stats-row');
   if (!statsRow) return;
-  const ctrlCost = estimateCost(m.lastModel, m.inputTokens, m.cacheWriteTokens, m.cacheReadTokens, m.outputTokens);
+  const ctrlCost = estimateCost(m.lastModel, m.inputTokens, m.outputTokens);
   const agentCost = estimateSubagentCost(m.lastModel, m.subagentTotalTokens);
   const totalCost = (ctrlCost != null || agentCost != null)
     ? (ctrlCost || 0) + (agentCost || 0) : null;
@@ -232,7 +229,7 @@ function renderStats(round) {
       note.className = 'cost-note';
       card.appendChild(note);
     }
-    note.textContent = `* Claude API rates as of ${COST_RATES_DATE}. Controller cost includes prompt cache read/write charges — online estimators typically exclude these, so actual spend will be higher than naive estimates. Subagent cost from <usage> tags assumes 90/10 input/output split (no cache breakdown available).`;
+    note.textContent = `* Claude API rates as of ${COST_RATES_DATE}. Controller cost uses input/output tokens only (excludes prompt cache). Subagent cost from <usage> tags assumes 90/10 input/output split.`;
   }
 }
 
