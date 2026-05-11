@@ -46,6 +46,9 @@ if [[ -d "$PACK_DIR/screenshots" ]] && ls "$PACK_DIR/screenshots/"*.png >/dev/nu
   done | jq -s '.')
 fi
 
+# Capture git branch
+GIT_BRANCH=$(git -C "$PLUGIN_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+
 # Build new round using --slurpfile to avoid "argument list too long" for large JSON files
 NEW_ROUND_TMP=$(mktemp)
 jq -n \
@@ -55,6 +58,7 @@ jq -n \
   --slurpfile testResults "$PACK_DIR/test-results.json" \
   --slurpfile tools       "$PACK_DIR/tools.json" \
   --argjson screenshots   "$SCREENSHOTS" \
+  --arg     gitBranch     "$GIT_BRANCH" \
   '{
     metrics:     $metrics[0],
     patterns:    $patterns[0],
@@ -62,6 +66,7 @@ jq -n \
     testResults: $testResults[0],
     tools:       $tools[0],
     screenshots: $screenshots,
+    gitBranch:   $gitBranch,
     generatedAt: now | todate
   }' > "$NEW_ROUND_TMP"
 

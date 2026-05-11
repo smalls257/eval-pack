@@ -70,17 +70,48 @@ function renderPageHeader(data, round) {
   setText('page-title', title);
   setText('session-id', data.sessionId || '—');
 
-  // index.html header stat IDs: workspace, messages, files, artifacts
-  // Map available round metrics to these slots meaningfully
+  // Summary subtitle — verdictStatement as deck text
+  const summaryEl = document.getElementById('page-summary');
+  if (summaryEl) summaryEl.textContent = a.verdictStatement || '';
+
   setText('header-stat-workspace-value', m.lastModel || '—');
   setText('header-stat-messages-value', m.turnCount != null ? m.turnCount : '—');
   setText('header-stat-files-value', m.filesChanged != null ? m.filesChanged : '—');
-  setText('header-stat-artifacts-value', formatNumber(m.totalTokens));
+  setText('header-stat-tokens-value', formatNumber(m.totalTokens));
+  setText('header-stat-branch-value', round.gitBranch || '—');
 
-  // Footer timestamp
   const genAt = document.getElementById('generated-at');
   if (genAt && data.generatedAt) {
     genAt.textContent = new Date(data.generatedAt).toLocaleString();
+  }
+}
+
+function renderHighlights(analysis) {
+  const h = (analysis || {}).highlights || {};
+  const cs = h.completionStatus || {};
+  const risk = h.mainRisk || '';
+
+  // Completion card
+  const card = document.getElementById('completion-card');
+  const val = document.getElementById('completion-value');
+  const notes = document.getElementById('completion-notes');
+  if (card && cs.label) {
+    const color = /^(green|amber|red)$/.test(cs.color || '') ? cs.color : 'green';
+    card.className = `highlight-card completion-card completion-${color}`;
+    if (val) val.innerHTML = `<span class="completion-dot"></span>${escapeHtml(cs.label)}`;
+    if (notes) notes.textContent = cs.notes || '';
+  }
+
+  // Risk card
+  const riskVal = document.getElementById('risk-value');
+  const riskCard = document.getElementById('risk-card');
+  if (riskVal) {
+    if (risk) {
+      riskVal.textContent = risk;
+      if (riskCard) riskCard.style.display = '';
+    } else {
+      if (riskCard) riskCard.style.display = 'none';
+    }
   }
 }
 
@@ -610,6 +641,7 @@ function renderRound(data, round) {
   const analysis = round.analysis || {};
 
   renderPageHeader(data, round);
+  renderHighlights(analysis);
   renderVerdict(round);
   renderStats(round);
   renderFlags(round);

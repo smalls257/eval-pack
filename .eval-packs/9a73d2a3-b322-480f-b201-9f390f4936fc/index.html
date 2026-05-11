@@ -22,9 +22,10 @@
 
   <main class="container">
 
-    <!-- Page Header: task title + 4 header stats -->
+    <!-- Page Header: task title + 5 header stats -->
     <section class="page-header" id="page-header">
       <h2 class="page-title" id="page-title"></h2>
+      <p class="page-summary" id="page-summary"></p>
       <div class="header-stats">
         <div class="header-stat" id="header-stat-workspace">
           <div class="header-stat-value" id="header-stat-workspace-value"></div>
@@ -38,24 +39,35 @@
           <div class="header-stat-value" id="header-stat-files-value"></div>
           <div class="header-stat-label">Files Changed</div>
         </div>
-        <div class="header-stat" id="header-stat-artifacts">
-          <div class="header-stat-value" id="header-stat-artifacts-value"></div>
-          <div class="header-stat-label">Proof Artifacts</div>
+        <div class="header-stat" id="header-stat-tokens">
+          <div class="header-stat-value" id="header-stat-tokens-value"></div>
+          <div class="header-stat-label">Total Tokens</div>
+        </div>
+        <div class="header-stat" id="header-stat-branch">
+          <div class="header-stat-value header-stat-branch-value" id="header-stat-branch-value"></div>
+          <div class="header-stat-label">Branch</div>
         </div>
       </div>
     </section>
+
+    <!-- Highlights: completion status + main risk -->
+    <div class="highlights-row" id="highlights-row">
+      <div class="highlight-card completion-card" id="completion-card">
+        <div class="highlight-card-label">Completion</div>
+        <div class="highlight-card-value" id="completion-value"></div>
+        <div class="highlight-card-notes" id="completion-notes"></div>
+      </div>
+      <div class="highlight-card risk-card" id="risk-card">
+        <div class="highlight-card-label">Main Risk</div>
+        <div class="highlight-card-value" id="risk-value"></div>
+      </div>
+    </div>
 
     <!-- Verdict Banner -->
     <section class="verdict-banner" id="verdict-banner">
       <div class="verdict-icon" id="verdict-icon"></div>
       <div class="verdict-text" id="verdict-text"></div>
       <div class="verdict-detail" id="verdict-detail"></div>
-    </section>
-
-    <!-- Screenshots / Visual Evidence (shown only when screenshots present) -->
-    <section class="card" id="screenshots-section" style="display:none;">
-      <h2 class="card-title">Visual Evidence</h2>
-      <div class="screenshot-grid" id="screenshot-grid"></div>
     </section>
 
     <!-- Session Metrics (always visible) -->
@@ -68,6 +80,12 @@
     <section class="card" id="timeline-section">
       <h2 class="card-title">Session Timeline</h2>
       <div class="session-timeline" id="session-timeline"></div>
+    </section>
+
+    <!-- Screenshots / Visual Evidence (shown only when screenshots present) -->
+    <section class="card" id="screenshots-section" style="display:none;">
+      <h2 class="card-title">Visual Evidence</h2>
+      <div class="screenshot-grid" id="screenshot-grid"></div>
     </section>
 
     <!-- Heuristic Flags (always visible) -->
