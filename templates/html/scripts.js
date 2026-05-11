@@ -180,14 +180,16 @@ function renderTimeline(transcript) {
   const total = transcript.length;
   const roles = Object.keys(counts);
 
+  const safeColor = c => /^#[0-9a-fA-F]{3,6}$/.test(c) ? c : '#bdc3c7';
+
   bar.innerHTML = roles.map(role => {
     const pct = ((counts[role] / total) * 100).toFixed(1);
-    const color = getPhaseColor(role);
+    const color = safeColor(getPhaseColor(role));
     return `<div class="timeline-segment" style="width:${pct}%;background:${color}" title="${escapeHtml(role)}: ${counts[role]}"></div>`;
   }).join('');
 
   legend.innerHTML = roles.map(role => {
-    const color = getPhaseColor(role);
+    const color = safeColor(getPhaseColor(role));
     return `<span class="legend-item"><span class="legend-dot" style="background:${color}"></span>${escapeHtml(role)} (${counts[role]})</span>`;
   }).join('');
 }
@@ -422,6 +424,7 @@ function renderPromptPattern(analysis) {
 }
 
 function isSafePath(path) {
+  if (/^\/\//.test(path)) return false;
   return /^https?:\/\//i.test(path) || /^\.{0,2}\//.test(path) || /^[^:]+$/.test(path);
 }
 
@@ -483,7 +486,7 @@ function renderTranscript(transcript) {
       : '';
 
     const ts = entry.timestamp
-      ? `<span class="transcript-ts">${new Date(entry.timestamp).toLocaleTimeString()}</span>`
+      ? `<span class="transcript-ts">${escapeHtml(new Date(entry.timestamp).toLocaleTimeString())}</span>`
       : '';
 
     return `<div class="transcript-entry transcript-${escapeHtml(role)}">
