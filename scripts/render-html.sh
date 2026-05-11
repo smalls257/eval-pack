@@ -16,14 +16,11 @@ cp "$TEMPLATE_DIR/index.html" "$PACK_DIR/index.html"
 cp "$TEMPLATE_DIR/styles.css" "$PACK_DIR/styles.css"
 cp "$TEMPLATE_DIR/scripts.js" "$PACK_DIR/scripts.js"
 
-# Copy transcript if present
+# Copy transcript and extract tool usage if present
 if [[ -n "$TRANSCRIPT_FILE" && -f "$TRANSCRIPT_FILE" ]]; then
   cp "$TRANSCRIPT_FILE" "$PACK_DIR/transcript.jsonl"
-fi
-
-# Extract tool usage from transcript
-if [[ -n "$TRANSCRIPT_FILE" && -f "$TRANSCRIPT_FILE" ]]; then
-  "$PLUGIN_ROOT/scripts/extract-tools.sh" "$TRANSCRIPT_FILE" "$PACK_DIR" || true
+  "$PLUGIN_ROOT/scripts/extract-tools.sh" "$TRANSCRIPT_FILE" "$PACK_DIR" \
+    || echo "Warning: extract-tools.sh failed; tool data will be empty" >&2
 fi
 
 # Write default intermediate files so --slurpfile always has a valid target
