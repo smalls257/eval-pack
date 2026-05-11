@@ -537,7 +537,7 @@ function renderTools(tools) {
         return `<div class="tool-bar-row">
           <span class="tool-bar-name">${escapeHtml(t.name)}</span>
           <div class="tool-bar-track"><div class="tool-bar-fill" style="width:${pct}%"></div></div>
-          <span class="tool-bar-count">${t.count}</span>
+          <span class="tool-bar-count">${escapeHtml(String(t.count))}</span>
         </div>`;
       }).join('');
     }
@@ -554,7 +554,7 @@ function renderTools(tools) {
           <div class="subagent-desc">${escapeHtml(s.description)}</div>
           <div class="subagent-meta">
             ${s.model ? `<span class="subagent-badge">${escapeHtml(s.model)}</span>` : ''}
-            ${s.subagentType !== 'general-purpose' ? `<span class="subagent-badge">${escapeHtml(s.subagentType)}</span>` : ''}
+            ${s.subagentType && s.subagentType !== 'general-purpose' ? `<span class="subagent-badge">${escapeHtml(s.subagentType)}</span>` : ''}
           </div>
         </div>`
       ).join('');
@@ -592,7 +592,7 @@ function renderRound(data, round) {
   renderTestsNew(analysis);
   renderFriction(analysis);
   renderDiff(analysis);
-  renderTools(round.tools || {});
+  renderTools(round.tools);
   renderImprovements(analysis);
   renderPromptPattern(analysis);
   renderSessionArtifacts(analysis);
