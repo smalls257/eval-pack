@@ -10,7 +10,7 @@
   "repository": "https://github.com/jasonsmith/eval-pack",
   "license": "MIT",
   "keywords": ["eval", "review", "metrics", "reporting"],
-  "skills": "./",
+  "skills": "./skills/",
   "userConfig": {
     "outputDir": {
       "type": "string",
