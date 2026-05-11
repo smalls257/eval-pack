@@ -88,13 +88,19 @@ TOTAL_CALLS=$(jq '.totalToolCalls' "$TEST_DIR/$SESSION_ID/tools.json")
 echo "  Distinct tools: $TOOL_COUNT"
 echo "  Total tool calls: $TOTAL_CALLS"
 
-if [[ "$TOOL_COUNT" -lt 1 ]]; then
-  echo "FAIL: should have at least 1 distinct tool" >&2
+if [[ "$TOOL_COUNT" -ne 2 ]]; then
+  echo "FAIL: expected 2 distinct tools, got $TOOL_COUNT" >&2
   exit 1
 fi
 
-if [[ "$TOTAL_CALLS" -lt 1 ]]; then
-  echo "FAIL: totalToolCalls should be > 0" >&2
+if [[ "$TOTAL_CALLS" -ne 2 ]]; then
+  echo "FAIL: expected 2 total tool calls, got $TOTAL_CALLS" >&2
+  exit 1
+fi
+
+READ_COUNT=$(jq '[.toolCalls[] | select(.name == "Read")] | length' "$TEST_DIR/$SESSION_ID/tools.json")
+if [[ "$READ_COUNT" -ne 1 ]]; then
+  echo "FAIL: expected Read tool in toolCalls" >&2
   exit 1
 fi
 echo "  PASS"

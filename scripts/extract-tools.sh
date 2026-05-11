@@ -36,7 +36,7 @@ SUBAGENTS=$(jq '[.[] | select(.name == "Agent") | {
 # Skills (Skill tool invocations) — deduplicated by name
 SKILLS=$(jq '[.[] | select(.name == "Skill") | {
   name: (.input.skill // ""),
-  args: ((.input.args // "") | .[0:200])
+  args: ((.input.args // "" | if type == "string" then . else tojson end) | .[0:200])
 }] | unique_by(.name)' "$TOOL_CALLS_TMP")
 
 jq -n \
@@ -51,5 +51,4 @@ jq -n \
     skills:         $skills
   }' > "$OUTPUT_DIR/tools.json"
 
-rm -f "$TOOL_CALLS_TMP"
 echo "Tools written to $OUTPUT_DIR/tools.json"
