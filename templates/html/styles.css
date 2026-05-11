@@ -827,19 +827,24 @@ details[open] .collapsible-trigger::before { content: '▾ '; }
 /* ===== Rounds Nav ===== */
 .rounds-nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .round-btn {
-  padding: 6px 16px;
+  padding: 4px 12px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--text);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
 }
 
+.round-btn .round-btn-num { display: block; font-weight: 600; }
+.round-btn .round-btn-time { display: block; font-size: 11px; color: var(--text-secondary); }
 .round-btn.active { border-color: var(--accent); background: rgba(0, 112, 243, 0.1); }
 
 /* ===== Footer ===== */

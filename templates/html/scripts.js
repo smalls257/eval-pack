@@ -662,8 +662,14 @@ function renderRounds(data) {
   }
   section.style.display = 'block';
   nav.innerHTML = data.rounds.map((r, i) => {
-    const label = r.generatedAt ? new Date(r.generatedAt).toLocaleString() : 'Round ' + (i + 1);
-    return `<button class="round-btn${i === data.rounds.length - 1 ? ' active' : ''}" data-round="${i}">${escapeHtml(label)}</button>`;
+    const time = r.generatedAt
+      ? new Date(r.generatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : '';
+    const isActive = i === data.rounds.length - 1;
+    return `<button class="round-btn${isActive ? ' active' : ''}" data-round="${i}">` +
+      `<span class="round-btn-num">Round ${i + 1}</span>` +
+      (time ? `<span class="round-btn-time">${escapeHtml(time)}</span>` : '') +
+      `</button>`;
   }).join('');
 
   nav.querySelectorAll('.round-btn').forEach(btn => {
