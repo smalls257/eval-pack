@@ -39,7 +39,7 @@ Note: New devs who clone this repo will need to run these commands once in Claud
 
 ```bash
 mkdir -p .github/workflows
-cp "${CLAUDE_PLUGIN_ROOT}/templates/workflows/eval-pack-pages.yml" .github/workflows/eval-pack-pages.yml
+cp "${CLAUDE_PLUGIN_ROOT}/templates/workflows/eval-pack.yml" .github/workflows/eval-pack.yml
 ```
 
 ## Step 3: Update .gitignore
@@ -51,20 +51,11 @@ Add to the project's `.gitignore` (create if missing):
 .eval-packs/
 ```
 
-## Step 4: Setup GitHub Pages
-
-If the `gh` CLI is available and authenticated:
-
-```bash
-gh api repos/{owner}/{repo}/pages -X POST -f source='{"branch":"gh-pages","path":"/"}' 2>/dev/null || true
-```
-
-If this fails, tell the user to enable GitHub Pages manually on the `gh-pages` branch.
-
-## Step 5: Report
+## Step 4: Report
 
 Tell the user:
 - What was set up
-- Remind them to commit `.claude/settings.json` and `.github/workflows/eval-pack-pages.yml`
-- Any dev who clones the repo gets eval-pack auto-installed by Claude Code — no extra steps
+- Remind them to commit `.github/workflows/eval-pack.yml`
+- New devs who clone the repo must install the plugin once: `/plugin marketplace add smalls257/eval-pack` then `/plugin install eval-pack@eval-pack`
+- Eval packs are uploaded as GitHub Actions artifacts on each PR — accessible from the Actions tab, private to repo collaborators
 - They can now use `/eval-pack:generate` and `/eval-pack:review`
