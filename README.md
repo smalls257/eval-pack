@@ -24,7 +24,22 @@ A Claude Code plugin that generates eval packs — polished HTML reports capturi
 
 ## Install
 
-Add to your project's `.claude/settings.json` (create if it doesn't exist):
+In Claude Code, run:
+
+```
+/plugin marketplace add smalls257/eval-pack
+/plugin install eval-pack@eval-pack
+```
+
+Then run the setup skill to wire up the GitHub Action, gitignore, and Pages config:
+
+```
+/eval-pack:setup
+```
+
+### Distribute to your team
+
+To give everyone who clones your repo the plugin config automatically, commit `.claude/settings.json` with:
 
 ```json
 {
@@ -42,13 +57,7 @@ Add to your project's `.claude/settings.json` (create if it doesn't exist):
 }
 ```
 
-Commit `.claude/settings.json`. Any dev who clones the repo gets eval-pack auto-installed by Claude Code on first open — no submodules, no manual steps.
-
-Then run the setup skill to wire up the GitHub Action, gitignore, and Pages config:
-
-```
-/eval-pack:setup
-```
+Each dev still needs to run `/plugin marketplace add smalls257/eval-pack` and `/plugin install eval-pack@eval-pack` once, but the config tells Claude Code where to find it.
 
 ## Usage
 

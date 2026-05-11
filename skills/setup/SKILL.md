@@ -29,6 +29,12 @@ Add this configuration (preserve any existing content):
 }
 ```
 
+Note: New devs who clone this repo will need to run these commands once in Claude Code to install the plugin:
+```
+/plugin marketplace add smalls257/eval-pack
+/plugin install eval-pack@eval-pack
+```
+
 ## Step 2: Copy GitHub Action
 
 ```bash
