@@ -30,6 +30,12 @@ fi
 [[ -f "$PACK_DIR/test-results.json" ]] || echo '{}' > "$PACK_DIR/test-results.json"
 [[ -f "$PACK_DIR/tools.json" ]]        || echo '{}' > "$PACK_DIR/tools.json"
 
+# Pull in any Playwright MCP screenshots from plugin root
+PLAYWRIGHT_MCP_DIR="$PLUGIN_ROOT/.playwright-mcp"
+if [[ -d "$PLAYWRIGHT_MCP_DIR" ]] && ls "$PLAYWRIGHT_MCP_DIR/"*.png >/dev/null 2>&1; then
+  cp "$PLAYWRIGHT_MCP_DIR/"*.png "$PACK_DIR/screenshots/" 2>/dev/null || true
+fi
+
 # Detect screenshots — short list, safe as --argjson
 SCREENSHOTS="[]"
 if [[ -d "$PACK_DIR/screenshots" ]] && ls "$PACK_DIR/screenshots/"*.png >/dev/null 2>&1; then
