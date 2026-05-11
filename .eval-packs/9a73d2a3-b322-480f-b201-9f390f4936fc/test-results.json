@@ -1,0 +1,10 @@
+{
+  "verdict": "pass",
+  "summary": "E2E pipeline test (extract → detect → render → regeneration) — all 6 steps pass after fixing transcript format compatibility.",
+  "testsRun": [
+    {"name": "tests/test-e2e.sh — extract metrics", "passed": true, "output": "lastModel: claude-sonnet-4-6, turnCount correct"},
+    {"name": "tests/test-e2e.sh — detect patterns", "passed": true, "output": "false completion detected, flags emitted"},
+    {"name": "tests/test-e2e.sh — render HTML", "passed": true, "output": "index.html generated, data.json with rounds"},
+    {"name": "tests/test-e2e.sh — regeneration round 2", "passed": true, "output": "rounds array appended correctly"}
+  ]
+}

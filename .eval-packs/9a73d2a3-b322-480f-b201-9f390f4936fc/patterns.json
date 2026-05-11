@@ -1,0 +1,13 @@
+{
+  "falseCompletions": [],
+  "retryCount": 1,
+  "testFailureCount": 14,
+  "scopeDrift": false,
+  "flags": [
+    {
+      "level": "red",
+      "label": "Test failures during session",
+      "count": 14
+    }
+  ]
+}

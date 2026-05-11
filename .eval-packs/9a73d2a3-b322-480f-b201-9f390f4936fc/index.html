@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eval Pack</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Top Bar -->
+  <header class="top-bar">
+    <div class="top-bar-left">
+      <h1 class="logo">Eval Pack</h1>
+      <span class="session-id" id="session-id"></span>
+    </div>
+    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+      <span class="theme-icon-dark">☀</span>
+      <span class="theme-icon-light">☾</span>
+    </button>
+  </header>
+
+  <main class="container">
+
+    <!-- Page Header: task title + 4 header stats -->
+    <section class="page-header" id="page-header">
+      <h2 class="page-title" id="page-title"></h2>
+      <div class="header-stats">
+        <div class="header-stat" id="header-stat-workspace">
+          <div class="header-stat-value" id="header-stat-workspace-value"></div>
+          <div class="header-stat-label">Model</div>
+        </div>
+        <div class="header-stat" id="header-stat-messages">
+          <div class="header-stat-value" id="header-stat-messages-value"></div>
+          <div class="header-stat-label">Session Messages</div>
+        </div>
+        <div class="header-stat" id="header-stat-files">
+          <div class="header-stat-value" id="header-stat-files-value"></div>
+          <div class="header-stat-label">Files Changed</div>
+        </div>
+        <div class="header-stat" id="header-stat-artifacts">
+          <div class="header-stat-value" id="header-stat-artifacts-value"></div>
+          <div class="header-stat-label">Proof Artifacts</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Verdict Banner -->
+    <section class="verdict-banner" id="verdict-banner">
+      <div class="verdict-icon" id="verdict-icon"></div>
+      <div class="verdict-text" id="verdict-text"></div>
+      <div class="verdict-detail" id="verdict-detail"></div>
+    </section>
+
+    <!-- Screenshots / Visual Evidence (shown only when screenshots present) -->
+    <section class="card" id="screenshots-section" style="display:none;">
+      <h2 class="card-title">Visual Evidence</h2>
+      <div class="screenshot-grid" id="screenshot-grid"></div>
+    </section>
+
+    <!-- Session Metrics (always visible) -->
+    <section class="card" id="stats-card">
+      <h2 class="card-title">Session Metrics</h2>
+      <div class="stats-row" id="stats-row"></div>
+    </section>
+
+    <!-- Phase Timeline (always visible) -->
+    <section class="card" id="timeline-section">
+      <h2 class="card-title">Phase Timeline</h2>
+      <div class="timeline-bar" id="timeline-bar"></div>
+      <div class="timeline-legend" id="timeline-legend"></div>
+    </section>
+
+    <!-- Heuristic Flags (always visible) -->
+    <section class="card" id="flags-section">
+      <h2 class="card-title">Heuristic Flags</h2>
+      <div class="flags-row" id="flags-row"></div>
+    </section>
+
+    <!-- Sticky Tab Navigation -->
+    <div class="tab-nav-wrapper">
+      <nav class="tab-nav" id="tab-nav" role="tablist">
+        <button class="tab-btn active" data-panel="summary" role="tab" aria-selected="true">Summary</button>
+        <button class="tab-btn" data-panel="proof" role="tab" aria-selected="false">Proof</button>
+        <button class="tab-btn" data-panel="tests-existing" role="tab" aria-selected="false">Tests: Existing</button>
+        <button class="tab-btn" data-panel="tests-new" role="tab" aria-selected="false">Tests: New</button>
+        <button class="tab-btn" data-panel="friction" role="tab" aria-selected="false">Friction</button>
+        <button class="tab-btn" data-panel="diff" role="tab" aria-selected="false">Diff</button>
+        <button class="tab-btn" data-panel="repo-improvements" role="tab" aria-selected="false">Repo Improvements</button>
+        <button class="tab-btn" data-panel="user-improvements" role="tab" aria-selected="false">User Improvements</button>
+        <div class="tab-nav-actions">
+          <button class="tab-action-btn" id="btn-show-all">Show all</button>
+          <button class="tab-action-btn" id="btn-focus-current">Focus current section</button>
+        </div>
+      </nav>
+    </div>
+
+    <!-- Tab Panels -->
+
+    <!-- Summary: 3-column what changed / proves / not proven -->
+    <section class="tab-panel card" id="panel-summary" role="tabpanel">
+      <div class="three-col">
+        <div class="three-col-item">
+          <h3 class="three-col-heading">What changed in the extension</h3>
+          <ul class="bullet-list" id="summary-what-changed"></ul>
+        </div>
+        <div class="three-col-item">
+          <h3 class="three-col-heading">What the transcript proves</h3>
+          <ul class="bullet-list" id="summary-what-proves"></ul>
+        </div>
+        <div class="three-col-item">
+          <h3 class="three-col-heading">What is still not proven</h3>
+          <ul class="bullet-list" id="summary-not-proven"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Proof: left content + right sidebar artifact inventory -->
+    <section class="tab-panel card" id="panel-proof" role="tabpanel" style="display:none;">
+      <div class="proof-layout">
+        <div class="proof-main">
+          <!-- Screenshots / video artifacts in proof context -->
+          <div id="proof-screenshots-area"></div>
+
+          <!-- Evidence table -->
+          <h3 class="section-subheading">Evidence</h3>
+          <table class="data-table" id="proof-evidence-table">
+            <thead>
+              <tr>
+                <th>Evidence Point</th>
+                <th>Where It Appeared</th>
+                <th>Why It Matters</th>
+              </tr>
+            </thead>
+            <tbody id="proof-evidence-tbody"></tbody>
+          </table>
+
+          <!-- High-signal transcript excerpts -->
+          <h3 class="section-subheading">High-Signal Transcript Excerpts</h3>
+          <ul class="excerpt-list" id="proof-excerpts"></ul>
+        </div>
+        <aside class="proof-sidebar">
+          <h3 class="sidebar-heading">Artifact Inventory</h3>
+          <ul class="artifact-inventory" id="artifact-inventory"></ul>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Tests: Existing -->
+    <section class="tab-panel card" id="panel-tests-existing" role="tabpanel" style="display:none;">
+      <p class="narrative" id="tests-existing-narrative"></p>
+
+      <h3 class="section-subheading">Validation</h3>
+      <table class="data-table" id="tests-existing-table">
+        <thead>
+          <tr>
+            <th>Validation</th>
+            <th>Observed Result</th>
+            <th>Interpretation</th>
+          </tr>
+        </thead>
+        <tbody id="tests-existing-tbody"></tbody>
+      </table>
+
+      <div class="two-col-grid">
+        <div class="two-col-item">
+          <h3 class="two-col-heading covered-heading">What covered well</h3>
+          <ul class="bullet-list" id="tests-covered-well"></ul>
+        </div>
+        <div class="two-col-item">
+          <h3 class="two-col-heading gap-heading">What not covered</h3>
+          <ul class="bullet-list" id="tests-not-covered"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tests: New -->
+    <section class="tab-panel card" id="panel-tests-new" role="tabpanel" style="display:none;">
+      <p class="narrative" id="tests-new-narrative"></p>
+      <ul class="bullet-list" id="tests-new-list"></ul>
+    </section>
+
+    <!-- Friction -->
+    <section class="tab-panel card" id="panel-friction" role="tabpanel" style="display:none;">
+      <table class="data-table" id="friction-table">
+        <thead>
+          <tr>
+            <th>Friction</th>
+            <th>Evidence</th>
+            <th>Type</th>
+            <th>Resolution / Impact</th>
+          </tr>
+        </thead>
+        <tbody id="friction-tbody"></tbody>
+      </table>
+    </section>
+
+    <!-- Diff -->
+    <section class="tab-panel card" id="panel-diff" role="tabpanel" style="display:none;">
+      <div class="diff-artifact-status" id="diff-artifact-status"></div>
+
+      <h3 class="section-subheading">Files Evidenced as Changed</h3>
+      <ul class="files-changed-list" id="diff-files-changed"></ul>
+
+      <h3 class="section-subheading">Change Evidence</h3>
+      <table class="data-table" id="diff-change-table">
+        <thead>
+          <tr>
+            <th>Area</th>
+            <th>Evidence in Transcript</th>
+            <th>Observed Effect</th>
+          </tr>
+        </thead>
+        <tbody id="diff-change-tbody"></tbody>
+      </table>
+
+      <h3 class="section-subheading">Representative Commands</h3>
+      <pre class="code-block" id="diff-commands"></pre>
+    </section>
+
+    <!-- Repo Improvements -->
+    <section class="tab-panel card" id="panel-repo-improvements" role="tabpanel" style="display:none;">
+      <ol class="improvements-list" id="repo-improvements-list"></ol>
+    </section>
+
+    <!-- User Improvements -->
+    <section class="tab-panel card" id="panel-user-improvements" role="tabpanel" style="display:none;">
+      <ol class="improvements-list" id="user-improvements-list"></ol>
+      <div id="prompt-pattern-area" style="display:none;">
+        <h3 class="section-subheading">Prompt pattern that would have reduced friction</h3>
+        <pre class="code-block prompt-pattern" id="prompt-pattern"></pre>
+      </div>
+    </section>
+
+    <!-- Session Artifacts (always visible, below all panels) -->
+    <section class="card" id="session-artifacts">
+      <h2 class="card-title">Session Artifacts</h2>
+      <ul class="session-artifacts-list" id="session-artifacts-list"></ul>
+    </section>
+
+    <!-- Verdict Statement -->
+    <section class="card verdict-statement-card" id="verdict-statement-card" style="display:none;">
+      <p class="verdict-statement" id="verdict-statement"></p>
+    </section>
+
+    <!-- Full Transcript (collapsible) -->
+    <section class="card" id="transcript-section">
+      <details class="collapsible">
+        <summary class="card-title collapsible-trigger">Full Transcript</summary>
+        <div class="transcript-container" id="transcript-container"></div>
+      </details>
+    </section>
+
+    <!-- Round picker (shown only when >1 round) -->
+    <section class="card" id="rounds-section" style="display:none;">
+      <h2 class="card-title">Iteration Rounds</h2>
+      <div class="rounds-nav" id="rounds-nav"></div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <span>Generated by <strong>eval-pack</strong></span>
+    <span id="generated-at"></span>
+  </footer>
+
+  <script src="scripts.js"></script>
+</body>
+</html>
