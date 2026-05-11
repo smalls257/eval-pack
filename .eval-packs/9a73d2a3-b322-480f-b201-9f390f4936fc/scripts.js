@@ -118,7 +118,7 @@ function renderPageHeader(data, round) {
   setText('header-stat-workspace-value', m.lastModel || '—');
   setText('header-stat-messages-value', m.turnCount != null ? m.turnCount : '—');
   setText('header-stat-files-value', m.filesChanged != null ? m.filesChanged : '—');
-  setText('header-stat-tokens-value', formatNumber(m.totalTokens));
+  setText('header-stat-tokens-value', formatNumber((m.inputTokens || 0) + (m.outputTokens || 0)));
   setText('header-stat-branch-value', round.gitBranch || '—');
 
   const genAt = document.getElementById('generated-at');
