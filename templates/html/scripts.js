@@ -98,14 +98,23 @@
     const grid = document.getElementById('screenshot-grid');
     if (screenshots.length === 0) { section.style.display = 'none'; return; }
     section.style.display = '';
-    grid.innerHTML = screenshots.map(s => {
-      const safePath = escapeHtml(s.path);
-      const safeLabel = escapeHtml(s.label || '');
-      return `<div class="screenshot-item" onclick="showModal('${safePath}')">
-        <img src="${safePath}" alt="${safeLabel}" loading="lazy">
-        <div class="screenshot-label">${safeLabel}</div>
-      </div>`;
-    }).join('');
+    grid.innerHTML = '';
+    screenshots.forEach(s => {
+      const item = document.createElement('div');
+      item.className = 'screenshot-item';
+      item.dataset.path = s.path;
+      const img = document.createElement('img');
+      img.src = s.path;
+      img.alt = s.label || '';
+      img.loading = 'lazy';
+      const label = document.createElement('div');
+      label.className = 'screenshot-label';
+      label.textContent = s.label || '';
+      item.appendChild(img);
+      item.appendChild(label);
+      item.addEventListener('click', () => showModal(s.path));
+      grid.appendChild(item);
+    });
   }
 
   // Screenshot modal
@@ -201,11 +210,11 @@
   }
 
   function escapeHtml(str) {
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
   function renderMarkdown(text) {
-    return text
+    return escapeHtml(text)
       .replace(/^### (.+)$/gm, '<h4>$1</h4>')
       .replace(/^## (.+)$/gm, '<h3>$1</h3>')
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')

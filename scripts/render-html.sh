@@ -52,8 +52,8 @@ fi
 # Detect screenshots
 if [[ -d "$PACK_DIR/screenshots" ]] && ls "$PACK_DIR/screenshots/"*.png >/dev/null 2>&1; then
   SCREENSHOTS=$(ls "$PACK_DIR/screenshots/"*.png | while read -r f; do
-    basename=$(basename "$f" .png)
-    label=$(echo "$basename" | tr '-' ' ' | tr '_' ' ')
+    stem=$(basename "$f" .png)
+    label=$(echo "$stem" | tr '-' ' ' | tr '_' ' ')
     printf '{"path":"screenshots/%s","label":"%s"}\n' "$(basename "$f")" "$label"
   done | jq -s '.')
 fi
