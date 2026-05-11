@@ -183,92 +183,42 @@ body {
 
 /* ===== Session Timeline ===== */
 .session-timeline {
-  max-height: 420px;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
+  counter-reset: tl-counter;
 }
 
 .tl-entry {
-  display: grid;
-  grid-template-columns: 56px 52px 1fr;
-  align-items: baseline;
-  gap: 8px;
-  padding: 5px 6px;
-  border-radius: 4px;
-  border-left: 3px solid transparent;
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.tl-entry:hover { background: var(--bg-hover, rgba(255,255,255,0.04)); }
-
-.tl-entry.tl-human,
-.tl-entry.tl-user {
-  border-left-color: #4a90e2;
-}
-
-.tl-entry.tl-assistant {
-  border-left-color: #7c5cbf;
-}
-
-.tl-time {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  text-align: right;
-}
-
-.tl-role {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-  padding: 2px 5px;
-  border-radius: 3px;
-}
-
-.tl-entry.tl-human .tl-role,
-.tl-entry.tl-user .tl-role {
-  color: #4a90e2;
-  background: rgba(74, 144, 226, 0.1);
-}
-
-.tl-entry.tl-assistant .tl-role {
-  color: #9b7fe8;
-  background: rgba(124, 92, 191, 0.1);
-}
-
-.tl-content {
   display: flex;
-  flex-wrap: wrap;
   align-items: baseline;
-  gap: 4px;
-  min-width: 0;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.tl-entry:last-child { border-bottom: none; }
+
+.tl-index {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  margin-top: 1px;
 }
 
 .tl-text {
   color: var(--text);
-  word-break: break-word;
-}
-
-.tl-tools {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-}
-
-.tl-tool {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  background: rgba(0, 112, 243, 0.08);
-  color: var(--accent);
-  border: 1px solid rgba(0, 112, 243, 0.15);
-  border-radius: 3px;
-  padding: 1px 5px;
-  white-space: nowrap;
 }
 
 /* ===== Flags ===== */

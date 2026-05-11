@@ -122,6 +122,13 @@ If enabled, read the transcript, metrics.json, and patterns.json. Write `${PACK_
     {"title": "Short title for improvement", "detail": "Full paragraph explaining the improvement and its impact."}
   ],
   "promptPattern": "Example prompt that would have reduced friction — include file names and context clues that would have front-loaded the right information.",
+  "sessionTimeline": [
+    "User asked to X — brief neutral description of the opening prompt",
+    "Agent and user brainstormed Y — key decisions made",
+    "Agent implemented Z using subagents",
+    "Code review caught issues, fixes applied",
+    "Session concluded with outcome"
+  ],
   "sessionArtifacts": [
     {"name": "artifact name", "path": "relative/path/in/pack", "description": "what this artifact contains"}
   ],

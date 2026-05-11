@@ -151,63 +151,20 @@ function renderStats(round) {
   ).join('');
 }
 
-function formatTime(ts) {
-  try {
-    const d = new Date(ts);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } catch (_) { return ''; }
-}
-
-function renderTimeline(transcript) {
+function renderTimeline(analysis) {
   const container = document.getElementById('session-timeline');
   if (!container) return;
-  if (!transcript || transcript.length === 0) {
-    container.innerHTML = '<p class="empty-state">No transcript available.</p>';
+  const events = (analysis || {}).sessionTimeline || [];
+  if (events.length === 0) {
+    container.innerHTML = '<p class="empty-state">No timeline recorded.</p>';
     return;
   }
-
-  const rows = [];
-  for (const entry of transcript) {
-    const role = entry.type || 'unknown';
-    if (role !== 'human' && role !== 'user' && role !== 'assistant') continue;
-
-    const msg = entry.message || {};
-    const ts = entry.timestamp ? formatTime(entry.timestamp) : '';
-    let toolsHtml = '';
-    let textHtml = '';
-
-    if (role === 'assistant') {
-      const blocks = Array.isArray(msg.content) ? msg.content : [];
-      const tools = blocks.filter(b => b.type === 'tool_use').map(b => b.name);
-      const textParts = blocks.filter(b => b.type === 'text').map(b => b.text || '').join(' ').trim();
-      const truncated = textParts.length > 100 ? textParts.slice(0, 100) + '\u2026' : textParts;
-
-      if (tools.length > 0) {
-        toolsHtml = `<span class="tl-tools">${tools.map(t => `<code class="tl-tool">${escapeHtml(t)}</code>`).join('')}</span>`;
-      }
-      if (truncated) {
-        textHtml = `<span class="tl-text">${escapeHtml(truncated)}</span>`;
-      }
-    } else {
-      const raw = typeof entry.content === 'string' ? entry.content
-        : typeof msg.content === 'string' ? msg.content
-        : Array.isArray(msg.content) ? msg.content.filter(b => b.type === 'text').map(b => b.text || '').join(' ')
-        : '';
-      const truncated = raw.trim().length > 120 ? raw.trim().slice(0, 120) + '\u2026' : raw.trim();
-      if (truncated) textHtml = `<span class="tl-text">${escapeHtml(truncated)}</span>`;
-    }
-
-    if (!toolsHtml && !textHtml) continue;
-
-    const roleLabel = (role === 'human' || role === 'user') ? 'user' : 'asst';
-    rows.push(`<div class="tl-entry tl-${escapeHtml(role)}">
-      <span class="tl-time">${escapeHtml(ts)}</span>
-      <span class="tl-role">${roleLabel}</span>
-      <div class="tl-content">${toolsHtml}${textHtml}</div>
-    </div>`);
-  }
-
-  container.innerHTML = rows.length > 0 ? rows.join('') : '<p class="empty-state">No events to display.</p>';
+  container.innerHTML = events.map((event, i) =>
+    `<div class="tl-entry">
+      <span class="tl-index">${i + 1}</span>
+      <span class="tl-text">${escapeHtml(event)}</span>
+    </div>`
+  ).join('');
 }
 
 function renderScreenshots(screenshots) {
@@ -668,7 +625,7 @@ function renderRound(data, round) {
   renderPromptPattern(analysis);
   renderSessionArtifacts(analysis);
   renderVerdictStatement(analysis);
-  renderTimeline(data.transcript);
+  renderTimeline(analysis);
 }
 
 function init(data) {

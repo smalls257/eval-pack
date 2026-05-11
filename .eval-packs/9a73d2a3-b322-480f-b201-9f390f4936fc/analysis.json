@@ -172,6 +172,15 @@
     }
   ],
   "promptPattern": "Redesign [component] to match [reference design]. Current schema: [existing schema]. New schema: [new schema with field names]. Expected output: [describe exact field names and shapes]. Note: renderer and schema must use identical field names.",
+  "sessionTimeline": [
+    "User asked for a complete HTML redesign of the eval-pack report — 8-tab structured layout replacing a flat metrics dump",
+    "writing-plans skill generated a 5-task implementation plan covering HTML, CSS, JS, schema changes, and script fixes",
+    "Subagent-driven development executed all 5 tasks with fresh implementer subagents per task",
+    "Spec compliance review caught 10 schema field name mismatches between analysis.json and the JS renderer — all silent empty states",
+    "Code quality review caught 3 CSS class name mismatches (verdict banner, flag chips, diff badges) and 3 XSS vectors",
+    "All fixes applied; E2E test suite and Playwright browser verification confirmed zero JS errors and all 8 tabs switching correctly",
+    "Session concluded with a fully functional v2 report; remaining gap is that no real v2-schema session had been generated yet to populate all panels with live data"
+  ],
   "sessionArtifacts": [
     {"name": "Transcript", "path": "transcript.jsonl", "description": "418-turn session JSONL"},
     {"name": "Metrics", "path": "metrics.json", "description": "Token counts, turn count, git stats"},
