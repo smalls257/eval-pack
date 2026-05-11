@@ -59,17 +59,67 @@ Identify and run appropriate tests for the changes made in this session:
 
 Check if analysis is enabled (plugin config `analysis` option, default true).
 
-If enabled, read the transcript, metrics.json, and patterns.json. Write `${PACK_DIR}/analysis.json` with three sections:
+If enabled, read the transcript, metrics.json, and patterns.json. Write `${PACK_DIR}/analysis.json` with this schema:
 
 ```json
 {
-  "retrospective": "What went well, what was slow, where time was wasted in this session.",
-  "friction": "What repository characteristics slowed things down — missing types, unclear structure, no test harness, poor naming, missing docs.",
-  "promptQuality": "Was the initial context sufficient? What information, if front-loaded by the developer, would have made this session faster?"
+  "title": "Short task description for page heading (1 sentence, no period)",
+  "highlights": {
+    "completionStatus": { "label": "Completion below", "color": "green", "notes": "One sentence on what was achieved" },
+    "bestProof": { "badges": ["Screenshots", "Passing"], "note": "One sentence on strongest evidence type" },
+    "strongestEvidence": "One sentence naming the single most convincing proof point",
+    "mainRisk": "One sentence on the biggest remaining uncertainty or gap"
+  },
+  "summary": {
+    "whatChanged": ["bullet: what changed in the extension/codebase", "..."],
+    "whatTranscriptProves": ["point: what the session transcript directly demonstrates", "..."],
+    "whatStillNotProven": ["gap: what was not verified or remains uncertain", "..."]
+  },
+  "proof": {
+    "artifactInventory": [
+      {"name": "Transcript", "path": "transcript.jsonl", "type": "transcript", "description": "Primary source for commands, failures, and outputs"}
+    ],
+    "evidenceTable": [
+      {"point": "evidence point", "where": "transcript line / command / file", "whyItMatters": "why this evidence is significant"}
+    ],
+    "transcriptExcerpts": ["verbatim or paraphrased high-signal line from transcript", "..."]
+  },
+  "testsExisting": {
+    "narrative": "Paragraph describing what existing tests cover and what was validated.",
+    "validationTable": [
+      {"validation": "command or test name", "observedResult": "what happened", "interpretation": "what this means"}
+    ],
+    "coveredWell": ["area covered by existing tests", "..."],
+    "notCovered": ["gap in test coverage", "..."]
+  },
+  "testsNew": {
+    "narrative": "Paragraph describing any new tests added.",
+    "newTests": ["test name or description", "..."]
+  },
+  "frictionLog": [
+    {"friction": "what slowed things down", "evidence": "specific transcript moment or pattern", "type": "tooling|structure|naming|docs|other", "resolution": "how it was resolved or what the impact was"}
+  ],
+  "diff": {
+    "artifactStatus": { "hasDiffStat": false, "hasDiffPatch": false, "note": "Why diff artifacts are absent or what they show" },
+    "filesChanged": [{"file": "path/to/file", "description": "what changed and why"}],
+    "changeTable": [{"area": "logical area changed", "evidenceInTranscript": "command or message proving this", "observedEffect": "what the change does"}],
+    "representativeCommands": ["git commit -m ...", "npm test", "..."]
+  },
+  "repoImprovements": [
+    {"title": "Short title for improvement", "detail": "Full paragraph explaining the improvement and its impact."}
+  ],
+  "userImprovements": [
+    {"title": "Short title for improvement", "detail": "Full paragraph explaining the improvement and its impact."}
+  ],
+  "promptPattern": "Example prompt that would have reduced friction — include file names and context clues that would have front-loaded the right information.",
+  "sessionArtifacts": [
+    {"name": "artifact name", "path": "relative/path/in/pack", "description": "what this artifact contains"}
+  ],
+  "verdictStatement": "Closing italic sentence summarizing the session outcome and its trustworthiness as evidence."
 }
 ```
 
-Be specific and actionable. Reference actual files, patterns, and moments from the transcript. This analysis is for the developer and their reviewer — not generic advice.
+Be specific and actionable. Reference actual files, patterns, and moments from the transcript. Do not include empty arrays or null fields — omit sections for which there is no data.
 
 ## Step 5: Render HTML
 
