@@ -2,15 +2,15 @@
   "toolCalls": [
     {
       "name": "Bash",
-      "count": 161
+      "count": 170
     },
     {
       "name": "Edit",
-      "count": 69
+      "count": 73
     },
     {
       "name": "Read",
-      "count": 58
+      "count": 59
     },
     {
       "name": "Agent",
@@ -69,7 +69,7 @@
       "count": 1
     }
   ],
-  "totalToolCalls": 501,
+  "totalToolCalls": 515,
   "subagents": [
     {
       "description": "Research Claude Code plugin structure",

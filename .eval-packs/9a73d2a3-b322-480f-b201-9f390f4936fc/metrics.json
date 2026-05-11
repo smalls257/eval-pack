@@ -1,27 +1,26 @@
 {
   "lastModel": "claude-sonnet-4-6",
-  "inputTokens": 1280,
-  "outputTokens": 530715,
-  "totalTokens": 81418238,
-  "turnCount": 1413,
+  "inputTokens": 1317,
+  "outputTokens": 544246,
+  "totalTokens": 83072459,
+  "turnCount": 1452,
   "firstTimestamp": "2026-05-11T02:12:34.361Z",
-  "lastTimestamp": "2026-05-11T16:18:39.744Z",
-  "filesChanged": 8,
-  "insertions": 29079,
-  "deletions": 26523,
+  "lastTimestamp": "2026-05-11T16:22:55.599Z",
+  "filesChanged": 7,
+  "insertions": 29997,
+  "deletions": 27227,
   "changedFilesList": [
     ".eval-packs/9a73d2a3-b322-480f-b201-9f390f4936fc/data.json",
+    ".eval-packs/9a73d2a3-b322-480f-b201-9f390f4936fc/metrics.json",
     ".eval-packs/9a73d2a3-b322-480f-b201-9f390f4936fc/scripts.js",
-    ".eval-packs/9a73d2a3-b322-480f-b201-9f390f4936fc/styles.css",
     ".eval-packs/9a73d2a3-b322-480f-b201-9f390f4936fc/tools.json",
     ".eval-packs/9a73d2a3-b322-480f-b201-9f390f4936fc/transcript.jsonl",
     "scripts/extract-metrics.sh",
-    "templates/html/scripts.js",
-    "templates/html/styles.css"
+    "templates/html/scripts.js"
   ],
-  "cacheReadTokens": 78493808,
-  "cacheWriteTokens": 2392435,
-  "subagentTotalTokens": 2995469,
+  "cacheReadTokens": 80119170,
+  "cacheWriteTokens": 2407726,
+  "subagentTotalTokens": 3676667,
   "tokensByModel": [
     {
       "model": "claude-opus-4-6",
@@ -30,8 +29,30 @@
     },
     {
       "model": "claude-sonnet-4-6",
-      "inputTokens": 1076,
-      "outputTokens": 487482
+      "inputTokens": 1113,
+      "outputTokens": 501013
+    }
+  ],
+  "subagentTokensByModel": [
+    {
+      "model": "claude-code-guide",
+      "totalTokens": 70966
+    },
+    {
+      "model": "haiku",
+      "totalTokens": 815705
+    },
+    {
+      "model": "sonnet",
+      "totalTokens": 461153
+    },
+    {
+      "model": "superpowers:code-reviewer",
+      "totalTokens": 502145
+    },
+    {
+      "model": "unknown",
+      "totalTokens": 327612
     }
   ]
 }

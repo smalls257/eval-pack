@@ -28,6 +28,55 @@ LAST_TS=$(jq -s '[.[] | .timestamp // empty] | last // null' "$TRANSCRIPT_FILE")
 # Sum total_tokens from subagent <usage> tags embedded in tool_result content
 SUBAGENT_TOTAL_TOKENS=$({ grep -o 'total_tokens: [0-9]*' "$TRANSCRIPT_FILE" 2>/dev/null || true; } | awk -F': ' '{sum += $2} END {print sum+0}')
 
+# Per-model subagent token breakdown via tool_use_id correlation
+SUBAGENT_TOKENS_BY_MODEL=$(python3 - "$TRANSCRIPT_FILE" <<'PYEOF'
+import json, re, sys
+from collections import defaultdict
+
+with open(sys.argv[1]) as f:
+    lines = f.readlines()
+
+# Map tool_use_id -> model (short name or subagent_type fallback)
+tool_model = {}
+for line in lines:
+    try:
+        obj = json.loads(line)
+        content = obj.get('message', {}).get('content', obj.get('content', []))
+        if not isinstance(content, list): continue
+        for block in content:
+            if isinstance(block, dict) and block.get('type') == 'tool_use' and block.get('name') == 'Agent':
+                tid = block.get('id')
+                inp = block.get('input', {})
+                model = inp.get('model') or inp.get('subagent_type') or 'unknown'
+                if tid:
+                    tool_model[tid] = model
+    except Exception:
+        pass
+
+model_tokens = defaultdict(int)
+for line in lines:
+    try:
+        obj = json.loads(line)
+        content = obj.get('message', {}).get('content', obj.get('content', []))
+        if not isinstance(content, list): continue
+        for block in content:
+            if isinstance(block, dict) and block.get('type') == 'tool_result':
+                tid = block.get('tool_use_id', '')
+                model = tool_model.get(tid, 'unknown')
+                inner = block.get('content', '')
+                if isinstance(inner, list):
+                    inner = ' '.join(b.get('text', '') for b in inner if isinstance(b, dict))
+                m = re.search(r'total_tokens: (\d+)', str(inner))
+                if m:
+                    model_tokens[model] += int(m.group(1))
+    except Exception:
+        pass
+
+result = [{'model': k, 'totalTokens': v} for k, v in sorted(model_tokens.items())]
+print(json.dumps(result))
+PYEOF
+)
+
 DIFF_STAT=""
 if git rev-parse HEAD~1 >/dev/null 2>&1; then
   DIFF_STAT=$(git diff --stat HEAD~1 2>/dev/null || echo "")
@@ -56,6 +105,7 @@ jq -n \
   --argjson cache_write_tokens "$CACHE_WRITE_TOKENS" \
   --argjson subagent_total_tokens "$SUBAGENT_TOTAL_TOKENS" \
   --argjson token_by_model "$TOKEN_BY_MODEL" \
+  --argjson subagent_tokens_by_model "$SUBAGENT_TOKENS_BY_MODEL" \
   '{
     lastModel: $model,
     inputTokens: $input_tokens,
@@ -71,7 +121,8 @@ jq -n \
     cacheReadTokens:  $cache_read_tokens,
     cacheWriteTokens: $cache_write_tokens,
     subagentTotalTokens: $subagent_total_tokens,
-    tokensByModel: $token_by_model
+    tokensByModel: $token_by_model,
+    subagentTokensByModel: $subagent_tokens_by_model
   }' > "$OUTPUT_DIR/metrics.json"
 
 echo "Metrics written to $OUTPUT_DIR/metrics.json"

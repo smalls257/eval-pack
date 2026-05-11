@@ -224,20 +224,29 @@ function renderStats(round) {
         { label: 'Controller input',  value: formatNumber(m.inputTokens) },
         { label: 'Controller output', value: formatNumber(m.outputTokens) },
       ];
-  tokenItems.push({ label: 'Subagent tokens (total)', value: formatNumber(m.subagentTotalTokens) });
+  const subagentTokensByModel = Array.isArray(m.subagentTokensByModel) ? m.subagentTokensByModel : [];
+  const subagentItems = subagentTokensByModel.length > 0
+    ? subagentTokensByModel.map(r => ({ label: shortModelName(r.model), value: formatNumber(r.totalTokens) }))
+    : [{ label: 'Total', value: formatNumber(m.subagentTotalTokens) }];
 
-  const costItems = tokensByModel.length > 0
+  const ctrlCostItems = tokensByModel.length > 0
     ? tokensByModel.map(r => ({
         label: shortModelName(r.model),
         value: formatCost(estimateCost(r.model, r.inputTokens, r.outputTokens))
       }))
     : [{ label: 'Controller', value: formatCost(ctrlCost) }];
-  costItems.push({ label: 'Subagents ~', value: formatCost(agentCost) });
-  costItems.push({ label: 'Total *',     value: formatCost(totalCost) });
+  const subagentCostItems = subagentTokensByModel.length > 0
+    ? subagentTokensByModel.map(r => ({
+        label: shortModelName(r.model) + ' ~',
+        value: formatCost(estimateSubagentCost(r.model, r.totalTokens))
+      }))
+    : [{ label: 'Subagents ~', value: formatCost(agentCost) }];
+  const costItems = [...ctrlCostItems, ...subagentCostItems, { label: 'Total *', value: formatCost(totalCost) }];
 
   const groups = [
-    { heading: 'Tokens',  items: tokenItems },
-    { heading: 'Cost',    items: costItems },
+    { heading: 'Controller tokens', items: tokenItems },
+    { heading: 'Subagent tokens',   items: subagentItems },
+    { heading: 'Cost',              items: costItems },
     {
       heading: 'Session',
       items: [
