@@ -7,15 +7,7 @@ tags: ["setup", "config"]
 
 Bootstrap the current repository to use eval-pack. Follow these steps:
 
-## Step 1: Add Submodule
-
-If eval-pack is not already a submodule in this repo:
-
-```bash
-git submodule add https://github.com/smalls257/eval-pack .claude/plugins/eval-pack
-```
-
-## Step 2: Register Plugin
+## Step 1: Register Plugin
 
 Check if `.claude/settings.json` exists. If it does, merge into it. If not, create it.
 
@@ -24,7 +16,12 @@ Add this configuration (preserve any existing content):
 ```json
 {
   "extraKnownMarketplaces": {
-    "eval-pack": "./.claude/plugins/eval-pack"
+    "eval-pack": {
+      "source": {
+        "source": "github",
+        "repo": "smalls257/eval-pack"
+      }
+    }
   },
   "enabledPlugins": {
     "eval-pack@eval-pack": true
@@ -32,14 +29,14 @@ Add this configuration (preserve any existing content):
 }
 ```
 
-## Step 3: Copy GitHub Action
+## Step 2: Copy GitHub Action
 
 ```bash
 mkdir -p .github/workflows
 cp "${CLAUDE_PLUGIN_ROOT}/templates/workflows/eval-pack-pages.yml" .github/workflows/eval-pack-pages.yml
 ```
 
-## Step 4: Update .gitignore
+## Step 3: Update .gitignore
 
 Add to the project's `.gitignore` (create if missing):
 
@@ -48,7 +45,7 @@ Add to the project's `.gitignore` (create if missing):
 .eval-packs/
 ```
 
-## Step 5: Setup GitHub Pages
+## Step 4: Setup GitHub Pages
 
 If the `gh` CLI is available and authenticated:
 
@@ -58,10 +55,10 @@ gh api repos/{owner}/{repo}/pages -X POST -f source='{"branch":"gh-pages","path"
 
 If this fails, tell the user to enable GitHub Pages manually on the `gh-pages` branch.
 
-## Step 6: Report
+## Step 5: Report
 
 Tell the user:
 - What was set up
-- Remind them to commit `.claude/settings.json`, `.gitmodules`, and `.github/workflows/eval-pack-pages.yml`
-- Devs need to run `git submodule update --init` after cloning
+- Remind them to commit `.claude/settings.json` and `.github/workflows/eval-pack-pages.yml`
+- Any dev who clones the repo gets eval-pack auto-installed by Claude Code — no extra steps
 - They can now use `/eval-pack:generate` and `/eval-pack:review`

@@ -24,22 +24,17 @@ A Claude Code plugin that generates eval packs — polished HTML reports capturi
 
 ## Install
 
-**Option A — Git submodule (pinned version):**
-
-```bash
-git submodule add https://github.com/smalls257/eval-pack .claude/plugins/eval-pack
-```
-
-**Option B — Always latest from GitHub (no submodule):**
-
-Skip the submodule step entirely — Claude Code will pull from GitHub automatically.
-
-**Add to `.claude/settings.json`** (create if it doesn't exist):
+Add to your project's `.claude/settings.json` (create if it doesn't exist):
 
 ```json
 {
   "extraKnownMarketplaces": {
-    "eval-pack": "./.claude/plugins/eval-pack"
+    "eval-pack": {
+      "source": {
+        "source": "github",
+        "repo": "smalls257/eval-pack"
+      }
+    }
   },
   "enabledPlugins": {
     "eval-pack@eval-pack": true
@@ -47,18 +42,12 @@ Skip the submodule step entirely — Claude Code will pull from GitHub automatic
 }
 ```
 
-> For Option B (no submodule), use `{ "source": "github", "repo": "smalls257/eval-pack" }` as the marketplace value instead of the path string.
+Commit `.claude/settings.json`. Any dev who clones the repo gets eval-pack auto-installed by Claude Code on first open — no submodules, no manual steps.
 
-**Run the setup skill** to wire up the GitHub Action, gitignore, and Pages config:
+Then run the setup skill to wire up the GitHub Action, gitignore, and Pages config:
 
 ```
 /eval-pack:setup
-```
-
-After cloning a repo with eval-pack already installed, devs run:
-
-```bash
-git submodule update --init
 ```
 
 ## Usage
