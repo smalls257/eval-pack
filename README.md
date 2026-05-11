@@ -24,21 +24,37 @@ A Claude Code plugin that generates eval packs — polished HTML reports capturi
 
 ## Install
 
-Add as a git submodule to your project:
+**1. Add as a git submodule:**
 
 ```bash
-git submodule add <this-repo-url> .claude/plugins/eval-pack
+git submodule add https://github.com/smalls257/eval-pack .claude/plugins/eval-pack
 ```
 
-Then run the setup skill:
+**2. Register the plugin in `.claude/settings.json`:**
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "eval-pack": {
+      "source": {
+        "source": "local",
+        "path": "./.claude/plugins/eval-pack"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "eval-pack@eval-pack": true
+  }
+}
+```
+
+**3. Run the setup skill** to finish wiring up the GitHub Action, gitignore, and Pages config:
 
 ```
 /eval-pack:setup
 ```
 
-This copies the GitHub Action, adds config to `.claude/settings.json`, and sets up `.gitignore`.
-
-After cloning a repo with eval-pack, devs run:
+After cloning a repo with eval-pack already installed, devs run:
 
 ```bash
 git submodule update --init

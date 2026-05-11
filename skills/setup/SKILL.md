@@ -24,7 +24,17 @@ Add this configuration (preserve any existing content):
 
 ```json
 {
-  "plugins": [".claude/plugins/eval-pack"],
+  "extraKnownMarketplaces": {
+    "eval-pack": {
+      "source": {
+        "source": "local",
+        "path": "./.claude/plugins/eval-pack"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "eval-pack@eval-pack": true
+  },
   "pluginConfigs": {
     "eval-pack": {
       "options": {
