@@ -2,15 +2,25 @@
 
 A Claude Code plugin that generates eval packs — polished HTML reports capturing how AI-assisted code was produced. Designed for PR review workflows where reviewers need visibility into agent behavior, not just the diff.
 
+## Screenshots
+
+![Eval Pack — header, completion status, verdict, and session metrics](docs/screenshots/hero.png)
+
+![Session metrics — per-model token breakdown, cost, and session stats](docs/screenshots/metrics.png)
+
+![Tools tab — tool usage bar chart and subagents dispatched](docs/screenshots/tools.png)
+
 ## What's in an Eval Pack?
 
 - **Verdict banner** — pass/fail based on agent-driven test results
 - **Visual evidence** — screenshots from Playwright or browser verification
-- **Session stats** — model, tokens, turns, duration, files changed
-- **Phase timeline** — where time was spent (understanding → planning → implementation → testing → fixing)
+- **Session metrics** — per-model token breakdown (controller + subagents), API cost estimate, turns, files changed
+- **Session timeline** — human-readable narrative of what happened during the session
 - **Heuristic flags** — false completions, retries, scope drift, test failures
 - **Claude analysis** — retrospective, repo friction report, prompt quality assessment
+- **Tools tab** — tool usage bar chart, subagents dispatched with model tags, skills leveraged
 - **Full transcript** — collapsible conversation history with syntax highlighting
+- **Iteration rounds** — compare multiple runs side by side
 
 ## Install
 
