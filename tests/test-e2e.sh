@@ -18,13 +18,14 @@ echo ""
 mkdir -p "$TEST_DIR/$SESSION_ID"
 cat > "$TEST_DIR/transcript.jsonl" << 'JSONL'
 {"type":"human","timestamp":"2026-05-10T10:00:00Z","content":"Fix the auth bug in login.ts"}
-{"type":"assistant","timestamp":"2026-05-10T10:01:00Z","model":"claude-opus-4-6","usage":{"input_tokens":1200,"output_tokens":800},"content":"I'll look at the auth bug. Let me read login.ts first."}
-{"type":"human","timestamp":"2026-05-10T10:03:00Z","content":"The token expiry check is wrong"}
-{"type":"assistant","timestamp":"2026-05-10T10:04:00Z","model":"claude-opus-4-6","usage":{"input_tokens":1500,"output_tokens":1000},"content":"Found it. The comparison uses < instead of <=. Let me fix that and run the tests."}
-{"type":"assistant","timestamp":"2026-05-10T10:06:00Z","model":"claude-opus-4-6","usage":{"input_tokens":800,"output_tokens":600},"content":"Done. All tests pass now."}
+{"type":"assistant","timestamp":"2026-05-10T10:01:00Z","message":{"model":"claude-opus-4-6","usage":{"input_tokens":1200,"output_tokens":800},"content":[{"type":"tool_use","name":"Read","id":"t1","input":{"file_path":"login.ts"}},{"type":"text","text":"Let me read login.ts first."}]}}
+{"type":"user","timestamp":"2026-05-10T10:02:00Z","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"export function checkExpiry(ts) { return ts < Date.now(); }"}]}}
+{"type":"assistant","timestamp":"2026-05-10T10:03:00Z","message":{"model":"claude-opus-4-6","usage":{"input_tokens":1500,"output_tokens":1000},"content":[{"type":"tool_use","name":"Bash","id":"t2","input":{"command":"npm test"}},{"type":"text","text":"Running tests."}]}}
+{"type":"user","timestamp":"2026-05-10T10:04:00Z","message":{"content":[{"type":"tool_result","tool_use_id":"t2","content":"PASS auth.test.ts"}]}}
+{"type":"assistant","timestamp":"2026-05-10T10:06:00Z","message":{"model":"claude-opus-4-6","usage":{"input_tokens":800,"output_tokens":600},"content":[{"type":"text","text":"Done. All tests pass now."}]}}
 {"type":"human","timestamp":"2026-05-10T10:07:00Z","content":"Actually the test for edge case is still failing"}
-{"type":"assistant","timestamp":"2026-05-10T10:08:00Z","model":"claude-opus-4-6","usage":{"input_tokens":900,"output_tokens":700},"content":"Let me try again with the edge case. I see the issue — the boundary condition at midnight."}
-{"type":"assistant","timestamp":"2026-05-10T10:10:00Z","model":"claude-opus-4-6","usage":{"input_tokens":600,"output_tokens":500},"content":"Fixed. All tests pass including the midnight edge case."}
+{"type":"assistant","timestamp":"2026-05-10T10:08:00Z","message":{"model":"claude-opus-4-6","usage":{"input_tokens":900,"output_tokens":700},"content":[{"type":"text","text":"Let me try again with the edge case. I see the issue — the boundary condition at midnight."}]}}
+{"type":"assistant","timestamp":"2026-05-10T10:10:00Z","message":{"model":"claude-opus-4-6","usage":{"input_tokens":600,"output_tokens":500},"content":[{"type":"text","text":"Fixed. All tests pass including the midnight edge case."}]}}
 JSONL
 
 # Step 1: Extract metrics
@@ -68,6 +69,32 @@ echo "  Flags: $FLAGS"
 
 if [[ "$FALSE_COMP" -lt 1 ]]; then
   echo "FAIL: should detect false completion (agent said 'Done' then user corrected)" >&2
+  exit 1
+fi
+echo "  PASS"
+
+# Step 2.5: Extract tool usage
+echo ""
+echo "--- Step 2.5: Extract tool usage ---"
+"$PLUGIN_ROOT/scripts/extract-tools.sh" "$TEST_DIR/transcript.jsonl" "$TEST_DIR/$SESSION_ID"
+
+if [[ ! -f "$TEST_DIR/$SESSION_ID/tools.json" ]]; then
+  echo "FAIL: tools.json not created" >&2
+  exit 1
+fi
+
+TOOL_COUNT=$(jq '.toolCalls | length' "$TEST_DIR/$SESSION_ID/tools.json")
+TOTAL_CALLS=$(jq '.totalToolCalls' "$TEST_DIR/$SESSION_ID/tools.json")
+echo "  Distinct tools: $TOOL_COUNT"
+echo "  Total tool calls: $TOTAL_CALLS"
+
+if [[ "$TOOL_COUNT" -lt 1 ]]; then
+  echo "FAIL: should have at least 1 distinct tool" >&2
+  exit 1
+fi
+
+if [[ "$TOTAL_CALLS" -lt 1 ]]; then
+  echo "FAIL: totalToolCalls should be > 0" >&2
   exit 1
 fi
 echo "  PASS"
