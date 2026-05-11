@@ -788,6 +788,93 @@ details[open] .collapsible-trigger::before { content: '▾ '; }
   gap: 16px;
 }
 
+/* ===== Tools Panel ===== */
+.tool-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.tool-bar-name {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  min-width: 150px;
+  color: var(--text);
+}
+.tool-bar-track {
+  flex: 1;
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.tool-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+.tool-bar-count {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  min-width: 32px;
+  text-align: right;
+}
+.subagent-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  background: var(--bg-card);
+}
+.subagent-desc {
+  font-size: 14px;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.subagent-meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.subagent-badge {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  background: rgba(0, 112, 243, 0.1);
+  color: var(--accent);
+  border: 1px solid rgba(0, 112, 243, 0.2);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+.tools-skills-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.tools-skills-list li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.tools-skills-list li:last-child { border-bottom: none; }
+.skill-name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--bg-code);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.skill-args {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 900px) {
   .proof-layout { grid-template-columns: 1fr; }
