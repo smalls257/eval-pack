@@ -2,15 +2,15 @@
   "toolCalls": [
     {
       "name": "Bash",
-      "count": 91
-    },
-    {
-      "name": "TaskUpdate",
-      "count": 56
+      "count": 92
     },
     {
       "name": "Agent",
-      "count": 53
+      "count": 57
+    },
+    {
+      "name": "TaskUpdate",
+      "count": 57
     },
     {
       "name": "Read",
@@ -65,7 +65,7 @@
       "count": 1
     }
   ],
-  "totalToolCalls": 336,
+  "totalToolCalls": 342,
   "subagents": [
     {
       "description": "Research Claude Code plugin structure",
@@ -331,6 +331,26 @@
       "description": "Task 4: scripts.js renderTools + e2e + visual verify + push",
       "model": "default",
       "subagentType": "general-purpose"
+    },
+    {
+      "description": "Spec compliance review — Task 4: scripts.js renderTools",
+      "model": "default",
+      "subagentType": "superpowers:code-reviewer"
+    },
+    {
+      "description": "Code quality review — Task 4: scripts.js renderTools",
+      "model": "default",
+      "subagentType": "superpowers:code-reviewer"
+    },
+    {
+      "description": "Fix renderTools issues: escapeHtml count, null guard, empty badge",
+      "model": "default",
+      "subagentType": "general-purpose"
+    },
+    {
+      "description": "Re-review Task 4 fixes",
+      "model": "default",
+      "subagentType": "superpowers:code-reviewer"
     }
   ],
   "skills": [
