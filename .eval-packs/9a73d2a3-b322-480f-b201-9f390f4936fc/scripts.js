@@ -24,24 +24,29 @@ const COST_RATES_DATE = '2026-05-11';
 
 function modelRates(model) {
   const m = (model || '').toLowerCase();
-  if (m.includes('opus'))       return { inRate: 15,   outRate: 75  };
-  if (m.includes('haiku'))      return { inRate: 0.80, outRate: 4   };
-  return                               { inRate: 3,    outRate: 15  }; // sonnet default
+  // Rates per million tokens: [input, cacheWrite, cacheRead, output]
+  if (m.includes('opus'))  return { inRate: 15,   cacheWrite: 18.75, cacheRead: 1.50, outRate: 75  };
+  if (m.includes('haiku')) return { inRate: 0.80, cacheWrite: 1.00,  cacheRead: 0.08, outRate: 4   };
+  return                          { inRate: 3,    cacheWrite: 3.75,  cacheRead: 0.30, outRate: 15  }; // sonnet
 }
 
-function estimateCost(model, inputTokens, outputTokens) {
-  const { inRate, outRate } = modelRates(model);
-  const cost = ((inputTokens || 0) * inRate + (outputTokens || 0) * outRate) / 1_000_000;
-  if (cost <= 0) return null;
-  return cost;
+function estimateCost(model, inputTokens, cacheWriteTokens, cacheReadTokens, outputTokens) {
+  const r = modelRates(model);
+  const cost = (
+    (inputTokens      || 0) * r.inRate     +
+    (cacheWriteTokens || 0) * r.cacheWrite +
+    (cacheReadTokens  || 0) * r.cacheRead  +
+    (outputTokens     || 0) * r.outRate
+  ) / 1_000_000;
+  return cost > 0 ? cost : null;
 }
 
-// Subagent usage tags only have total_tokens (no input/output split).
-// Assume 80% input / 20% output — typical for agent sessions reading large contexts.
+// Subagent usage tags only report total_tokens with no cache breakdown.
+// Assume 90% input / 10% output — agentic workloads are input-heavy.
 function estimateSubagentCost(model, totalTokens) {
   if (!totalTokens) return null;
-  const { inRate, outRate } = modelRates(model);
-  const blended = inRate * 0.8 + outRate * 0.2;
+  const r = modelRates(model);
+  const blended = r.inRate * 0.9 + r.outRate * 0.1;
   return (totalTokens * blended) / 1_000_000;
 }
 
@@ -198,7 +203,7 @@ function renderStats(round) {
   const m = round.metrics || {};
   const statsRow = document.getElementById('stats-row');
   if (!statsRow) return;
-  const ctrlCost = estimateCost(m.lastModel, m.inputTokens, m.outputTokens);
+  const ctrlCost = estimateCost(m.lastModel, m.inputTokens, m.cacheWriteTokens, m.cacheReadTokens, m.outputTokens);
   const agentCost = estimateSubagentCost(m.lastModel, m.subagentTotalTokens);
   const totalCost = (ctrlCost != null || agentCost != null)
     ? (ctrlCost || 0) + (agentCost || 0) : null;
@@ -227,7 +232,7 @@ function renderStats(round) {
       note.className = 'cost-note';
       card.appendChild(note);
     }
-    note.textContent = `* Claude API rates as of ${COST_RATES_DATE}. Subagent cost estimated from <usage> tags in tool results using 80/20 input/output split — actual split may vary.`;
+    note.textContent = `* Claude API rates as of ${COST_RATES_DATE}. Controller cost includes prompt cache read/write charges — online estimators typically exclude these, so actual spend will be higher than naive estimates. Subagent cost from <usage> tags assumes 90/10 input/output split (no cache breakdown available).`;
   }
 }
 

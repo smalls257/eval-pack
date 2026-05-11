@@ -17,7 +17,9 @@ MODEL=$(jq -rs '[.[] | select(.type == "assistant") | (.message.model // .model)
 
 INPUT_TOKENS=$(jq -s '[.[] | select(.type == "assistant") | ((.message.usage // .usage).input_tokens // 0)] | add // 0' "$TRANSCRIPT_FILE")
 OUTPUT_TOKENS=$(jq -s '[.[] | select(.type == "assistant") | ((.message.usage // .usage).output_tokens // 0)] | add // 0' "$TRANSCRIPT_FILE")
-TOTAL_TOKENS=$((INPUT_TOKENS + OUTPUT_TOKENS))
+CACHE_READ_TOKENS=$(jq -s '[.[] | select(.type == "assistant") | ((.message.usage // .usage).cache_read_input_tokens // 0)] | add // 0' "$TRANSCRIPT_FILE")
+CACHE_WRITE_TOKENS=$(jq -s '[.[] | select(.type == "assistant") | ((.message.usage // .usage).cache_creation_input_tokens // 0)] | add // 0' "$TRANSCRIPT_FILE")
+TOTAL_TOKENS=$((INPUT_TOKENS + OUTPUT_TOKENS + CACHE_READ_TOKENS + CACHE_WRITE_TOKENS))
 
 FIRST_TS=$(jq -s '[.[] | .timestamp // empty] | first // null' "$TRANSCRIPT_FILE")
 LAST_TS=$(jq -s '[.[] | .timestamp // empty] | last // null' "$TRANSCRIPT_FILE")
@@ -49,6 +51,8 @@ jq -n \
   --argjson insertions "${INSERTIONS:-0}" \
   --argjson deletions "${DELETIONS:-0}" \
   --argjson changed_files "$CHANGED_FILES" \
+  --argjson cache_read_tokens  "$CACHE_READ_TOKENS" \
+  --argjson cache_write_tokens "$CACHE_WRITE_TOKENS" \
   --argjson subagent_total_tokens "$SUBAGENT_TOTAL_TOKENS" \
   '{
     lastModel: $model,
@@ -62,6 +66,8 @@ jq -n \
     insertions: $insertions,
     deletions: $deletions,
     changedFilesList: $changed_files,
+    cacheReadTokens:  $cache_read_tokens,
+    cacheWriteTokens: $cache_write_tokens,
     subagentTotalTokens: $subagent_total_tokens
   }' > "$OUTPUT_DIR/metrics.json"
 
