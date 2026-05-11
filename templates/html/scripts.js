@@ -27,15 +27,6 @@ function formatNumber(n) {
   return String(n);
 }
 
-function formatDuration(first, last) {
-  if (!first || !last) return '—';
-  const ms = new Date(last) - new Date(first);
-  const mins = Math.floor(ms / 60000);
-  if (mins < 60) return mins + 'm';
-  const hrs = Math.floor(mins / 60);
-  const rem = mins % 60;
-  return hrs + 'h ' + rem + 'm';
-}
 
 function getPhaseColor(label) {
   const map = {
@@ -53,10 +44,6 @@ function setText(id, val) {
   if (el) el.textContent = val != null ? val : '—';
 }
 
-function setHtml(id, html) {
-  const el = document.getElementById(id);
-  if (el) el.innerHTML = html;
-}
 
 // ── tab navigation ────────────────────────────────────────────────────────────
 
@@ -65,7 +52,9 @@ let currentPanel = 'summary';
 function activatePanel(panelId) {
   currentPanel = panelId;
   document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.panel === panelId);
+    const isActive = btn.dataset.panel === panelId;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
   });
   document.querySelectorAll('.tab-panel').forEach(panel => {
     panel.style.display = panel.id === 'panel-' + panelId ? '' : 'none';
@@ -142,9 +131,15 @@ function renderVerdict(round) {
   if (text) text.textContent = summaryText;
 
   const a = round.analysis || {};
-  const highlights = a.highlights || [];
-  if (detail && highlights.length > 0) {
-    detail.textContent = highlights.join(' · ');
+  const h = a.highlights || {};
+  const highlightParts = [
+    h.strongestEvidence,
+    h.mainRisk ? 'Risk: ' + h.mainRisk : null
+  ].filter(Boolean);
+  if (detail && highlightParts.length > 0) {
+    detail.textContent = highlightParts.join(' · ');
+  } else if (detail && h.completionStatus && h.completionStatus.notes) {
+    detail.textContent = h.completionStatus.notes;
   }
 }
 
@@ -162,7 +157,7 @@ function renderStats(round) {
     { label: 'Deletions', value: m.deletions != null ? '-' + m.deletions : '—' }
   ];
   statsRow.innerHTML = stats.map(s =>
-    `<div class="stat-card"><div class="stat-value">${escapeHtml(String(s.value))}</div><div class="stat-label">${escapeHtml(s.label)}</div></div>`
+    `<div class="stat-item"><div class="stat-value">${escapeHtml(String(s.value))}</div><div class="stat-label">${escapeHtml(s.label)}</div></div>`
   ).join('');
 }
 
@@ -199,12 +194,12 @@ function renderFlags(round) {
   const row = document.getElementById('flags-row');
   if (!row) return;
   if (flags.length === 0) {
-    row.innerHTML = '<span class="flag flag-green">No issues detected</span>';
+    row.innerHTML = '<span class="flag-chip green">No issues detected</span>';
     return;
   }
   row.innerHTML = flags.map(f => {
     const count = f.count != null ? ` (${f.count})` : '';
-    return `<span class="flag flag-${escapeHtml(f.level)}">${escapeHtml(f.label)}${count}</span>`;
+    return `<span class="flag-chip ${escapeHtml(f.level)}">${escapeHtml(f.label)}${count}</span>`;
   }).join('');
 }
 
@@ -222,30 +217,27 @@ function renderSummary(analysis) {
 
   if (whatChanged) whatChanged.innerHTML = makeList(s.whatChanged);
   if (proves) proves.innerHTML = makeList(s.whatTranscriptProves);
-  if (notProven) notProven.innerHTML = makeList(s.whatNotProven);
+  if (notProven) notProven.innerHTML = makeList(s.whatStillNotProven);
 }
 
 function renderProof(analysis) {
   const proof = analysis.proof || {};
 
   // Artifact inventory — index.html has <ul id="artifact-inventory">
-  const inv = proof.artifactInventory || {};
   const invEl = document.getElementById('artifact-inventory');
   if (invEl) {
-    const items = [
-      { label: 'Screenshots', value: inv.screenshots > 0 ? inv.screenshots : null, icon: '📸' },
-      { label: 'Video', value: inv.video ? 'Yes' : null, icon: '🎥' },
-      { label: 'Transcript', value: inv.transcript ? 'Yes' : null, icon: '📄' },
-      { label: 'Terminal output', value: inv.terminalOutput ? 'Yes' : null, icon: '💻' }
-    ];
-    invEl.innerHTML = items.map(item => {
-      const present = item.value != null;
-      return `<li class="artifact-item ${present ? 'artifact-present' : 'artifact-absent'}">
-        <span class="artifact-icon">${item.icon}</span>
-        <span class="artifact-label">${escapeHtml(item.label)}</span>
-        <span class="artifact-value">${present ? escapeHtml(String(item.value)) : 'None'}</span>
-      </li>`;
-    }).join('');
+    const items = proof.artifactInventory || [];
+    if (items.length === 0) {
+      invEl.innerHTML = '<li class="empty-state">No artifacts recorded.</li>';
+    } else {
+      invEl.innerHTML = items.map(item =>
+        `<li class="artifact-item">
+          <strong>${escapeHtml(item.name || '')}</strong>
+          ${item.path && isSafePath(item.path) ? ` — <a href="${escapeHtml(item.path)}">${escapeHtml(item.path)}</a>` : (item.path ? ` — ${escapeHtml(item.path)}` : '')}
+          ${item.description ? `<div class="artifact-desc">${renderMarkdown(item.description)}</div>` : ''}
+        </li>`
+      ).join('');
+    }
   }
 
   // Evidence table
@@ -256,7 +248,7 @@ function renderProof(analysis) {
       tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No evidence recorded.</td></tr>';
     } else {
       tbody.innerHTML = rows.map(r =>
-        `<tr><td>${renderMarkdown(r.evidencePoint)}</td><td>${renderMarkdown(r.whereItAppeared)}</td><td>${renderMarkdown(r.whyItMatters)}</td></tr>`
+        `<tr><td>${renderMarkdown(r.point)}</td><td>${renderMarkdown(r.where)}</td><td>${renderMarkdown(r.whyItMatters)}</td></tr>`
       ).join('');
     }
   }
@@ -264,17 +256,13 @@ function renderProof(analysis) {
   // High-signal excerpts — index.html has <ul id="proof-excerpts">
   const excerpts = document.getElementById('proof-excerpts');
   if (excerpts) {
-    const items = proof.highSignalExcerpts || [];
+    const items = proof.transcriptExcerpts || [];
     if (items.length === 0) {
       excerpts.innerHTML = '<li class="empty-state">No excerpts recorded.</li>';
     } else {
-      excerpts.innerHTML = items.map(ex => {
-        const role = ex.role || 'unknown';
-        return `<li class="excerpt-item excerpt-${escapeHtml(role)}">
-          <div class="excerpt-meta">Turn ${escapeHtml(String(ex.turn || ''))} · ${escapeHtml(role)}</div>
-          <div class="excerpt-text">${renderMarkdown(ex.text)}</div>
-        </li>`;
-      }).join('');
+      excerpts.innerHTML = items.map(ex =>
+        `<li>${renderMarkdown(ex)}</li>`
+      ).join('');
     }
   }
 }
@@ -313,7 +301,7 @@ function renderTestsNew(analysis) {
 
   const list = document.getElementById('tests-new-list');
   if (list) {
-    const items = t.list || [];
+    const items = t.newTests || [];
     if (items.length === 0) {
       list.innerHTML = '<li class="empty-state">No new tests recorded.</li>';
     } else {
@@ -348,14 +336,15 @@ function renderDiff(analysis) {
   if (statusEl) {
     const st = diff.artifactStatus || {};
     const badges = [
-      { label: 'Screenshot', key: 'screenshot' },
-      { label: 'Video', key: 'video' },
-      { label: 'Terminal log', key: 'terminalLog' }
+      { label: 'Diff stat', key: 'hasDiffStat' },
+      { label: 'Diff patch', key: 'hasDiffPatch' }
     ];
-    statusEl.innerHTML = badges.map(b => {
+    let html = badges.map(b => {
       const present = st[b.key];
-      return `<span class="diff-badge diff-badge-${present ? 'present' : 'absent'}">${escapeHtml(b.label)}: ${present ? 'Yes' : 'No'}</span>`;
+      return `<span class="diff-badge ${present ? 'present' : 'absent'}">${escapeHtml(b.label)}: ${present ? 'Yes' : 'No'}</span>`;
     }).join('');
+    if (st.note) html += `<p class="diff-note">${renderMarkdown(st.note)}</p>`;
+    statusEl.innerHTML = html;
   }
 
   // Files changed list
@@ -365,7 +354,11 @@ function renderDiff(analysis) {
     if (files.length === 0) {
       filesEl.innerHTML = '<li class="empty-state">No files recorded.</li>';
     } else {
-      filesEl.innerHTML = files.map(f => `<li><code>${escapeHtml(f)}</code></li>`).join('');
+      filesEl.innerHTML = files.map(f => {
+        const path = typeof f === 'string' ? f : (f.file || '');
+        const desc = typeof f === 'object' ? (f.description || '') : '';
+        return `<li><code>${escapeHtml(path)}</code>${desc ? ` — ${renderMarkdown(desc)}` : ''}</li>`;
+      }).join('');
     }
   }
 
@@ -377,7 +370,7 @@ function renderDiff(analysis) {
       tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No changes recorded.</td></tr>';
     } else {
       tbody.innerHTML = rows.map(r =>
-        `<tr><td>${renderMarkdown(r.area)}</td><td>${renderMarkdown(r.evidence)}</td><td>${renderMarkdown(r.observedEffect)}</td></tr>`
+        `<tr><td>${renderMarkdown(r.area)}</td><td>${renderMarkdown(r.evidenceInTranscript)}</td><td>${renderMarkdown(r.observedEffect)}</td></tr>`
       ).join('');
     }
   }
@@ -399,7 +392,10 @@ function renderImprovements(analysis) {
   if (repoEl) {
     const items = analysis.repoImprovements || [];
     repoEl.innerHTML = items.length > 0
-      ? items.map(item => `<li>${renderMarkdown(item)}</li>`).join('')
+      ? items.map(item => {
+          if (typeof item === 'string') return `<li>${renderMarkdown(item)}</li>`;
+          return `<li><strong>${escapeHtml(item.title || '')}</strong>${item.detail ? `<br><span class="improvement-detail">${renderMarkdown(item.detail)}</span>` : ''}</li>`;
+        }).join('')
       : '<li class="empty-state">No improvements recorded.</li>';
   }
 
@@ -407,7 +403,10 @@ function renderImprovements(analysis) {
   if (userEl) {
     const items = analysis.userImprovements || [];
     userEl.innerHTML = items.length > 0
-      ? items.map(item => `<li>${renderMarkdown(item)}</li>`).join('')
+      ? items.map(item => {
+          if (typeof item === 'string') return `<li>${renderMarkdown(item)}</li>`;
+          return `<li><strong>${escapeHtml(item.title || '')}</strong>${item.detail ? `<br><span class="improvement-detail">${renderMarkdown(item.detail)}</span>` : ''}</li>`;
+        }).join('')
       : '<li class="empty-state">No improvements recorded.</li>';
   }
 }
@@ -438,9 +437,9 @@ function renderSessionArtifacts(analysis) {
   }
   list.innerHTML = items.map(item => {
     if (item.path && isSafePath(item.path)) {
-      return `<li><a href="${escapeHtml(item.path)}" target="_blank">${escapeHtml(item.label || item.path)}</a></li>`;
+      return `<li><a href="${escapeHtml(item.path)}" target="_blank">${escapeHtml(item.name || item.label || item.path)}</a></li>`;
     }
-    return `<li>${escapeHtml(item.label || item.path || String(item))}</li>`;
+    return `<li>${escapeHtml(item.name || item.label || item.path || String(item))}</li>`;
   }).join('');
 }
 
