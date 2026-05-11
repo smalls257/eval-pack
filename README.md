@@ -27,28 +27,12 @@ A Claude Code plugin that generates eval packs — polished HTML reports capturi
 **1. Add as a git submodule:**
 
 ```bash
-git submodule add https://github.com/smalls257/eval-pack .claude/plugins/eval-pack
+git submodule add https://github.com/smalls257/eval-pack .claude/skills/eval-pack
 ```
 
-**2. Register the plugin in `.claude/settings.json`:**
+Claude Code auto-discovers skills from `.claude/skills/` — no extra config needed.
 
-```json
-{
-  "extraKnownMarketplaces": {
-    "eval-pack": {
-      "source": {
-        "source": "local",
-        "path": "./.claude/plugins/eval-pack"
-      }
-    }
-  },
-  "enabledPlugins": {
-    "eval-pack@eval-pack": true
-  }
-}
-```
-
-**3. Run the setup skill** to finish wiring up the GitHub Action, gitignore, and Pages config:
+**2. Run the setup skill** to wire up the GitHub Action, gitignore, and Pages config:
 
 ```
 /eval-pack:setup
