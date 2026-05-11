@@ -421,6 +421,10 @@ function renderPromptPattern(analysis) {
   }
 }
 
+function isSafePath(path) {
+  return /^https?:\/\//i.test(path) || /^\.{0,2}\//.test(path) || /^[^:]+$/.test(path);
+}
+
 function renderSessionArtifacts(analysis) {
   const list = document.getElementById('session-artifacts-list');
   if (!list) return;
@@ -430,10 +434,10 @@ function renderSessionArtifacts(analysis) {
     return;
   }
   list.innerHTML = items.map(item => {
-    if (item.path) {
+    if (item.path && isSafePath(item.path)) {
       return `<li><a href="${escapeHtml(item.path)}" target="_blank">${escapeHtml(item.label || item.path)}</a></li>`;
     }
-    return `<li>${escapeHtml(item.label || String(item))}</li>`;
+    return `<li>${escapeHtml(item.label || item.path || String(item))}</li>`;
   }).join('');
 }
 
