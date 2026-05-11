@@ -22,6 +22,9 @@ TOTAL_TOKENS=$((INPUT_TOKENS + OUTPUT_TOKENS))
 FIRST_TS=$(jq -s '[.[] | .timestamp // empty] | first // null' "$TRANSCRIPT_FILE")
 LAST_TS=$(jq -s '[.[] | .timestamp // empty] | last // null' "$TRANSCRIPT_FILE")
 
+# Sum total_tokens from subagent <usage> tags embedded in tool_result content
+SUBAGENT_TOTAL_TOKENS=$({ grep -o 'total_tokens: [0-9]*' "$TRANSCRIPT_FILE" 2>/dev/null || true; } | awk -F': ' '{sum += $2} END {print sum+0}')
+
 DIFF_STAT=""
 if git rev-parse HEAD~1 >/dev/null 2>&1; then
   DIFF_STAT=$(git diff --stat HEAD~1 2>/dev/null || echo "")
@@ -46,6 +49,7 @@ jq -n \
   --argjson insertions "${INSERTIONS:-0}" \
   --argjson deletions "${DELETIONS:-0}" \
   --argjson changed_files "$CHANGED_FILES" \
+  --argjson subagent_total_tokens "$SUBAGENT_TOTAL_TOKENS" \
   '{
     lastModel: $model,
     inputTokens: $input_tokens,
@@ -57,7 +61,8 @@ jq -n \
     filesChanged: $files_changed,
     insertions: $insertions,
     deletions: $deletions,
-    changedFilesList: $changed_files
+    changedFilesList: $changed_files,
+    subagentTotalTokens: $subagent_total_tokens
   }' > "$OUTPUT_DIR/metrics.json"
 
 echo "Metrics written to $OUTPUT_DIR/metrics.json"

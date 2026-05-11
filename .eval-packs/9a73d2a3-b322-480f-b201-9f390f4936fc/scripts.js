@@ -22,15 +22,32 @@ function renderMarkdown(text) {
 
 const COST_RATES_DATE = '2026-05-11';
 
-function estimateCost(model, inputTokens, outputTokens) {
+function modelRates(model) {
   const m = (model || '').toLowerCase();
-  let inRate, outRate;
-  if (m.includes('opus'))       { inRate = 15;   outRate = 75; }
-  else if (m.includes('haiku')) { inRate = 0.80; outRate = 4;  }
-  else                          { inRate = 3;    outRate = 15; } // sonnet default
+  if (m.includes('opus'))       return { inRate: 15,   outRate: 75  };
+  if (m.includes('haiku'))      return { inRate: 0.80, outRate: 4   };
+  return                               { inRate: 3,    outRate: 15  }; // sonnet default
+}
+
+function estimateCost(model, inputTokens, outputTokens) {
+  const { inRate, outRate } = modelRates(model);
   const cost = ((inputTokens || 0) * inRate + (outputTokens || 0) * outRate) / 1_000_000;
-  if (cost <= 0) return '—';
-  return (cost >= 0.01 ? '$' + cost.toFixed(2) : '$' + cost.toFixed(4)) + '*';
+  if (cost <= 0) return null;
+  return cost;
+}
+
+// Subagent usage tags only have total_tokens (no input/output split).
+// Assume 80% input / 20% output — typical for agent sessions reading large contexts.
+function estimateSubagentCost(model, totalTokens) {
+  if (!totalTokens) return null;
+  const { inRate, outRate } = modelRates(model);
+  const blended = inRate * 0.8 + outRate * 0.2;
+  return (totalTokens * blended) / 1_000_000;
+}
+
+function formatCost(n) {
+  if (n == null || n <= 0) return '—';
+  return (n >= 0.01 ? '$' + n.toFixed(2) : '$' + n.toFixed(4)) + '*';
 }
 
 function formatNumber(n) {
@@ -181,11 +198,18 @@ function renderStats(round) {
   const m = round.metrics || {};
   const statsRow = document.getElementById('stats-row');
   if (!statsRow) return;
+  const ctrlCost = estimateCost(m.lastModel, m.inputTokens, m.outputTokens);
+  const agentCost = estimateSubagentCost(m.lastModel, m.subagentTotalTokens);
+  const totalCost = (ctrlCost != null || agentCost != null)
+    ? (ctrlCost || 0) + (agentCost || 0) : null;
+
   const stats = [
     { label: 'Model', value: m.lastModel || '—' },
     { label: 'Input tokens', value: formatNumber(m.inputTokens) },
     { label: 'Output tokens', value: formatNumber(m.outputTokens) },
-    { label: 'Est. cost', value: estimateCost(m.lastModel, m.inputTokens, m.outputTokens) },
+    { label: 'Controller cost', value: formatCost(ctrlCost) },
+    { label: 'Subagent cost ~', value: formatCost(agentCost) },
+    { label: 'Total est. cost', value: formatCost(totalCost) },
     { label: 'Turns', value: m.turnCount != null ? m.turnCount : '—' },
     { label: 'Files changed', value: m.filesChanged != null ? m.filesChanged : '—' },
     { label: 'Insertions', value: m.insertions != null ? '+' + m.insertions : '—' },
@@ -203,7 +227,7 @@ function renderStats(round) {
       note.className = 'cost-note';
       card.appendChild(note);
     }
-    note.textContent = `* Claude API rates as of ${COST_RATES_DATE}. Controller session only — subagent tokens billed separately and not counted here.`;
+    note.textContent = `* Claude API rates as of ${COST_RATES_DATE}. Subagent cost estimated from <usage> tags in tool results using 80/20 input/output split — actual split may vary.`;
   }
 }
 
