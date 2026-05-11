@@ -2,7 +2,7 @@
   "toolCalls": [
     {
       "name": "Bash",
-      "count": 120
+      "count": 123
     },
     {
       "name": "Agent",
@@ -18,7 +18,7 @@
     },
     {
       "name": "Edit",
-      "count": 41
+      "count": 44
     },
     {
       "name": "TaskCreate",
@@ -37,27 +37,27 @@
       "count": 7
     },
     {
+      "name": "mcp__plugin_playwright_playwright__browser_navigate",
+      "count": 7
+    },
+    {
       "name": "mcp__plugin_playwright_playwright__browser_snapshot",
       "count": 7
+    },
+    {
+      "name": "Grep",
+      "count": 6
     },
     {
       "name": "Write",
       "count": 6
     },
     {
-      "name": "mcp__plugin_playwright_playwright__browser_navigate",
-      "count": 6
-    },
-    {
-      "name": "Grep",
-      "count": 5
+      "name": "mcp__plugin_playwright_playwright__browser_take_screenshot",
+      "count": 4
     },
     {
       "name": "mcp__plugin_playwright_playwright__browser_console_messages",
-      "count": 3
-    },
-    {
-      "name": "mcp__plugin_playwright_playwright__browser_take_screenshot",
       "count": 3
     },
     {
@@ -69,7 +69,7 @@
       "count": 1
     }
   ],
-  "totalToolCalls": 414,
+  "totalToolCalls": 423,
   "subagents": [
     {
       "description": "Research Claude Code plugin structure",

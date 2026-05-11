@@ -253,6 +253,7 @@ body {
 .stat-item { text-align: center; }
 .stat-value { font-size: 22px; font-weight: 700; font-family: var(--font-mono); }
 .stat-label { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+.cost-note { font-size: 11px; color: var(--text-secondary); margin-top: 12px; }
 
 /* ===== Session Timeline ===== */
 .session-timeline {

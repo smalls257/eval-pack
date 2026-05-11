@@ -20,6 +20,8 @@ function renderMarkdown(text) {
     .replace(/\n/g, '<br>');
 }
 
+const COST_RATES_DATE = '2026-05-11';
+
 function estimateCost(model, inputTokens, outputTokens) {
   const m = (model || '').toLowerCase();
   let inRate, outRate;
@@ -28,7 +30,7 @@ function estimateCost(model, inputTokens, outputTokens) {
   else                          { inRate = 3;    outRate = 15; } // sonnet default
   const cost = ((inputTokens || 0) * inRate + (outputTokens || 0) * outRate) / 1_000_000;
   if (cost <= 0) return '—';
-  return cost >= 0.01 ? '$' + cost.toFixed(2) : '$' + cost.toFixed(4);
+  return (cost >= 0.01 ? '$' + cost.toFixed(2) : '$' + cost.toFixed(4)) + '*';
 }
 
 function formatNumber(n) {
@@ -192,6 +194,17 @@ function renderStats(round) {
   statsRow.innerHTML = stats.map(s =>
     `<div class="stat-item"><div class="stat-value">${escapeHtml(String(s.value))}</div><div class="stat-label">${escapeHtml(s.label)}</div></div>`
   ).join('');
+
+  const card = document.getElementById('stats-card');
+  if (card) {
+    let note = card.querySelector('.cost-note');
+    if (!note) {
+      note = document.createElement('p');
+      note.className = 'cost-note';
+      card.appendChild(note);
+    }
+    note.textContent = `* Claude API rates as of ${COST_RATES_DATE}. Controller session only — subagent tokens billed separately and not counted here.`;
+  }
 }
 
 function renderTimeline(analysis) {
