@@ -134,17 +134,17 @@ body {
   border: 1px solid var(--border);
 }
 
-.verdict-banner.pass {
+.verdict-banner.verdict-green {
   background: linear-gradient(135deg, rgba(23, 177, 105, 0.08), transparent);
   border-color: var(--green);
 }
 
-.verdict-banner.fail {
+.verdict-banner.verdict-red {
   background: linear-gradient(135deg, rgba(229, 72, 77, 0.08), transparent);
   border-color: var(--red);
 }
 
-.verdict-banner.unknown {
+.verdict-banner.verdict-amber {
   background: linear-gradient(135deg, rgba(245, 166, 35, 0.08), transparent);
   border-color: var(--amber);
 }
