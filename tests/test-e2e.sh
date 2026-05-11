@@ -206,6 +206,13 @@ if [[ "$ROUNDS" -ne 1 ]]; then
   echo "FAIL: should have exactly 1 round" >&2
   exit 1
 fi
+
+HAS_TOOLS=$(jq '.rounds[0].tools.toolCalls | length' "$TEST_DIR/$SESSION_ID/data.json")
+if [[ "$HAS_TOOLS" -lt 1 ]]; then
+  echo "FAIL: tools should appear in data.json round" >&2
+  exit 1
+fi
+echo "  Tools in data.json: $HAS_TOOLS tool types"
 echo "  PASS"
 
 # Step 6: Test regeneration (round 2)

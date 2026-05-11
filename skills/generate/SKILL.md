@@ -29,6 +29,16 @@ Run the detect-patterns script:
 "${CLAUDE_PLUGIN_ROOT}/scripts/detect-patterns.sh" "${TRANSCRIPT_PATH}" "${PACK_DIR}"
 ```
 
+## Step 2.5: Extract Tool Usage
+
+Run the extract-tools script:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/extract-tools.sh" "${TRANSCRIPT_PATH}" "${PACK_DIR}"
+```
+
+If the transcript path is not available or the script fails, continue — `render-html.sh` will fall back to `{}` automatically.
+
 ## Step 3: Run Tests
 
 Identify and run appropriate tests for the changes made in this session:

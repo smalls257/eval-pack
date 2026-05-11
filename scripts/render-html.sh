@@ -21,11 +21,17 @@ if [[ -n "$TRANSCRIPT_FILE" && -f "$TRANSCRIPT_FILE" ]]; then
   cp "$TRANSCRIPT_FILE" "$PACK_DIR/transcript.jsonl"
 fi
 
+# Extract tool usage from transcript
+if [[ -n "$TRANSCRIPT_FILE" && -f "$TRANSCRIPT_FILE" ]]; then
+  "$PLUGIN_ROOT/scripts/extract-tools.sh" "$TRANSCRIPT_FILE" "$PACK_DIR" || true
+fi
+
 # Write default intermediate files so --slurpfile always has a valid target
 [[ -f "$PACK_DIR/metrics.json" ]]      || echo '{}' > "$PACK_DIR/metrics.json"
 [[ -f "$PACK_DIR/patterns.json" ]]     || echo '{}' > "$PACK_DIR/patterns.json"
 [[ -f "$PACK_DIR/analysis.json" ]]     || echo '{}' > "$PACK_DIR/analysis.json"
 [[ -f "$PACK_DIR/test-results.json" ]] || echo '{}' > "$PACK_DIR/test-results.json"
+[[ -f "$PACK_DIR/tools.json" ]]        || echo '{}' > "$PACK_DIR/tools.json"
 
 # Detect screenshots — short list, safe as --argjson
 SCREENSHOTS="[]"
@@ -44,12 +50,14 @@ jq -n \
   --slurpfile patterns    "$PACK_DIR/patterns.json" \
   --slurpfile analysis    "$PACK_DIR/analysis.json" \
   --slurpfile testResults "$PACK_DIR/test-results.json" \
+  --slurpfile tools       "$PACK_DIR/tools.json" \
   --argjson screenshots   "$SCREENSHOTS" \
   '{
     metrics:     $metrics[0],
     patterns:    $patterns[0],
     analysis:    $analysis[0],
     testResults: $testResults[0],
+    tools:       $tools[0],
     screenshots: $screenshots,
     generatedAt: now | todate
   }' > "$NEW_ROUND_TMP"
