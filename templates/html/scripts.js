@@ -52,6 +52,15 @@ function formatCost(n) {
   return (n >= 0.01 ? '$' + n.toFixed(2) : '$' + n.toFixed(4)) + '*';
 }
 
+function shortModelName(model) {
+  if (!model) return 'unknown';
+  const m = model.toLowerCase();
+  if (m.includes('opus'))  return 'Opus';
+  if (m.includes('haiku')) return 'Haiku';
+  if (m.includes('sonnet')) return 'Sonnet';
+  return model;
+}
+
 function formatNumber(n) {
   if (n == null) return '—';
   if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
@@ -205,27 +214,33 @@ function renderStats(round) {
   const totalCost = (ctrlCost != null || agentCost != null)
     ? (ctrlCost || 0) + (agentCost || 0) : null;
 
-  const groups = [
-    {
-      heading: 'Tokens',
-      items: [
+  const tokensByModel = Array.isArray(m.tokensByModel) ? m.tokensByModel : [];
+  const tokenItems = tokensByModel.length > 0
+    ? tokensByModel.flatMap(r => [
+        { label: shortModelName(r.model) + ' input',  value: formatNumber(r.inputTokens) },
+        { label: shortModelName(r.model) + ' output', value: formatNumber(r.outputTokens) },
+      ])
+    : [
         { label: 'Controller input',  value: formatNumber(m.inputTokens) },
         { label: 'Controller output', value: formatNumber(m.outputTokens) },
-        { label: 'Subagent tokens',   value: formatNumber(m.subagentTotalTokens) },
-      ]
-    },
-    {
-      heading: 'Cost',
-      items: [
-        { label: 'Controller',  value: formatCost(ctrlCost) },
-        { label: 'Subagents ~', value: formatCost(agentCost) },
-        { label: 'Total *',     value: formatCost(totalCost) },
-      ]
-    },
+      ];
+  tokenItems.push({ label: 'Subagent tokens (total)', value: formatNumber(m.subagentTotalTokens) });
+
+  const costItems = tokensByModel.length > 0
+    ? tokensByModel.map(r => ({
+        label: shortModelName(r.model),
+        value: formatCost(estimateCost(r.model, r.inputTokens, r.outputTokens))
+      }))
+    : [{ label: 'Controller', value: formatCost(ctrlCost) }];
+  costItems.push({ label: 'Subagents ~', value: formatCost(agentCost) });
+  costItems.push({ label: 'Total *',     value: formatCost(totalCost) });
+
+  const groups = [
+    { heading: 'Tokens',  items: tokenItems },
+    { heading: 'Cost',    items: costItems },
     {
       heading: 'Session',
       items: [
-        { label: 'Model',         value: m.lastModel || '—' },
         { label: 'Turns',         value: m.turnCount != null ? m.turnCount : '—' },
         { label: 'Files changed', value: m.filesChanged != null ? m.filesChanged : '—' },
         { label: 'Insertions',    value: m.insertions != null ? '+' + m.insertions : '—' },
