@@ -244,15 +244,18 @@ body {
 }
 
 /* ===== Stats Row ===== */
-.stats-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: 16px;
+.stats-row { display: flex; gap: 32px; flex-wrap: wrap; }
+.stat-group { flex: 1; min-width: 160px; }
+.stat-group-heading {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-secondary);
+  margin-bottom: 12px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
 }
-
-.stat-item { text-align: center; }
-.stat-value { font-size: 22px; font-weight: 700; font-family: var(--font-mono); }
-.stat-label { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+.stat-group-items { display: flex; flex-direction: column; gap: 10px; }
+.stat-item { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.stat-value { font-size: 14px; font-weight: 700; font-family: var(--font-mono); }
+.stat-label { font-size: 11px; color: var(--text-secondary); }
 .cost-note { font-size: 11px; color: var(--text-secondary); margin-top: 12px; }
 
 /* ===== Session Timeline ===== */

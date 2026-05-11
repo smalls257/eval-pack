@@ -205,20 +205,41 @@ function renderStats(round) {
   const totalCost = (ctrlCost != null || agentCost != null)
     ? (ctrlCost || 0) + (agentCost || 0) : null;
 
-  const stats = [
-    { label: 'Model', value: m.lastModel || '—' },
-    { label: 'Input tokens', value: formatNumber(m.inputTokens) },
-    { label: 'Output tokens', value: formatNumber(m.outputTokens) },
-    { label: 'Controller cost', value: formatCost(ctrlCost) },
-    { label: 'Subagent cost ~', value: formatCost(agentCost) },
-    { label: 'Total est. cost', value: formatCost(totalCost) },
-    { label: 'Turns', value: m.turnCount != null ? m.turnCount : '—' },
-    { label: 'Files changed', value: m.filesChanged != null ? m.filesChanged : '—' },
-    { label: 'Insertions', value: m.insertions != null ? '+' + m.insertions : '—' },
-    { label: 'Deletions', value: m.deletions != null ? '-' + m.deletions : '—' }
+  const groups = [
+    {
+      heading: 'Tokens',
+      items: [
+        { label: 'Controller input',  value: formatNumber(m.inputTokens) },
+        { label: 'Controller output', value: formatNumber(m.outputTokens) },
+        { label: 'Subagent tokens',   value: formatNumber(m.subagentTotalTokens) },
+      ]
+    },
+    {
+      heading: 'Cost',
+      items: [
+        { label: 'Controller',  value: formatCost(ctrlCost) },
+        { label: 'Subagents ~', value: formatCost(agentCost) },
+        { label: 'Total *',     value: formatCost(totalCost) },
+      ]
+    },
+    {
+      heading: 'Session',
+      items: [
+        { label: 'Model',         value: m.lastModel || '—' },
+        { label: 'Turns',         value: m.turnCount != null ? m.turnCount : '—' },
+        { label: 'Files changed', value: m.filesChanged != null ? m.filesChanged : '—' },
+        { label: 'Insertions',    value: m.insertions != null ? '+' + m.insertions : '—' },
+        { label: 'Deletions',     value: m.deletions != null ? '-' + m.deletions : '—' },
+      ]
+    }
   ];
-  statsRow.innerHTML = stats.map(s =>
-    `<div class="stat-item"><div class="stat-value">${escapeHtml(String(s.value))}</div><div class="stat-label">${escapeHtml(s.label)}</div></div>`
+  statsRow.innerHTML = groups.map(g =>
+    `<div class="stat-group">
+      <div class="stat-group-heading">${escapeHtml(g.heading)}</div>
+      <div class="stat-group-items">${g.items.map(s =>
+        `<div class="stat-item"><div class="stat-value">${escapeHtml(String(s.value))}</div><div class="stat-label">${escapeHtml(s.label)}</div></div>`
+      ).join('')}</div>
+    </div>`
   ).join('');
 
   const card = document.getElementById('stats-card');
