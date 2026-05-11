@@ -20,6 +20,17 @@ function renderMarkdown(text) {
     .replace(/\n/g, '<br>');
 }
 
+function estimateCost(model, inputTokens, outputTokens) {
+  const m = (model || '').toLowerCase();
+  let inRate, outRate;
+  if (m.includes('opus'))       { inRate = 15;   outRate = 75; }
+  else if (m.includes('haiku')) { inRate = 0.80; outRate = 4;  }
+  else                          { inRate = 3;    outRate = 15; } // sonnet default
+  const cost = ((inputTokens || 0) * inRate + (outputTokens || 0) * outRate) / 1_000_000;
+  if (cost <= 0) return '—';
+  return cost >= 0.01 ? '$' + cost.toFixed(2) : '$' + cost.toFixed(4);
+}
+
 function formatNumber(n) {
   if (n == null) return '—';
   if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
@@ -172,6 +183,7 @@ function renderStats(round) {
     { label: 'Model', value: m.lastModel || '—' },
     { label: 'Input tokens', value: formatNumber(m.inputTokens) },
     { label: 'Output tokens', value: formatNumber(m.outputTokens) },
+    { label: 'Est. cost', value: estimateCost(m.lastModel, m.inputTokens, m.outputTokens) },
     { label: 'Turns', value: m.turnCount != null ? m.turnCount : '—' },
     { label: 'Files changed', value: m.filesChanged != null ? m.filesChanged : '—' },
     { label: 'Insertions', value: m.insertions != null ? '+' + m.insertions : '—' },
