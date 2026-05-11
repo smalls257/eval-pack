@@ -13,6 +13,7 @@ fi
 
 # Extract all tool_use blocks from both real CC format (.message.content[]) and flat format (.content[])
 TOOL_CALLS_TMP=$(mktemp)
+trap 'rm -f "$TOOL_CALLS_TMP"' EXIT
 jq -s '[.[] |
   (.message.content // .content // []) |
   if type == "array" then .[] else empty end |
