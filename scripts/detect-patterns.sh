@@ -13,18 +13,32 @@ fi
 
 TRANSCRIPT=$(jq -s '.' "$TRANSCRIPT_FILE")
 
-# False completions: assistant says done/complete/finished, then human responds with correction
-FALSE_COMPLETIONS=$(echo "$TRANSCRIPT" | jq '
+# Helper: extract text from entry — handles both real CC format (.message.content array)
+# and flat test fixture format (.content string)
+TEXT_FROM_ENTRY='
+  def entry_text:
+    (.message.content // .content // "") |
+    if type == "string" then .
+    elif type == "array" then [.[] | select(.type == "text") | .text] | join(" ")
+    else tostring
+    end;
+  def is_human: .type == "user" or .type == "human";
+'
+
+# False completions: assistant says done/complete/finished, then user responds with correction
+FALSE_COMPLETIONS=$(echo "$TRANSCRIPT" | jq "$TEXT_FROM_ENTRY"'
   . as $arr |
   [range(0; ($arr | length) - 1) |
     . as $i |
-    if ($arr[$i].type == "assistant" and $arr[$i+1].type == "human") then
-      if (($arr[$i].content | test("(?i)(done|complete|finished|all set|that should|looks good now)")) and
-          ($arr[$i+1].content | test("(?i)(no|not|wrong|still|actually|but|fix|fail|error|broken|issue)"))) then
+    if ($arr[$i].type == "assistant" and ($arr[$i+1] | is_human)) then
+      ($arr[$i] | entry_text) as $agent |
+      ($arr[$i+1] | entry_text) as $user |
+      if (($agent | test("(?i)(done|complete|finished|all set|that should|looks good now)")) and
+          ($user | test("(?i)(no|not|wrong|still|actually|but|fix|fail|error|broken|issue)"))) then
         {
           turn: $i,
-          agentClaim: ($arr[$i].content | .[0:120]),
-          userResponse: ($arr[$i+1].content | .[0:120])
+          agentClaim: ($agent | .[0:120]),
+          userResponse: ($user | .[0:120])
         }
       else empty end
     else empty end
@@ -32,17 +46,17 @@ FALSE_COMPLETIONS=$(echo "$TRANSCRIPT" | jq '
 ')
 
 # Retry patterns: assistant attempts same tool/action multiple times
-RETRY_COUNT=$(echo "$TRANSCRIPT" | jq '
+RETRY_COUNT=$(echo "$TRANSCRIPT" | jq "$TEXT_FROM_ENTRY"'
   [.[] | select(.type == "assistant") |
-    .content | tostring |
+    entry_text |
     select(test("(?i)(try again|retry|let me try|another approach|different approach)"))
   ] | length
 ')
 
 # Test failures during session
-TEST_FAILURES=$(echo "$TRANSCRIPT" | jq '
+TEST_FAILURES=$(echo "$TRANSCRIPT" | jq "$TEXT_FROM_ENTRY"'
   [.[] | select(.type == "assistant") |
-    .content | tostring |
+    entry_text |
     select(test("(?i)(FAIL|test failed|tests? failing|assertion.?error|expect.* to |error:.*test)"))
   ] | length
 ')

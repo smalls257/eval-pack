@@ -11,12 +11,12 @@ if [[ ! -f "$TRANSCRIPT_FILE" ]]; then
   exit 1
 fi
 
-TURN_COUNT=$(jq -s '[.[] | select(.type == "human" or .type == "assistant")] | length' "$TRANSCRIPT_FILE")
+TURN_COUNT=$(jq -s '[.[] | select(.type == "user" or .type == "human" or .type == "assistant")] | length' "$TRANSCRIPT_FILE")
 
-MODEL=$(jq -s '[.[] | select(.type == "assistant") | .model // empty] | last // "unknown"' "$TRANSCRIPT_FILE")
+MODEL=$(jq -rs '[.[] | select(.type == "assistant") | (.message.model // .model) // empty] | last // "unknown"' "$TRANSCRIPT_FILE")
 
-INPUT_TOKENS=$(jq -s '[.[] | select(.type == "assistant") | .usage.input_tokens // 0] | add // 0' "$TRANSCRIPT_FILE")
-OUTPUT_TOKENS=$(jq -s '[.[] | select(.type == "assistant") | .usage.output_tokens // 0] | add // 0' "$TRANSCRIPT_FILE")
+INPUT_TOKENS=$(jq -s '[.[] | select(.type == "assistant") | ((.message.usage // .usage).input_tokens // 0)] | add // 0' "$TRANSCRIPT_FILE")
+OUTPUT_TOKENS=$(jq -s '[.[] | select(.type == "assistant") | ((.message.usage // .usage).output_tokens // 0)] | add // 0' "$TRANSCRIPT_FILE")
 TOTAL_TOKENS=$((INPUT_TOKENS + OUTPUT_TOKENS))
 
 FIRST_TS=$(jq -s '[.[] | .timestamp // empty] | first // null' "$TRANSCRIPT_FILE")

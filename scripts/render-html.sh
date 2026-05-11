@@ -21,35 +21,14 @@ if [[ -n "$TRANSCRIPT_FILE" && -f "$TRANSCRIPT_FILE" ]]; then
   cp "$TRANSCRIPT_FILE" "$PACK_DIR/transcript.jsonl"
 fi
 
-# Build data.json from intermediate files
-METRICS="{}"
-PATTERNS="{}"
-ANALYSIS="{}"
-TRANSCRIPT="[]"
-TEST_RESULTS="{}"
+# Write default intermediate files so --slurpfile always has a valid target
+[[ -f "$PACK_DIR/metrics.json" ]]      || echo '{}' > "$PACK_DIR/metrics.json"
+[[ -f "$PACK_DIR/patterns.json" ]]     || echo '{}' > "$PACK_DIR/patterns.json"
+[[ -f "$PACK_DIR/analysis.json" ]]     || echo '{}' > "$PACK_DIR/analysis.json"
+[[ -f "$PACK_DIR/test-results.json" ]] || echo '{}' > "$PACK_DIR/test-results.json"
+
+# Detect screenshots — short list, safe as --argjson
 SCREENSHOTS="[]"
-
-if [[ -f "$PACK_DIR/metrics.json" ]]; then
-  METRICS=$(cat "$PACK_DIR/metrics.json")
-fi
-
-if [[ -f "$PACK_DIR/patterns.json" ]]; then
-  PATTERNS=$(cat "$PACK_DIR/patterns.json")
-fi
-
-if [[ -f "$PACK_DIR/analysis.json" ]]; then
-  ANALYSIS=$(cat "$PACK_DIR/analysis.json")
-fi
-
-if [[ -f "$PACK_DIR/test-results.json" ]]; then
-  TEST_RESULTS=$(cat "$PACK_DIR/test-results.json")
-fi
-
-if [[ -f "$PACK_DIR/transcript.jsonl" ]]; then
-  TRANSCRIPT=$(jq -s '.' "$PACK_DIR/transcript.jsonl")
-fi
-
-# Detect screenshots
 if [[ -d "$PACK_DIR/screenshots" ]] && ls "$PACK_DIR/screenshots/"*.png >/dev/null 2>&1; then
   SCREENSHOTS=$(ls "$PACK_DIR/screenshots/"*.png | while read -r f; do
     stem=$(basename "$f" .png)
@@ -58,39 +37,52 @@ if [[ -d "$PACK_DIR/screenshots" ]] && ls "$PACK_DIR/screenshots/"*.png >/dev/nu
   done | jq -s '.')
 fi
 
-# Check for existing data.json with rounds
-EXISTING_ROUNDS="[]"
-if [[ -f "$PACK_DIR/data.json" ]]; then
-  EXISTING_ROUNDS=$(jq '.rounds // []' "$PACK_DIR/data.json")
-fi
-
-NEW_ROUND=$(jq -n \
-  --argjson metrics "$METRICS" \
-  --argjson patterns "$PATTERNS" \
-  --argjson analysis "$ANALYSIS" \
-  --argjson testResults "$TEST_RESULTS" \
-  --argjson screenshots "$SCREENSHOTS" \
+# Build new round using --slurpfile to avoid "argument list too long" for large JSON files
+NEW_ROUND_TMP=$(mktemp)
+jq -n \
+  --slurpfile metrics     "$PACK_DIR/metrics.json" \
+  --slurpfile patterns    "$PACK_DIR/patterns.json" \
+  --slurpfile analysis    "$PACK_DIR/analysis.json" \
+  --slurpfile testResults "$PACK_DIR/test-results.json" \
+  --argjson screenshots   "$SCREENSHOTS" \
   '{
-    metrics: $metrics,
-    patterns: $patterns,
-    analysis: $analysis,
-    testResults: $testResults,
+    metrics:     $metrics[0],
+    patterns:    $patterns[0],
+    analysis:    $analysis[0],
+    testResults: $testResults[0],
     screenshots: $screenshots,
     generatedAt: now | todate
-  }')
+  }' > "$NEW_ROUND_TMP"
 
-ROUNDS=$(echo "$EXISTING_ROUNDS" | jq --argjson new "$NEW_ROUND" '. + [$new]')
+# Accumulate rounds — append new round to existing (supports regeneration)
+ROUNDS_TMP=$(mktemp)
+if [[ -f "$PACK_DIR/data.json" ]]; then
+  jq --slurpfile new "$NEW_ROUND_TMP" '(.rounds // []) + $new' "$PACK_DIR/data.json" > "$ROUNDS_TMP"
+else
+  jq -s '.' "$NEW_ROUND_TMP" > "$ROUNDS_TMP"
+fi
 
+# Build data.json base (no transcript yet — transcript merged separately to avoid arg limits)
 jq -n \
-  --arg sessionId "$SESSION_ID" \
-  --arg generatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  --argjson rounds "$ROUNDS" \
-  --argjson transcript "$TRANSCRIPT" \
+  --arg sessionId    "$SESSION_ID" \
+  --arg generatedAt  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --slurpfile rounds "$ROUNDS_TMP" \
   '{
-    sessionId: $sessionId,
+    sessionId:   $sessionId,
     generatedAt: $generatedAt,
-    rounds: $rounds,
-    transcript: $transcript
+    rounds:      $rounds[0],
+    transcript:  []
   }' > "$PACK_DIR/data.json"
+
+# Merge transcript from file — avoids arg-list limits on long sessions
+if [[ -f "$PACK_DIR/transcript.jsonl" ]]; then
+  TRANSCRIPT_TMP=$(mktemp)
+  jq -s '.' "$PACK_DIR/transcript.jsonl" > "$TRANSCRIPT_TMP"
+  jq --slurpfile tr "$TRANSCRIPT_TMP" '.transcript = $tr[0]' "$PACK_DIR/data.json" > "$PACK_DIR/data.json.tmp"
+  mv "$PACK_DIR/data.json.tmp" "$PACK_DIR/data.json"
+  rm -f "$TRANSCRIPT_TMP"
+fi
+
+rm -f "$NEW_ROUND_TMP" "$ROUNDS_TMP"
 
 echo "Eval pack rendered to $PACK_DIR"
