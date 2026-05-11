@@ -28,16 +28,6 @@ function formatNumber(n) {
 }
 
 
-function getPhaseColor(label) {
-  const map = {
-    'user': '#4a90e2',
-    'human': '#4a90e2',
-    'assistant': '#7c5cbf',
-    'tool': '#2ecc71',
-    'system': '#95a5a6'
-  };
-  return map[label] || '#bdc3c7';
-}
 
 function setText(id, val) {
   const el = document.getElementById(id);
@@ -161,32 +151,112 @@ function renderStats(round) {
   ).join('');
 }
 
+function formatTime(ts) {
+  try {
+    const d = new Date(ts);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch (_) { return ''; }
+}
+
 function renderTimeline(transcript) {
-  const bar = document.getElementById('timeline-bar');
-  const legend = document.getElementById('timeline-legend');
-  if (!bar || !transcript || transcript.length === 0) return;
+  const container = document.getElementById('session-timeline');
+  if (!container) return;
+  if (!transcript || transcript.length === 0) {
+    container.innerHTML = '<p class="empty-state">No transcript available.</p>';
+    return;
+  }
 
-  const counts = {};
-  transcript.forEach(entry => {
+  const rows = [];
+  for (const entry of transcript) {
     const role = entry.type || 'unknown';
-    counts[role] = (counts[role] || 0) + 1;
-  });
+    if (role !== 'human' && role !== 'user' && role !== 'assistant') continue;
 
-  const total = transcript.length;
-  const roles = Object.keys(counts);
+    const msg = entry.message || {};
+    const ts = entry.timestamp ? formatTime(entry.timestamp) : '';
+    let toolsHtml = '';
+    let textHtml = '';
 
-  const safeColor = c => /^#[0-9a-fA-F]{3,6}$/.test(c) ? c : '#bdc3c7';
+    if (role === 'assistant') {
+      const blocks = Array.isArray(msg.content) ? msg.content : [];
+      const tools = blocks.filter(b => b.type === 'tool_use').map(b => b.name);
+      const textParts = blocks.filter(b => b.type === 'text').map(b => b.text || '').join(' ').trim();
+      const truncated = textParts.length > 100 ? textParts.slice(0, 100) + '\u2026' : textParts;
 
-  bar.innerHTML = roles.map(role => {
-    const pct = ((counts[role] / total) * 100).toFixed(1);
-    const color = safeColor(getPhaseColor(role));
-    return `<div class="timeline-segment" style="width:${pct}%;background:${color}" title="${escapeHtml(role)}: ${counts[role]}"></div>`;
-  }).join('');
+      if (tools.length > 0) {
+        toolsHtml = `<span class="tl-tools">${tools.map(t => `<code class="tl-tool">${escapeHtml(t)}</code>`).join('')}</span>`;
+      }
+      if (truncated) {
+        textHtml = `<span class="tl-text">${escapeHtml(truncated)}</span>`;
+      }
+    } else {
+      const raw = typeof entry.content === 'string' ? entry.content
+        : typeof msg.content === 'string' ? msg.content
+        : Array.isArray(msg.content) ? msg.content.filter(b => b.type === 'text').map(b => b.text || '').join(' ')
+        : '';
+      const truncated = raw.trim().length > 120 ? raw.trim().slice(0, 120) + '\u2026' : raw.trim();
+      if (truncated) textHtml = `<span class="tl-text">${escapeHtml(truncated)}</span>`;
+    }
 
-  legend.innerHTML = roles.map(role => {
-    const color = safeColor(getPhaseColor(role));
-    return `<span class="legend-item"><span class="legend-dot" style="background:${color}"></span>${escapeHtml(role)} (${counts[role]})</span>`;
-  }).join('');
+    if (!toolsHtml && !textHtml) continue;
+
+    const roleLabel = (role === 'human' || role === 'user') ? 'user' : 'asst';
+    rows.push(`<div class="tl-entry tl-${escapeHtml(role)}">
+      <span class="tl-time">${escapeHtml(ts)}</span>
+      <span class="tl-role">${roleLabel}</span>
+      <div class="tl-content">${toolsHtml}${textHtml}</div>
+    </div>`);
+  }
+
+  container.innerHTML = rows.length > 0 ? rows.join('') : '<p class="empty-state">No events to display.</p>';
+}
+
+function renderScreenshots(screenshots) {
+  const section = document.getElementById('screenshots-section');
+  const grid = document.getElementById('screenshot-grid');
+  const proofArea = document.getElementById('proof-screenshots-area');
+
+  if (!screenshots || screenshots.length === 0) {
+    if (section) section.style.display = 'none';
+    return;
+  }
+
+  const makeItem = (s, large) => {
+    const path = escapeHtml(s.path || '');
+    const label = escapeHtml(s.label || s.path || '');
+    return `<div class="screenshot-item" data-src="${path}" style="${large ? '' : 'max-width:200px'}">
+      <img src="${path}" alt="${label}" loading="lazy">
+      <div class="screenshot-label">${label}</div>
+    </div>`;
+  };
+
+  if (grid) {
+    grid.innerHTML = screenshots.map(s => makeItem(s, true)).join('');
+    grid.querySelectorAll('.screenshot-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.innerHTML = `<img src="${item.dataset.src}" alt="">`;
+        overlay.addEventListener('click', () => overlay.remove());
+        document.body.appendChild(overlay);
+      });
+    });
+  }
+
+  if (section) section.style.display = 'block';
+
+  if (proofArea) {
+    proofArea.innerHTML = `<h3 class="section-subheading">Screenshots</h3>
+      <div class="screenshot-grid">${screenshots.map(s => makeItem(s, true)).join('')}</div>`;
+    proofArea.querySelectorAll('.screenshot-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.innerHTML = `<img src="${item.dataset.src}" alt="">`;
+        overlay.addEventListener('click', () => overlay.remove());
+        document.body.appendChild(overlay);
+      });
+    });
+  }
 }
 
 function renderFlags(round) {
@@ -593,6 +663,7 @@ function renderRound(data, round) {
   renderFriction(analysis);
   renderDiff(analysis);
   renderTools(round.tools);
+  renderScreenshots(round.screenshots);
   renderImprovements(analysis);
   renderPromptPattern(analysis);
   renderSessionArtifacts(analysis);
