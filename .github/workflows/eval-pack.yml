@@ -25,7 +25,7 @@ jobs:
         id: find-packs
         run: |
           if [ -d ".eval-packs" ]; then
-            PACKS=$(find .eval-packs -name "index.html" -maxdepth 2 -mindepth 2 | head -20)
+            PACKS=$(find .eval-packs -name "*.zip" -maxdepth 1 | head -20)
             if [ -n "$PACKS" ]; then
               echo "found=true" >> "$GITHUB_OUTPUT"
               echo "packs<<EOF" >> "$GITHUB_OUTPUT"
@@ -47,6 +47,14 @@ jobs:
           retention-days: 90
           include-hidden-files: true
 
+      - name: Extract data.json from zips
+        if: steps.find-packs.outputs.found == 'true'
+        run: |
+          for zip in ${{ steps.find-packs.outputs.packs }}; do
+            session=$(basename "$zip" .zip)
+            unzip -p "$zip" "$session/data.json" > ".eval-packs/$session.data.json" 2>/dev/null || true
+          done
+
       - name: Post PR comment
         if: steps.find-packs.outputs.found == 'true'
         uses: actions/github-script@v9
@@ -55,13 +63,12 @@ jobs:
             const fs = require('fs');
             const packs = `${{ steps.find-packs.outputs.packs }}`.trim().split('\n');
 
-            for (const packHtml of packs) {
-              const packDir = packHtml.replace('/index.html', '');
-              const sessionId = packDir.split('/').pop();
+            for (const packZip of packs) {
+              const sessionId = packZip.replace('.eval-packs/', '').replace('.zip', '');
 
               let dataJson = {};
               try {
-                dataJson = JSON.parse(fs.readFileSync(`${packDir}/data.json`, 'utf8'));
+                dataJson = JSON.parse(fs.readFileSync(`.eval-packs/${sessionId}.data.json`, 'utf8'));
               } catch (e) {
                 console.log(`Could not read data.json for ${sessionId}`);
                 continue;
@@ -86,7 +93,7 @@ jobs:
             | Metric | Value |
             |--------|-------|
             | Model | ${metrics.lastModel || 'N/A'} |
-            | Tokens | ${(metrics.totalTokens || 0).toLocaleString()} |
+            | Tokens | ${((metrics.inputTokens || 0) + (metrics.outputTokens || 0) + (metrics.subagentTotalTokens || 0)).toLocaleString()} |
             | Turns | ${metrics.turnCount || 0} |
             | Files Changed | ${metrics.filesChanged || 0} |
             | Lines | +${metrics.insertions || 0} / -${metrics.deletions || 0} |
