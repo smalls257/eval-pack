@@ -130,7 +130,6 @@ function renderPageHeader(data, round) {
 function renderHighlights(analysis) {
   const h = (analysis || {}).highlights || {};
   const cs = h.completionStatus || {};
-  const risk = h.mainRisk || '';
 
   // Completion card
   const card = document.getElementById('completion-card');
@@ -143,10 +142,56 @@ function renderHighlights(analysis) {
     if (notes) notes.textContent = cs.notes || '';
   }
 
-  // Risk card
+  // Confidence card
+  const confCard = document.getElementById('confidence-card');
+  const confVal = document.getElementById('confidence-value');
+  const confNotes = document.getElementById('confidence-notes');
+  const pct = h.confidencePercent;
+  if (confCard && pct != null) {
+    const n = Math.max(0, Math.min(100, Number(pct) || 0));
+    const tier = n >= 75 ? 'high' : n >= 40 ? 'mid' : 'low';
+    confCard.className = `highlight-card confidence-card confidence-${tier}`;
+    confCard.style.display = '';
+    if (confVal) confVal.innerHTML =
+      `${n}%<div class="confidence-bar"><div class="confidence-bar-fill" style="width:${n}%"></div></div>`;
+    if (confNotes) confNotes.textContent = h.confidenceNotes || '';
+  } else if (confCard) {
+    confCard.style.display = 'none';
+  }
+
+  // Business risk card
+  const bizCard = document.getElementById('biz-risk-card');
+  const bizVal = document.getElementById('biz-risk-value');
+  const bizNotes = document.getElementById('biz-risk-notes');
+  const biz = h.businessRisk || {};
+  if (bizCard && biz.level) {
+    const lvl = /^(low|medium|high)$/.test(biz.level) ? biz.level : 'medium';
+    bizCard.className = `highlight-card biz-risk-card biz-risk-${lvl}`;
+    bizCard.style.display = '';
+    if (bizVal) bizVal.textContent = lvl.charAt(0).toUpperCase() + lvl.slice(1);
+    if (bizNotes) bizNotes.textContent = biz.notes || '';
+  } else if (bizCard) {
+    bizCard.style.display = 'none';
+  }
+
+  // Risk mitigation card
+  const mitCard = document.getElementById('mitigation-card');
+  const mitVal = document.getElementById('mitigation-value');
+  const steps = h.riskMitigation || [];
+  if (mitCard && steps.length > 0) {
+    mitCard.style.display = '';
+    if (mitVal) mitVal.innerHTML = steps.map(s =>
+      `<div class="mitigation-step">${escapeHtml(s)}</div>`
+    ).join('');
+  } else if (mitCard) {
+    mitCard.style.display = 'none';
+  }
+
+  // Main risk card
   const riskVal = document.getElementById('risk-value');
   const riskCard = document.getElementById('risk-card');
   if (riskVal) {
+    const risk = h.mainRisk || '';
     if (risk) {
       riskVal.textContent = risk;
       if (riskCard) riskCard.style.display = '';

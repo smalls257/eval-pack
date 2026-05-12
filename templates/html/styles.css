@@ -146,7 +146,7 @@ main.container {
 /* ===== Highlights Row ===== */
 .highlights-row {
   display: grid;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 12px;
   margin-bottom: 12px;
 }
@@ -201,6 +201,47 @@ main.container {
   font-weight: 400;
   color: var(--text);
   line-height: 1.5;
+}
+
+.confidence-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  margin-top: 8px;
+  overflow: hidden;
+}
+.confidence-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.confidence-high  .confidence-bar-fill { background: var(--green, #17b169); }
+.confidence-mid   .confidence-bar-fill { background: var(--amber, #f5a623); }
+.confidence-low   .confidence-bar-fill { background: var(--red, #e5484d); }
+.confidence-high  .highlight-card-value { color: var(--green, #17b169); }
+.confidence-mid   .highlight-card-value { color: var(--amber, #f5a623); }
+.confidence-low   .highlight-card-value { color: var(--red, #e5484d); }
+
+.biz-risk-low    .highlight-card-value { color: var(--green, #17b169); }
+.biz-risk-medium .highlight-card-value { color: var(--amber, #f5a623); }
+.biz-risk-high   .highlight-card-value { color: var(--red, #e5484d); }
+
+.mitigation-card .highlight-card-value {
+  font-size: 12px;
+  font-weight: 400;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.mitigation-step {
+  display: flex;
+  gap: 6px;
+  line-height: 1.4;
+}
+.mitigation-step::before {
+  content: '→';
+  color: var(--text-secondary);
+  flex-shrink: 0;
 }
 
 /* ===== Verdict Banner ===== */

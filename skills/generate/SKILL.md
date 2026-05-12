@@ -76,6 +76,10 @@ If enabled, read the transcript, metrics.json, and patterns.json. Write `${PACK_
   "title": "Short task description for page heading (1 sentence, no period)",
   "highlights": {
     "completionStatus": { "label": "Completion below", "color": "green", "notes": "One sentence on what was achieved" },
+    "confidencePercent": 85,
+    "confidenceNotes": "One sentence explaining the confidence score — what evidence supports it or limits it",
+    "businessRisk": { "level": "low|medium|high", "notes": "One sentence on why this risk level was assigned" },
+    "riskMitigation": ["Step to reduce risk", "Step to reduce risk"],
     "bestProof": { "badges": ["Screenshots", "Passing"], "note": "One sentence on strongest evidence type" },
     "strongestEvidence": "One sentence naming the single most convincing proof point",
     "mainRisk": "One sentence on the biggest remaining uncertainty or gap"
