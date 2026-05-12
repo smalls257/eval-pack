@@ -1,5 +1,5 @@
 ---
-description: Generate an eval pack and create (or update) a pull request with the eval pack attached. Posts a summary comment with verdict badge; GitHub Action uploads eval pack as a private artifact.
+description: Generate an eval pack and create (or update) a pull request with the eval pack committed to the branch.
 tags: ["eval", "review", "pr"]
 ---
 
@@ -19,11 +19,12 @@ Invoke the eval-pack generate skill internally. Run the full generation flow:
 
 ## Step 2: Stage Eval Pack
 
-Add the generated eval pack to git:
+The `.eval-packs/` directory is gitignored — force-add the zip:
 
 ```bash
-git add .eval-packs/
+git add -f .eval-packs/
 git commit -m "chore: add eval pack for session ${SESSION_ID}"
+git push
 ```
 
 ## Step 3: Create or Update PR
@@ -34,7 +35,7 @@ Check if a PR already exists for the current branch:
 EXISTING_PR=$(gh pr list --head "$(git branch --show-current)" --json number --jq '.[0].number // empty')
 ```
 
-If a PR exists, push the new commit. The PR updates automatically.
+If a PR exists, the push above already updated it.
 
 If no PR exists, create one:
 
@@ -46,8 +47,8 @@ gh pr create --title "<appropriate title based on work done>" --body "$(cat <<'E
 
 ## Eval Pack
 
-Eval pack artifact will be uploaded by GitHub Actions when this PR runs CI.
-Check the Actions tab → Artifacts after the workflow completes.
+The eval pack zip is committed to this branch at `.eval-packs/<session-id>.zip`.
+Extract and open `index.html` in a browser to view the full report.
 
 ## Test Results
 
@@ -64,4 +65,4 @@ EOF
 Tell the user:
 - PR URL
 - Eval pack verdict
-- That the GitHub Action will upload the eval pack as an artifact (Actions tab → Artifacts) when it runs
+- That the zip is in `.eval-packs/` on the branch — extract and open `index.html`

@@ -38,7 +38,7 @@ In Claude Code, run:
 /plugin install eval-pack@eval-pack
 ```
 
-Then run the setup skill to wire up the GitHub Action and gitignore:
+Then run the setup skill to wire up the gitignore:
 
 ```
 /eval-pack:setup
@@ -79,7 +79,7 @@ Produces a self-contained zip in `.eval-packs/<session-id>.zip`. Extract and ope
 /eval-pack:review
 ```
 
-Generates the eval pack, commits the zip to the current branch, creates (or updates) a PR, and posts a summary comment. The GitHub Action uploads the zip as a private artifact once the PR runs CI.
+Generates the eval pack, commits the zip to the current branch, and creates (or updates) a PR.
 
 ### Agent auto-generation
 
@@ -111,10 +111,9 @@ In your project's `.claude/settings.json`:
 2. Scripts extract metrics and detect heuristic patterns from the transcript
 3. Claude runs appropriate tests, captures screenshots and logs
 4. Claude analyzes the session — retrospective, repo friction, prompt quality
-5. HTML report is rendered with all data
-6. `/eval-pack:review` optionally creates a PR and posts a summary comment
-7. GitHub Action uploads the zip as a private artifact
-8. Reviewer downloads zip from the Actions tab, extracts, opens `index.html`
+5. HTML report is rendered with all data, zipped to `.eval-packs/<session-id>.zip`
+6. `/eval-pack:review` commits the zip to the branch and creates a PR
+7. Reviewer downloads zip from the branch, extracts, opens `index.html`
 
 ## License
 

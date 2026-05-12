@@ -1,5 +1,5 @@
 ---
-description: Bootstrap a repository to use eval-pack — copies GitHub Action, adds config, sets up gitignore. Run once per repo.
+description: Bootstrap a repository to use eval-pack — adds config and sets up gitignore. Run once per repo.
 tags: ["setup", "config"]
 ---
 
@@ -22,9 +22,6 @@ Add this configuration (preserve any existing content):
         "repo": "smalls257/eval-pack"
       }
     }
-  },
-  "enabledPlugins": {
-    "eval-pack@eval-pack": true
   }
 }
 ```
@@ -35,14 +32,7 @@ Note: New devs who clone this repo will need to run these commands once in Claud
 /plugin install eval-pack@eval-pack
 ```
 
-## Step 2: Copy GitHub Action
-
-```bash
-mkdir -p .github/workflows
-cp "${CLAUDE_PLUGIN_ROOT}/templates/workflows/eval-pack.yml" .github/workflows/eval-pack.yml
-```
-
-## Step 3: Update .gitignore
+## Step 2: Update .gitignore
 
 Add to the project's `.gitignore` (create if missing):
 
@@ -51,11 +41,9 @@ Add to the project's `.gitignore` (create if missing):
 .eval-packs/
 ```
 
-## Step 4: Report
+## Step 3: Report
 
 Tell the user:
 - What was set up
-- Remind them to commit `.github/workflows/eval-pack.yml`
 - New devs who clone the repo must install the plugin once: `/plugin marketplace add smalls257/eval-pack` then `/plugin install eval-pack@eval-pack`
-- Eval packs are uploaded as GitHub Actions artifacts on each PR — accessible from the Actions tab, private to repo collaborators
 - They can now use `/eval-pack:generate` and `/eval-pack:review`
