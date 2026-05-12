@@ -59,36 +59,7 @@ EOF
 )"
 ```
 
-## Step 4: Post Eval Pack Comment
-
-Post a summary comment on the PR with key indicators:
-
-```bash
-gh pr comment "$PR_NUMBER" --body "$(cat <<'EOF'
-## Eval Pack Report
-
-<verdict badge: ✅ PASS / ❌ FAIL / ⚠️ NO TESTS>
-
-| Metric | Value |
-|--------|-------|
-| Model | <model> |
-| Tokens | <total> |
-| Turns | <count> |
-| Files Changed | <count> |
-| Lines | +<ins> / -<del> |
-
-### Flags
-<list heuristic flags as chips>
-
-### Key Findings
-<1-2 sentence summary from analysis>
-
-Eval pack artifact uploaded by GitHub Actions — Actions tab → Artifacts → eval-pack-pr-<PR number>
-EOF
-)"
-```
-
-## Step 5: Report
+## Step 4: Report
 
 Tell the user:
 - PR URL
