@@ -110,46 +110,67 @@ fi
 
 rm -f "$NEW_ROUND_TMP" "$ROUNDS_TMP"
 
-# Render transcript.html if transcript available
+# Render transcript.html — conversational turns only (user text + assistant text + subagent dispatches)
 if [[ -f "$PACK_DIR/transcript.jsonl" ]]; then
 python3 -c "
 import json, html as htmllib
 
-entries = [json.loads(l) for l in open('$PACK_DIR/transcript.jsonl') if l.strip()]
-
-def render_content(c):
-    if isinstance(c, str):
-        return '<pre>' + htmllib.escape(c) + '</pre>'
-    if isinstance(c, list):
-        parts = []
-        for item in c:
-            t = item.get('type','')
-            if t == 'text':
-                parts.append('<pre>' + htmllib.escape(item.get('text','')) + '</pre>')
-            elif t == 'tool_use':
-                parts.append('<details><summary>🔧 ' + htmllib.escape(item.get('name','tool')) + '</summary><pre>' + htmllib.escape(json.dumps(item.get('input',{}), indent=2)) + '</pre></details>')
-            elif t == 'tool_result':
-                content = item.get('content','')
-                if isinstance(content, list):
-                    content = ' '.join(x.get('text','') for x in content if isinstance(x,dict))
-                parts.append('<details><summary>↩ result</summary><pre>' + htmllib.escape(str(content)[:2000]) + '</pre></details>')
-        return ''.join(parts)
-    return ''
-
 rows = []
-for e in entries:
-    role = e.get('type') or (e.get('message') or {}).get('role','')
-    msg = e.get('message') or e
-    content = msg.get('content','')
-    model = msg.get('model','')
-    ts = e.get('timestamp','')
-    color = '#1a1a2e' if role == 'assistant' else '#0f3460'
-    label = (model or role).upper()
-    rows.append(f'<div style=\"margin:8px 0;border-left:3px solid #444;padding:8px 12px;background:{color}\"><div style=\"font-size:11px;color:#888;margin-bottom:4px\">{htmllib.escape(label)} {htmllib.escape(ts[:19] if ts else \"\")}</div>{render_content(content)}</div>')
+try:
+    with open('$PACK_DIR/transcript.jsonl') as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                e = json.loads(line)
+            except Exception:
+                continue
+            role = e.get('type') or (e.get('message') or {}).get('role', '')
+            msg = e.get('message') or e
+            content = msg.get('content', '')
+            ts = e.get('timestamp', '')[:19]
+
+            if role in ('human', 'user'):
+                # User message — plain text only
+                text = content if isinstance(content, str) else ' '.join(
+                    b.get('text', '') for b in content if isinstance(b, dict) and b.get('type') == 'text'
+                ) if isinstance(content, list) else ''
+                if not text.strip():
+                    continue
+                rows.append('<div class=\"turn user\"><div class=\"meta\">USER ' + htmllib.escape(ts) + '</div><pre>' + htmllib.escape(text) + '</pre></div>')
+
+            elif role == 'assistant':
+                if not isinstance(content, list):
+                    continue
+                for block in content:
+                    if not isinstance(block, dict):
+                        continue
+                    # Assistant text
+                    if block.get('type') == 'text':
+                        text = block.get('text', '').strip()
+                        if text:
+                            model = (msg.get('model') or '').upper()
+                            rows.append('<div class=\"turn assistant\"><div class=\"meta\">' + htmllib.escape(model or 'ASSISTANT') + ' ' + htmllib.escape(ts) + '</div><pre>' + htmllib.escape(text) + '</pre></div>')
+                    # Subagent dispatch — show description only
+                    elif block.get('type') == 'tool_use' and block.get('name') == 'Agent':
+                        desc = (block.get('input') or {}).get('description', '')
+                        model = (block.get('input') or {}).get('model') or (block.get('input') or {}).get('subagent_type', '')
+                        if desc:
+                            rows.append('<div class=\"turn subagent\"><div class=\"meta\">→ SUBAGENT ' + htmllib.escape(ts) + '</div><pre>' + htmllib.escape(('[' + model + '] ' if model else '') + desc) + '</pre></div>')
+except Exception as ex:
+    rows.append('<div class=\"turn user\"><pre>Error rendering transcript: ' + htmllib.escape(str(ex)) + '</pre></div>')
 
 page = '''<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Transcript</title>
-<style>body{background:#0d0d1a;color:#ccc;font-family:monospace;font-size:13px;padding:16px;margin:0}pre{white-space:pre-wrap;word-break:break-word;margin:4px 0}details{margin:4px 0}summary{cursor:pointer;color:#7ec8e3}</style>
-</head><body>''' + ''.join(rows) + '</body></html>'
+<style>
+body{background:#0d0d1a;color:#ccc;font-family:monospace;font-size:13px;padding:16px;margin:0}
+pre{white-space:pre-wrap;word-break:break-word;margin:4px 0}
+.turn{margin:8px 0;border-left:3px solid #444;padding:8px 12px}
+.user{background:#0f3460;border-color:#3a6ea5}
+.assistant{background:#1a1a2e;border-color:#444}
+.subagent{background:#1a2e1a;border-color:#3a7a3a}
+.meta{font-size:11px;color:#888;margin-bottom:4px}
+</style></head><body>''' + ''.join(rows) + '</body></html>'
 open('$PACK_DIR/transcript.html', 'w').write(page)
 "
 fi
