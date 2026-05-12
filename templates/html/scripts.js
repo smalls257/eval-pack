@@ -294,53 +294,85 @@ function renderTimeline(analysis) {
   ).join('');
 }
 
-function renderScreenshots(screenshots) {
+function makeScreenshotItem(s) {
+  const path = escapeHtml(s.path || '');
+  const label = escapeHtml(s.label || s.path || '');
+  return `<div class="screenshot-item" data-src="${path}">
+    <img src="${path}" alt="${label}" loading="lazy">
+    <div class="screenshot-label">${label}</div>
+  </div>`;
+}
+
+function attachScreenshotClicks(container) {
+  container.querySelectorAll('.screenshot-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML = `<img src="${item.dataset.src}" alt="">`;
+      overlay.addEventListener('click', () => overlay.remove());
+      document.body.appendChild(overlay);
+    });
+  });
+}
+
+function renderVisualEvidence(data) {
   const section = document.getElementById('screenshots-section');
   const grid = document.getElementById('screenshot-grid');
-  const proofArea = document.getElementById('proof-screenshots-area');
+  const filterNav = document.getElementById('evidence-round-filter');
+  if (!section || !grid) return;
 
-  if (!screenshots || screenshots.length === 0) {
-    if (section) section.style.display = 'none';
-    return;
-  }
+  const rounds = data.rounds || [];
+  const anyScreenshots = rounds.some(r => r.screenshots && r.screenshots.length > 0);
+  if (!anyScreenshots) { section.style.display = 'none'; return; }
 
-  const makeItem = (s, large) => {
-    const path = escapeHtml(s.path || '');
-    const label = escapeHtml(s.label || s.path || '');
-    return `<div class="screenshot-item" data-src="${path}" style="${large ? '' : 'max-width:200px'}">
-      <img src="${path}" alt="${label}" loading="lazy">
-      <div class="screenshot-label">${label}</div>
-    </div>`;
-  };
+  section.style.display = 'block';
 
-  if (grid) {
-    grid.innerHTML = screenshots.map(s => makeItem(s, true)).join('');
-    grid.querySelectorAll('.screenshot-item').forEach(item => {
-      item.addEventListener('click', () => {
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay';
-        overlay.innerHTML = `<img src="${item.dataset.src}" alt="">`;
-        overlay.addEventListener('click', () => overlay.remove());
-        document.body.appendChild(overlay);
+  let activeIdx = rounds.length - 1;
+
+  function showRound(idx) {
+    activeIdx = idx;
+    const screenshots = (rounds[idx] && rounds[idx].screenshots) || [];
+    if (screenshots.length === 0) {
+      grid.innerHTML = '<p class="empty-state">No screenshots for this round.</p>';
+    } else {
+      grid.innerHTML = screenshots.map(makeScreenshotItem).join('');
+      attachScreenshotClicks(grid);
+    }
+    if (filterNav) {
+      filterNav.querySelectorAll('.round-btn').forEach((b, i) => {
+        b.classList.toggle('active', i === idx);
       });
-    });
+    }
+    // Also update proof-screenshots-area if present
+    const proofArea = document.getElementById('proof-screenshots-area');
+    if (proofArea && screenshots.length > 0) {
+      proofArea.innerHTML = `<h3 class="section-subheading">Screenshots</h3>
+        <div class="screenshot-grid">${screenshots.map(makeScreenshotItem).join('')}</div>`;
+      attachScreenshotClicks(proofArea);
+    }
   }
 
-  if (section) section.style.display = 'block';
-
-  if (proofArea) {
-    proofArea.innerHTML = `<h3 class="section-subheading">Screenshots</h3>
-      <div class="screenshot-grid">${screenshots.map(s => makeItem(s, true)).join('')}</div>`;
-    proofArea.querySelectorAll('.screenshot-item').forEach(item => {
-      item.addEventListener('click', () => {
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay';
-        overlay.innerHTML = `<img src="${item.dataset.src}" alt="">`;
-        overlay.addEventListener('click', () => overlay.remove());
-        document.body.appendChild(overlay);
+  if (filterNav) {
+    if (rounds.length > 1) {
+      filterNav.style.display = 'flex';
+      filterNav.innerHTML = rounds.map((r, i) => {
+        const time = r.generatedAt
+          ? new Date(r.generatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : '';
+        return `<button class="round-btn${i === activeIdx ? ' active' : ''}" data-round="${i}">` +
+          `<span class="round-btn-num">Round ${i + 1}</span>` +
+          (time ? `<span class="round-btn-time">${escapeHtml(time)}</span>` : '') +
+          `</button>`;
+      }).join('');
+      filterNav.querySelectorAll('.round-btn').forEach(btn => {
+        btn.addEventListener('click', () => showRound(parseInt(btn.dataset.round, 10)));
       });
-    });
+    } else {
+      filterNav.style.display = 'none';
+    }
   }
+
+  showRound(activeIdx);
 }
 
 function renderFlags(round) {
@@ -653,34 +685,6 @@ function renderTranscript(transcript) {
   }).join('');
 }
 
-function renderRounds(data) {
-  const section = document.getElementById('rounds-section');
-  const nav = document.getElementById('rounds-nav');
-  if (!section || !nav || !data.rounds || data.rounds.length <= 1) {
-    if (section) section.style.display = 'none';
-    return;
-  }
-  section.style.display = 'block';
-  nav.innerHTML = data.rounds.map((r, i) => {
-    const time = r.generatedAt
-      ? new Date(r.generatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      : '';
-    const isActive = i === data.rounds.length - 1;
-    return `<button class="round-btn${isActive ? ' active' : ''}" data-round="${i}">` +
-      `<span class="round-btn-num">Round ${i + 1}</span>` +
-      (time ? `<span class="round-btn-time">${escapeHtml(time)}</span>` : '') +
-      `</button>`;
-  }).join('');
-
-  nav.querySelectorAll('.round-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const idx = parseInt(btn.dataset.round, 10);
-      nav.querySelectorAll('.round-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      renderRound(data, data.rounds[idx]);
-    });
-  });
-}
 
 function renderTools(tools) {
   if (!tools) return;
@@ -754,7 +758,6 @@ function renderRound(data, round) {
   renderFriction(analysis);
   renderDiff(analysis);
   renderTools(round.tools);
-  renderScreenshots(round.screenshots);
   renderImprovements(analysis);
   renderPromptPattern(analysis);
   renderSessionArtifacts(analysis);
@@ -767,8 +770,8 @@ function init(data) {
   const latestRound = rounds.length > 0 ? rounds[rounds.length - 1] : {};
 
   renderRound(data, latestRound);
+  renderVisualEvidence(data);
   renderTranscript(data.transcript);
-  renderRounds(data);
 
   // Tab navigation
   document.querySelectorAll('.tab-btn').forEach(btn => {
