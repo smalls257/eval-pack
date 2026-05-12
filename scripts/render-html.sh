@@ -110,25 +110,27 @@ fi
 
 rm -f "$NEW_ROUND_TMP" "$ROUNDS_TMP"
 
-# Inline data.json into index.html so it opens without a server
-# Escape </script> to prevent the tag from breaking the inline script block
+# Inline data into index.html — transcript stripped to keep file size small
 python3 -c "
 import re, json
 html = open('$PACK_DIR/index.html').read()
-data = open('$PACK_DIR/data.json').read()
-# Escape </script> sequences so they don't end the script tag prematurely
-safe_data = data.replace('</', '<\\\\/')
+data = json.loads(open('$PACK_DIR/data.json').read())
+# Strip transcript — keeps index.html small; transcript tab shows offline note
+data['transcript'] = []
+safe_data = json.dumps(data).replace('</', '<\\\\/')
 tag = '<script>window.__EVAL_PACK_DATA__ = ' + safe_data + ';</script>'
-# Replace existing inline tag, or insert before <script src=\"scripts.js\">
 if '__EVAL_PACK_DATA__' in html:
     html = re.sub(r'<script>window\.__EVAL_PACK_DATA__.*?</script>', tag, html, flags=re.DOTALL)
 else:
     html = html.replace('<script src=\"scripts.js\">', tag + '\n  <script src=\"scripts.js\">')
 open('$PACK_DIR/index.html', 'w').write(html)
+# Also strip transcript from data.json in the zip
+data_path = '$PACK_DIR/data.json'
+open(data_path, 'w').write(json.dumps(data))
 "
 
 # Zip the pack and remove the staging directory
-(cd "$OUTPUT_DIR" && zip -r "$SESSION_ID.zip" "$SESSION_ID/" -x "*.jsonl")
+(cd "$OUTPUT_DIR" && zip -9 -r "$SESSION_ID.zip" "$SESSION_ID/" -x "*.jsonl")
 rm -rf "$PACK_DIR"
 
 echo "Eval pack rendered to $OUTPUT_DIR/$SESSION_ID.zip"

@@ -613,7 +613,7 @@ function renderTranscript(transcript) {
   const container = document.getElementById('transcript-container');
   if (!container) return;
   if (!transcript || transcript.length === 0) {
-    container.innerHTML = '<p class="empty-state">No transcript available.</p>';
+    container.innerHTML = '<p class="empty-state">Transcript not included in eval pack to keep file size small.</p>';
     return;
   }
 
