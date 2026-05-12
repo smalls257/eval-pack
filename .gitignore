@@ -2,3 +2,6 @@
 .playwright-mcp/
 docs/superpowers/
 node_modules/
+
+# Eval packs live on PR branches, not main
+.eval-packs/
