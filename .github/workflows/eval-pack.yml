@@ -41,6 +41,7 @@ jobs:
           name: eval-pack-pr-${{ github.event.pull_request.number }}
           path: .eval-packs/
           retention-days: 90
+          include-hidden-files: true
 
       - name: Post PR comment
         if: steps.find-packs.outputs.found == 'true'
