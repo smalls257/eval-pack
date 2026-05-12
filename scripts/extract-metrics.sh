@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if ! command -v python3 &>/dev/null; then
+  echo "Error: python3 is required by extract-metrics.sh but was not found. Install Python 3 and try again." >&2
+  exit 1
+fi
+
 TRANSCRIPT_FILE="${1:?Usage: extract-metrics.sh <transcript.jsonl> <output-dir>}"
 OUTPUT_DIR="${2:?Usage: extract-metrics.sh <transcript.jsonl> <output-dir>}"
 
