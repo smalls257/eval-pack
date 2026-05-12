@@ -123,4 +123,8 @@ else:
 open('$PACK_DIR/index.html', 'w').write(html)
 "
 
-echo "Eval pack rendered to $PACK_DIR"
+# Zip the pack and remove raw directory
+(cd "$OUTPUT_DIR" && zip -r "$SESSION_ID.zip" "$SESSION_ID/" -x "*.jsonl")
+rm -rf "$PACK_DIR"
+
+echo "Eval pack rendered to $OUTPUT_DIR/$SESSION_ID.zip"
