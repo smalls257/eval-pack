@@ -22,6 +22,12 @@ A Claude Code plugin that generates eval packs — polished HTML reports capturi
 - **Full transcript** — collapsible conversation history with syntax highlighting
 - **Iteration rounds** — compare multiple runs side by side
 
+## Requirements
+
+- **Python 3** — required by the generation scripts (`extract-metrics.sh`, `render-html.sh`)
+- **jq** — used for JSON processing throughout
+- **gh** CLI — required by `/eval-pack:review` to create PRs and post comments
+
 ## Install
 
 In Claude Code, run:
