@@ -7,7 +7,7 @@
     "name": "Jason Smith",
     "email": "wallawalla1337@gmail.com"
   },
-  "repository": "https://github.com/jasonsmith/eval-pack",
+  "repository": "https://github.com/smalls257/eval-pack",
   "license": "MIT",
   "keywords": ["eval", "review", "metrics", "reporting"],
   "skills": "./skills/",
@@ -29,6 +29,6 @@
       "title": "Enable Claude analysis",
       "description": "Have Claude write retrospective, friction report, and prompt quality analysis. When false, only heuristic flags are included.",
       "default": true
-    },
+    }
   }
 }

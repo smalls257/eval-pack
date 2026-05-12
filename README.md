@@ -37,7 +37,7 @@ In Claude Code, run:
 /plugin install eval-pack@eval-pack
 ```
 
-Then run the setup skill to wire up the GitHub Action, gitignore, and Pages config:
+Then run the setup skill to wire up the GitHub Action and gitignore:
 
 ```
 /eval-pack:setup
@@ -45,7 +45,7 @@ Then run the setup skill to wire up the GitHub Action, gitignore, and Pages conf
 
 ### Distribute to your team
 
-To give everyone who clones your repo the plugin config automatically, commit `.claude/settings.json` with:
+To distribute the marketplace config to everyone who clones your repo, commit `.claude/settings.json` with:
 
 ```json
 {
@@ -73,7 +73,7 @@ Each dev still needs to run `/plugin marketplace add smalls257/eval-pack` and `/
 /eval-pack:generate
 ```
 
-Produces a self-contained HTML report in `.eval-packs/<session-id>/`. Open `index.html` in a browser.
+Produces a self-contained zip in `.eval-packs/<session-id>.zip`. Extract and open `index.html` in a browser.
 
 ### Generate + create PR
 
@@ -98,7 +98,6 @@ In your project's `.claude/settings.json`:
       "options": {
         "outputDir": ".eval-packs",
         "includeTranscript": true,
-        "redactPatterns": ["\\.env", "SECRET"],
         "analysis": true
       }
     }
@@ -110,7 +109,6 @@ In your project's `.claude/settings.json`:
 |--------|------|---------|-------------|
 | `outputDir` | string | `.eval-packs` | Where eval packs are written |
 | `includeTranscript` | boolean | `true` | Include full conversation in pack |
-| `redactPatterns` | string[] | `[]` | Regex patterns to strip from transcript |
 | `analysis` | boolean | `true` | Enable Claude retrospective analysis |
 
 ## How It Works
@@ -121,8 +119,8 @@ In your project's `.claude/settings.json`:
 4. Claude analyzes the session — retrospective, repo friction, prompt quality
 5. HTML report is rendered with all data
 6. `/eval-pack:review` optionally creates a PR and posts a summary comment
-7. GitHub Action uploads the HTML as a private artifact (90-day retention)
-8. Reviewer downloads artifact from the Actions tab, extracts, opens `index.html`
+7. GitHub Action uploads the zip as a private artifact
+8. Reviewer downloads zip from the Actions tab, extracts, opens `index.html`
 
 ## License
 
