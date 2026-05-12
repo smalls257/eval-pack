@@ -55,8 +55,18 @@ if [[ -d "$PACK_DIR/screenshots" ]] && ls "$PACK_DIR/screenshots/"*.png >/dev/nu
   done | jq -s '.')
 fi
 
-# Capture git branch
+# Capture git branch and derive zip name from it
 GIT_BRANCH=$(git -C "$PLUGIN_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+ZIP_NAME=$(echo "$GIT_BRANCH" | tr '/' '-' | tr ' ' '-' | sed 's/[^a-zA-Z0-9._-]/-/g')
+ZIP_NAME="${ZIP_NAME:-$SESSION_ID}"
+
+# Restore previous rounds from existing zip before building new round
+PREV_DATA_TMP=$(mktemp)
+if [[ -f "$OUTPUT_DIR/$ZIP_NAME.zip" ]]; then
+  unzip -p "$OUTPUT_DIR/$ZIP_NAME.zip" "*/data.json" > "$PREV_DATA_TMP" 2>/dev/null || echo '{}' > "$PREV_DATA_TMP"
+else
+  echo '{}' > "$PREV_DATA_TMP"
+fi
 
 # Build new round using --slurpfile to avoid "argument list too long" for large JSON files
 NEW_ROUND_TMP=$(mktemp)
@@ -79,13 +89,10 @@ jq -n \
     generatedAt: now | todate
   }' > "$NEW_ROUND_TMP"
 
-# Accumulate rounds — append new round to existing (supports regeneration)
+# Accumulate rounds — append new round to rounds from previous zip
 ROUNDS_TMP=$(mktemp)
-if [[ -f "$PACK_DIR/data.json" ]]; then
-  jq --slurpfile new "$NEW_ROUND_TMP" '(.rounds // []) + $new' "$PACK_DIR/data.json" > "$ROUNDS_TMP"
-else
-  jq -s '.' "$NEW_ROUND_TMP" > "$ROUNDS_TMP"
-fi
+jq --slurpfile new "$NEW_ROUND_TMP" '(.rounds // []) + $new' "$PREV_DATA_TMP" > "$ROUNDS_TMP"
+rm -f "$PREV_DATA_TMP"
 
 # Build data.json base (no transcript yet — transcript merged separately to avoid arg limits)
 jq -n \
@@ -192,7 +199,7 @@ open('$PACK_DIR/data.json', 'w').write(json.dumps(data))
 "
 
 # Zip the pack and remove the staging directory
-(cd "$OUTPUT_DIR" && zip -9 -r "$SESSION_ID.zip" "$SESSION_ID/" -x "*.jsonl")
+(cd "$OUTPUT_DIR" && zip -9 -r "$ZIP_NAME.zip" "$SESSION_ID/" -x "*.jsonl")
 rm -rf "$PACK_DIR"
 
-echo "Eval pack rendered to $OUTPUT_DIR/$SESSION_ID.zip"
+echo "Eval pack rendered to $OUTPUT_DIR/$ZIP_NAME.zip"
