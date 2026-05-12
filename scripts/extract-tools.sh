@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if ! command -v jq &>/dev/null; then
+  echo "Error: jq is required by extract-tools.sh but was not found. Install jq and try again." >&2
+  exit 1
+fi
+
 TRANSCRIPT_FILE="${1:?Usage: extract-tools.sh <transcript.jsonl> <output-dir>}"
 OUTPUT_DIR="${2:?Usage: extract-tools.sh <transcript.jsonl> <output-dir>}"
 

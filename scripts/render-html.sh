@@ -5,6 +5,10 @@ if ! command -v python3 &>/dev/null; then
   echo "Error: python3 is required by render-html.sh but was not found. Install Python 3 and try again." >&2
   exit 1
 fi
+if ! command -v jq &>/dev/null; then
+  echo "Error: jq is required by render-html.sh but was not found. Install jq and try again." >&2
+  exit 1
+fi
 
 OUTPUT_DIR="${1:?Usage: render-html.sh <output-dir> <session-id> <plugin-root> [transcript-file]}"
 SESSION_ID="${2:?Usage: render-html.sh <output-dir> <session-id> <plugin-root> [transcript-file]}"
@@ -123,7 +127,7 @@ else:
 open('$PACK_DIR/index.html', 'w').write(html)
 "
 
-# Zip the pack and remove raw directory
+# Zip the pack and remove the staging directory
 (cd "$OUTPUT_DIR" && zip -r "$SESSION_ID.zip" "$SESSION_ID/" -x "*.jsonl")
 rm -rf "$PACK_DIR"
 

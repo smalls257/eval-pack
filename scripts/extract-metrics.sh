@@ -5,6 +5,10 @@ if ! command -v python3 &>/dev/null; then
   echo "Error: python3 is required by extract-metrics.sh but was not found. Install Python 3 and try again." >&2
   exit 1
 fi
+if ! command -v jq &>/dev/null; then
+  echo "Error: jq is required by extract-metrics.sh but was not found. Install jq and try again." >&2
+  exit 1
+fi
 
 TRANSCRIPT_FILE="${1:?Usage: extract-metrics.sh <transcript.jsonl> <output-dir>}"
 OUTPUT_DIR="${2:?Usage: extract-metrics.sh <transcript.jsonl> <output-dir>}"
@@ -82,9 +86,17 @@ print(json.dumps(result))
 PYEOF
 )
 
-DIFF_STAT=""
+# Find a base to diff against: prefer HEAD~1, fall back to empty tree (first commit)
+DIFF_BASE=""
 if git rev-parse HEAD~1 >/dev/null 2>&1; then
-  DIFF_STAT=$(git diff --stat HEAD~1 2>/dev/null || echo "")
+  DIFF_BASE="HEAD~1"
+elif git rev-parse HEAD >/dev/null 2>&1; then
+  DIFF_BASE=$(git hash-object -t tree /dev/null)
+fi
+
+DIFF_STAT=""
+if [[ -n "$DIFF_BASE" ]]; then
+  DIFF_STAT=$(git diff --stat "$DIFF_BASE" 2>/dev/null || echo "")
 fi
 FILES_CHANGED=$(echo "$DIFF_STAT" | grep -c ' | ' || true)
 INSERTIONS=$(echo "$DIFF_STAT" | tail -1 | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || true)
@@ -92,7 +104,7 @@ INSERTIONS=${INSERTIONS:-0}
 DELETIONS=$(echo "$DIFF_STAT" | tail -1 | grep -oE '[0-9]+ deletion' | grep -oE '[0-9]+' || true)
 DELETIONS=${DELETIONS:-0}
 
-CHANGED_FILES=$(git diff --name-only HEAD~1 2>/dev/null | jq -R -s 'split("\n") | map(select(. != ""))')
+CHANGED_FILES=$([[ -n "$DIFF_BASE" ]] && git diff --name-only "$DIFF_BASE" 2>/dev/null | jq -R -s 'split("\n") | map(select(. != ""))' || echo '[]')
 
 jq -n \
   --arg model "$MODEL" \
