@@ -110,12 +110,55 @@ fi
 
 rm -f "$NEW_ROUND_TMP" "$ROUNDS_TMP"
 
+# Render transcript.html if transcript available
+if [[ -f "$PACK_DIR/transcript.jsonl" ]]; then
+python3 -c "
+import json, html as htmllib
+
+entries = [json.loads(l) for l in open('$PACK_DIR/transcript.jsonl') if l.strip()]
+
+def render_content(c):
+    if isinstance(c, str):
+        return '<pre>' + htmllib.escape(c) + '</pre>'
+    if isinstance(c, list):
+        parts = []
+        for item in c:
+            t = item.get('type','')
+            if t == 'text':
+                parts.append('<pre>' + htmllib.escape(item.get('text','')) + '</pre>')
+            elif t == 'tool_use':
+                parts.append('<details><summary>🔧 ' + htmllib.escape(item.get('name','tool')) + '</summary><pre>' + htmllib.escape(json.dumps(item.get('input',{}), indent=2)) + '</pre></details>')
+            elif t == 'tool_result':
+                content = item.get('content','')
+                if isinstance(content, list):
+                    content = ' '.join(x.get('text','') for x in content if isinstance(x,dict))
+                parts.append('<details><summary>↩ result</summary><pre>' + htmllib.escape(str(content)[:2000]) + '</pre></details>')
+        return ''.join(parts)
+    return ''
+
+rows = []
+for e in entries:
+    role = e.get('type') or (e.get('message') or {}).get('role','')
+    msg = e.get('message') or e
+    content = msg.get('content','')
+    model = msg.get('model','')
+    ts = e.get('timestamp','')
+    color = '#1a1a2e' if role == 'assistant' else '#0f3460'
+    label = (model or role).upper()
+    rows.append(f'<div style=\"margin:8px 0;border-left:3px solid #444;padding:8px 12px;background:{color}\"><div style=\"font-size:11px;color:#888;margin-bottom:4px\">{htmllib.escape(label)} {htmllib.escape(ts[:19] if ts else \"\")}</div>{render_content(content)}</div>')
+
+page = '''<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Transcript</title>
+<style>body{background:#0d0d1a;color:#ccc;font-family:monospace;font-size:13px;padding:16px;margin:0}pre{white-space:pre-wrap;word-break:break-word;margin:4px 0}details{margin:4px 0}summary{cursor:pointer;color:#7ec8e3}</style>
+</head><body>''' + ''.join(rows) + '</body></html>'
+open('$PACK_DIR/transcript.html', 'w').write(page)
+"
+fi
+
 # Inline data into index.html — transcript stripped to keep file size small
 python3 -c "
 import re, json
 html = open('$PACK_DIR/index.html').read()
 data = json.loads(open('$PACK_DIR/data.json').read())
-# Strip transcript — keeps index.html small; transcript tab shows offline note
 data['transcript'] = []
 safe_data = json.dumps(data).replace('</', '<\\\\/')
 tag = '<script>window.__EVAL_PACK_DATA__ = ' + safe_data + ';</script>'
@@ -124,9 +167,7 @@ if '__EVAL_PACK_DATA__' in html:
 else:
     html = html.replace('<script src=\"scripts.js\">', tag + '\n  <script src=\"scripts.js\">')
 open('$PACK_DIR/index.html', 'w').write(html)
-# Also strip transcript from data.json in the zip
-data_path = '$PACK_DIR/data.json'
-open(data_path, 'w').write(json.dumps(data))
+open('$PACK_DIR/data.json', 'w').write(json.dumps(data))
 "
 
 # Zip the pack and remove the staging directory
