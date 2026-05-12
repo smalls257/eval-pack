@@ -2,19 +2,19 @@
   "toolCalls": [
     {
       "name": "Bash",
-      "count": 201
+      "count": 249
     },
     {
       "name": "Edit",
-      "count": 83
+      "count": 110
     },
     {
       "name": "Read",
-      "count": 76
+      "count": 89
     },
     {
       "name": "Agent",
-      "count": 59
+      "count": 63
     },
     {
       "name": "TaskUpdate",
@@ -25,32 +25,32 @@
       "count": 30
     },
     {
+      "name": "mcp__plugin_playwright_playwright__browser_evaluate",
+      "count": 27
+    },
+    {
       "name": "mcp__plugin_playwright_playwright__browser_take_screenshot",
-      "count": 19
+      "count": 21
     },
     {
       "name": "mcp__plugin_playwright_playwright__browser_navigate",
-      "count": 16
+      "count": 20
+    },
+    {
+      "name": "Write",
+      "count": 14
     },
     {
       "name": "Grep",
       "count": 13
     },
     {
-      "name": "mcp__plugin_playwright_playwright__browser_evaluate",
-      "count": 12
+      "name": "Skill",
+      "count": 11
     },
     {
       "name": "ToolSearch",
       "count": 11
-    },
-    {
-      "name": "Skill",
-      "count": 9
-    },
-    {
-      "name": "Write",
-      "count": 9
     },
     {
       "name": "mcp__plugin_playwright_playwright__browser_click",
@@ -77,7 +77,7 @@
       "count": 1
     }
   ],
-  "totalToolCalls": 616,
+  "totalToolCalls": 736,
   "subagents": [
     {
       "description": "Research Claude Code plugin structure",
@@ -373,11 +373,35 @@
       "description": "Check if Claude Code auto-discovers skills from .claude/ directory",
       "model": "default",
       "subagentType": "claude-code-guide"
+    },
+    {
+      "description": "Verify exact Claude Code skill discovery depth from .claude/skills/",
+      "model": "default",
+      "subagentType": "claude-code-guide"
+    },
+    {
+      "description": "Find valid extraKnownMarketplaces source types in Claude Code",
+      "model": "default",
+      "subagentType": "claude-code-guide"
+    },
+    {
+      "description": "Find exact working extraKnownMarketplaces schema from Claude Code source or docs",
+      "model": "default",
+      "subagentType": "general-purpose"
+    },
+    {
+      "description": "Find Claude Code CLI plugin install commands",
+      "model": "default",
+      "subagentType": "claude-code-guide"
     }
   ],
   "skills": [
     {
       "name": "eval-pack:generate",
+      "args": ""
+    },
+    {
+      "name": "eval-pack:setup",
       "args": ""
     },
     {

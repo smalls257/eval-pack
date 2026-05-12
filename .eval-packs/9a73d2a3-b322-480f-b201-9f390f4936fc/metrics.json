@@ -1,26 +1,21 @@
 {
   "lastModel": "claude-sonnet-4-6",
-  "inputTokens": 1317,
-  "outputTokens": 544246,
-  "totalTokens": 83072459,
-  "turnCount": 1452,
+  "inputTokens": 1902,
+  "outputTokens": 669452,
+  "totalTokens": 122503262,
+  "turnCount": 2100,
   "firstTimestamp": "2026-05-11T02:12:34.361Z",
-  "lastTimestamp": "2026-05-11T16:22:55.599Z",
-  "filesChanged": 7,
-  "insertions": 29997,
-  "deletions": 27227,
+  "lastTimestamp": "2026-05-12T02:28:01.315Z",
+  "filesChanged": 2,
+  "insertions": 127,
+  "deletions": 0,
   "changedFilesList": [
-    ".eval-packs/9a73d2a3-b322-480f-b201-9f390f4936fc/data.json",
-    ".eval-packs/9a73d2a3-b322-480f-b201-9f390f4936fc/metrics.json",
-    ".eval-packs/9a73d2a3-b322-480f-b201-9f390f4936fc/scripts.js",
-    ".eval-packs/9a73d2a3-b322-480f-b201-9f390f4936fc/tools.json",
-    ".eval-packs/9a73d2a3-b322-480f-b201-9f390f4936fc/transcript.jsonl",
-    "scripts/extract-metrics.sh",
-    "templates/html/scripts.js"
+    ".github/workflows/eval-pack.yml",
+    ".gitignore"
   ],
-  "cacheReadTokens": 80119170,
-  "cacheWriteTokens": 2407726,
-  "subagentTotalTokens": 3676667,
+  "cacheReadTokens": 118763295,
+  "cacheWriteTokens": 3068613,
+  "subagentTotalTokens": 3864954,
   "tokensByModel": [
     {
       "model": "claude-opus-4-6",
@@ -29,14 +24,18 @@
     },
     {
       "model": "claude-sonnet-4-6",
-      "inputTokens": 1113,
-      "outputTokens": 501013
+      "inputTokens": 1698,
+      "outputTokens": 626219
     }
   ],
   "subagentTokensByModel": [
     {
       "model": "claude-code-guide",
-      "totalTokens": 70966
+      "totalTokens": 224135
+    },
+    {
+      "model": "general-purpose",
+      "totalTokens": 35118
     },
     {
       "model": "haiku",
