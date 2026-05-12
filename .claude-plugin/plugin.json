@@ -30,11 +30,5 @@
       "description": "Have Claude write retrospective, friction report, and prompt quality analysis. When false, only heuristic flags are included.",
       "default": true
     },
-    "artifactRetentionDays": {
-      "type": "number",
-      "title": "Artifact retention days",
-      "description": "How many days GitHub Actions artifacts are retained (default: 90).",
-      "default": 90
-    }
   }
 }

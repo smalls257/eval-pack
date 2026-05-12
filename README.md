@@ -99,8 +99,7 @@ In your project's `.claude/settings.json`:
         "outputDir": ".eval-packs",
         "includeTranscript": true,
         "redactPatterns": ["\\.env", "SECRET"],
-        "analysis": true,
-        "artifactRetentionDays": 90
+        "analysis": true
       }
     }
   }
@@ -113,7 +112,6 @@ In your project's `.claude/settings.json`:
 | `includeTranscript` | boolean | `true` | Include full conversation in pack |
 | `redactPatterns` | string[] | `[]` | Regex patterns to strip from transcript |
 | `analysis` | boolean | `true` | Enable Claude retrospective analysis |
-| `artifactRetentionDays` | number | `90` | Days to retain eval pack artifacts |
 
 ## How It Works
 
