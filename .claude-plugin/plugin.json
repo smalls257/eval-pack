@@ -30,10 +30,11 @@
       "description": "Have Claude write retrospective, friction report, and prompt quality analysis. When false, only heuristic flags are included.",
       "default": true
     },
-    "pagesBaseUrl": {
-      "type": "string",
-      "title": "GitHub Pages base URL",
-      "description": "Base URL for deployed eval packs (e.g. https://myorg.github.io/myrepo/eval-packs). Used in PR comment links."
+    "artifactRetentionDays": {
+      "type": "number",
+      "title": "Artifact retention days",
+      "description": "How many days GitHub Actions artifacts are retained (default: 90).",
+      "default": 90
     }
   }
 }

@@ -100,7 +100,7 @@ In your project's `.claude/settings.json`:
         "includeTranscript": true,
         "redactPatterns": ["\\.env", "SECRET"],
         "analysis": true,
-        "pagesBaseUrl": "https://myorg.github.io/myrepo/eval-packs"
+        "artifactRetentionDays": 90
       }
     }
   }

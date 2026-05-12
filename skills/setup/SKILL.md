@@ -1,5 +1,5 @@
 ---
-description: Bootstrap a repository to use eval-pack — copies GitHub Action, adds config, sets up gitignore and Pages. Run once per repo.
+description: Bootstrap a repository to use eval-pack — copies GitHub Action, adds config, sets up gitignore. Run once per repo.
 tags: ["setup", "config"]
 ---
 
@@ -47,7 +47,7 @@ cp "${CLAUDE_PLUGIN_ROOT}/templates/workflows/eval-pack.yml" .github/workflows/e
 Add to the project's `.gitignore` (create if missing):
 
 ```
-# Eval packs live on PR branches and gh-pages, not main
+# Eval packs are committed to PR branches, not main
 .eval-packs/
 ```
 
