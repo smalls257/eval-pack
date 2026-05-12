@@ -801,13 +801,16 @@ function init(data) {
 
 // ── bootstrap ─────────────────────────────────────────────────────────────────
 
-fetch('data.json')
-  .then(r => r.json())
-  .then(init)
-  .catch(err => {
-    document.body.innerHTML = `<div style="padding:2rem;font-family:monospace;color:#e74c3c">
-      <h2>Failed to load eval pack data</h2>
-      <p>${escapeHtml(String(err))}</p>
-      <p>Serve this directory over HTTP: <code>python3 -m http.server 8080</code></p>
-    </div>`;
-  });
+if (window.__EVAL_PACK_DATA__) {
+  init(window.__EVAL_PACK_DATA__);
+} else {
+  fetch('data.json')
+    .then(r => r.json())
+    .then(init)
+    .catch(err => {
+      document.body.innerHTML = `<div style="padding:2rem;font-family:monospace;color:#e74c3c">
+        <h2>Failed to load eval pack data</h2>
+        <p>${escapeHtml(String(err))}</p>
+      </div>`;
+    });
+}

@@ -1,13 +1,24 @@
 {
-  "falseCompletions": [],
+  "falseCompletions": [
+    {
+      "turn": 2947,
+      "agentClaim": "Done. Manual comment deleted from PR #1, review skill updated so only the Actions bot posts, pushed to main.",
+      "userResponse": "i see something about node 20 being deprecated and to use 24 or something in the action logs"
+    }
+  ],
   "retryCount": 2,
-  "testFailureCount": 21,
+  "testFailureCount": 22,
   "scopeDrift": false,
   "flags": [
     {
       "level": "red",
       "label": "Test failures during session",
-      "count": 21
+      "count": 22
+    },
+    {
+      "level": "amber",
+      "label": "False completions",
+      "count": 1
     }
   ]
 }
