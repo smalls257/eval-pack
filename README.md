@@ -26,6 +26,7 @@ A Claude Code plugin that generates eval packs — polished HTML reports capturi
 
 - **Python 3** — required by the generation scripts (`extract-metrics.sh`, `render-html.sh`)
 - **jq** — used for JSON processing throughout
+- **zip** — used to package the eval pack output
 - **gh** CLI — required by `/eval-pack:review` to create PRs and post comments
 
 ## Install
@@ -56,14 +57,11 @@ To distribute the marketplace config to everyone who clones your repo, commit `.
         "repo": "smalls257/eval-pack"
       }
     }
-  },
-  "enabledPlugins": {
-    "eval-pack@eval-pack": true
   }
 }
 ```
 
-Each dev still needs to run `/plugin marketplace add smalls257/eval-pack` and `/plugin install eval-pack@eval-pack` once, but the config tells Claude Code where to find it.
+Each dev still needs to run `/plugin marketplace add smalls257/eval-pack` and `/plugin install eval-pack@eval-pack` once to install the plugin.
 
 ## Usage
 
@@ -81,7 +79,7 @@ Produces a self-contained zip in `.eval-packs/<session-id>.zip`. Extract and ope
 /eval-pack:review
 ```
 
-Generates the eval pack, creates (or updates) a PR, and posts a summary comment. The GitHub Action uploads the eval pack as a private artifact on the Actions tab.
+Generates the eval pack, commits the zip to the current branch, creates (or updates) a PR, and posts a summary comment. The GitHub Action uploads the zip as a private artifact once the PR runs CI.
 
 ### Agent auto-generation
 
@@ -96,8 +94,6 @@ In your project's `.claude/settings.json`:
   "pluginConfigs": {
     "eval-pack": {
       "options": {
-        "outputDir": ".eval-packs",
-        "includeTranscript": true,
         "analysis": true
       }
     }
@@ -107,8 +103,6 @@ In your project's `.claude/settings.json`:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `outputDir` | string | `.eval-packs` | Where eval packs are written |
-| `includeTranscript` | boolean | `true` | Include full conversation in pack |
 | `analysis` | boolean | `true` | Enable Claude retrospective analysis |
 
 ## How It Works
