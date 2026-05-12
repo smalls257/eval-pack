@@ -40,7 +40,7 @@ fi
 [[ -f "$PACK_DIR/tools.json" ]]        || echo '{}' > "$PACK_DIR/tools.json"
 
 # Capture git branch and derive zip name from it
-GIT_BRANCH=$(git -C "$PLUGIN_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+GIT_BRANCH=$(git -C "$OUTPUT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
 ZIP_NAME=$(echo "$GIT_BRANCH" | tr '/' '-' | tr ' ' '-' | sed 's/[^a-zA-Z0-9._-]/-/g')
 ZIP_NAME="${ZIP_NAME:-$SESSION_ID}"
 
