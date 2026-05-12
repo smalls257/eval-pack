@@ -39,22 +39,6 @@ fi
 [[ -f "$PACK_DIR/test-results.json" ]] || echo '{}' > "$PACK_DIR/test-results.json"
 [[ -f "$PACK_DIR/tools.json" ]]        || echo '{}' > "$PACK_DIR/tools.json"
 
-# Pull in any Playwright MCP screenshots from plugin root
-PLAYWRIGHT_MCP_DIR="$PLUGIN_ROOT/.playwright-mcp"
-if [[ -d "$PLAYWRIGHT_MCP_DIR" ]] && ls "$PLAYWRIGHT_MCP_DIR/"*.png >/dev/null 2>&1; then
-  cp "$PLAYWRIGHT_MCP_DIR/"*.png "$PACK_DIR/screenshots/" 2>/dev/null || true
-fi
-
-# Detect screenshots — short list, safe as --argjson
-SCREENSHOTS="[]"
-if [[ -d "$PACK_DIR/screenshots" ]] && ls "$PACK_DIR/screenshots/"*.png >/dev/null 2>&1; then
-  SCREENSHOTS=$(ls "$PACK_DIR/screenshots/"*.png | while read -r f; do
-    stem=$(basename "$f" .png)
-    label=$(echo "$stem" | tr '-' ' ' | tr '_' ' ')
-    printf '{"path":"screenshots/%s","label":"%s"}\n' "$(basename "$f")" "$label"
-  done | jq -s '.')
-fi
-
 # Capture git branch and derive zip name from it
 GIT_BRANCH=$(git -C "$PLUGIN_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
 ZIP_NAME=$(echo "$GIT_BRANCH" | tr '/' '-' | tr ' ' '-' | sed 's/[^a-zA-Z0-9._-]/-/g')
@@ -66,6 +50,30 @@ if [[ -f "$OUTPUT_DIR/$ZIP_NAME.zip" ]]; then
   unzip -p "$OUTPUT_DIR/$ZIP_NAME.zip" "*/data.json" > "$PREV_DATA_TMP" 2>/dev/null || echo '{}' > "$PREV_DATA_TMP"
 else
   echo '{}' > "$PREV_DATA_TMP"
+fi
+
+# Pull in any Playwright MCP screenshots from plugin root
+PLAYWRIGHT_MCP_DIR="$PLUGIN_ROOT/.playwright-mcp"
+if [[ -d "$PLAYWRIGHT_MCP_DIR" ]] && ls "$PLAYWRIGHT_MCP_DIR/"*.png >/dev/null 2>&1; then
+  cp "$PLAYWRIGHT_MCP_DIR/"*.png "$PACK_DIR/screenshots/" 2>/dev/null || true
+fi
+
+# Build set of screenshot filenames already in previous rounds (to deduplicate)
+PREV_SCREENSHOTS=$(jq -r '[.rounds[]?.screenshots[]?.path | ltrimstr("screenshots/")] | unique | .[]' "$PREV_DATA_TMP" 2>/dev/null || true)
+
+# Detect screenshots new to this round — exclude any already in prior rounds
+SCREENSHOTS="[]"
+if [[ -d "$PACK_DIR/screenshots" ]] && ls "$PACK_DIR/screenshots/"*.png >/dev/null 2>&1; then
+  SCREENSHOTS=$(ls "$PACK_DIR/screenshots/"*.png | while read -r f; do
+    fname=$(basename "$f")
+    # Skip if this file appeared in a previous round
+    if echo "$PREV_SCREENSHOTS" | grep -qxF "$fname"; then
+      continue
+    fi
+    stem=$(basename "$f" .png)
+    label=$(echo "$stem" | tr '-' ' ' | tr '_' ' ')
+    printf '{"path":"screenshots/%s","label":"%s"}\n' "$fname" "$label"
+  done | jq -s '.')
 fi
 
 # Build new round using --slurpfile to avoid "argument list too long" for large JSON files
