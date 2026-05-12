@@ -107,26 +107,20 @@ fi
 rm -f "$NEW_ROUND_TMP" "$ROUNDS_TMP"
 
 # Inline data.json into index.html so it opens without a server
-DATA_JS="<script>window.__EVAL_PACK_DATA__ = $(cat "$PACK_DIR/data.json");</script>"
-if grep -q '__EVAL_PACK_DATA__' "$PACK_DIR/index.html" 2>/dev/null; then
-  # Replace existing inline data
-  python3 -c "
-import sys, re
+# Escape </script> to prevent the tag from breaking the inline script block
+python3 -c "
+import re, json
 html = open('$PACK_DIR/index.html').read()
 data = open('$PACK_DIR/data.json').read()
-html = re.sub(r'<script>window\.__EVAL_PACK_DATA__[^<]*</script>', '<script>window.__EVAL_PACK_DATA__ = ' + data + ';</script>', html)
+# Escape </script> sequences so they don't end the script tag prematurely
+safe_data = data.replace('</', '<\\\\/')
+tag = '<script>window.__EVAL_PACK_DATA__ = ' + safe_data + ';</script>'
+# Replace existing inline tag, or insert before <script src=\"scripts.js\">
+if '__EVAL_PACK_DATA__' in html:
+    html = re.sub(r'<script>window\.__EVAL_PACK_DATA__.*?</script>', tag, html, flags=re.DOTALL)
+else:
+    html = html.replace('<script src=\"scripts.js\">', tag + '\n  <script src=\"scripts.js\">')
 open('$PACK_DIR/index.html', 'w').write(html)
 "
-else
-  # Insert before </body>
-  python3 -c "
-import sys
-html = open('$PACK_DIR/index.html').read()
-data = open('$PACK_DIR/data.json').read()
-tag = '<script>window.__EVAL_PACK_DATA__ = ' + data + ';</script>'
-html = html.replace('</body>', tag + '\n</body>')
-open('$PACK_DIR/index.html', 'w').write(html)
-"
-fi
 
 echo "Eval pack rendered to $PACK_DIR"
