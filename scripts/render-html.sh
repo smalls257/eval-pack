@@ -101,4 +101,27 @@ fi
 
 rm -f "$NEW_ROUND_TMP" "$ROUNDS_TMP"
 
+# Inline data.json into index.html so it opens without a server
+DATA_JS="<script>window.__EVAL_PACK_DATA__ = $(cat "$PACK_DIR/data.json");</script>"
+if grep -q '__EVAL_PACK_DATA__' "$PACK_DIR/index.html" 2>/dev/null; then
+  # Replace existing inline data
+  python3 -c "
+import sys, re
+html = open('$PACK_DIR/index.html').read()
+data = open('$PACK_DIR/data.json').read()
+html = re.sub(r'<script>window\.__EVAL_PACK_DATA__[^<]*</script>', '<script>window.__EVAL_PACK_DATA__ = ' + data + ';</script>', html)
+open('$PACK_DIR/index.html', 'w').write(html)
+"
+else
+  # Insert before </body>
+  python3 -c "
+import sys
+html = open('$PACK_DIR/index.html').read()
+data = open('$PACK_DIR/data.json').read()
+tag = '<script>window.__EVAL_PACK_DATA__ = ' + data + ';</script>'
+html = html.replace('</body>', tag + '\n</body>')
+open('$PACK_DIR/index.html', 'w').write(html)
+"
+fi
+
 echo "Eval pack rendered to $PACK_DIR"
