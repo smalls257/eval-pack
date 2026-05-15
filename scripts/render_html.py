@@ -55,7 +55,7 @@ def load_jsonl(path):
             try:
                 entries.append(json.loads(line))
             except json.JSONDecodeError:
-                pass
+                print(f"Warning: skipping malformed JSONL line in {path}", file=sys.stderr)
     return entries
 
 
@@ -186,6 +186,7 @@ def main():
                         prev_data = json.loads(zf.read(name).decode("utf-8"))
                         break
         except Exception:
+            print(f"Warning: could not read prior zip {zip_path}; starting fresh", file=sys.stderr)
             prev_data = {}
 
     playwright_dir = plugin_root / ".playwright-mcp"
