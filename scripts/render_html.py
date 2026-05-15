@@ -146,9 +146,7 @@ def main():
 
     pack_dir.mkdir(parents=True, exist_ok=True)
     screenshots_dir = pack_dir / "screenshots"
-    if screenshots_dir.is_dir():
-        shutil.rmtree(screenshots_dir)
-    screenshots_dir.mkdir()
+    screenshots_dir.mkdir(exist_ok=True)
     (pack_dir / "logs").mkdir(exist_ok=True)
 
     shutil.copy(template_dir / "index.html", pack_dir / "index.html")
