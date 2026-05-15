@@ -343,6 +343,9 @@ main.container {
 
 .tl-text {
   color: var(--text);
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 /* ===== Flags ===== */
@@ -459,6 +462,8 @@ main.container {
   padding-left: 16px;
   position: relative;
   color: var(--text);
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .bullet-list li::before {
@@ -567,6 +572,8 @@ main.container {
   vertical-align: top;
   color: var(--text);
   line-height: 1.5;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .data-table tbody tr:last-child td { border-bottom: none; }
@@ -672,21 +679,15 @@ main.container {
 
 .files-changed-list li {
   font-size: 13px;
-  display: flex;
-  gap: 10px;
-  align-items: baseline;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
-.files-changed-list .file-path {
+.files-changed-list li code {
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--accent);
-  flex-shrink: 0;
-}
-
-.files-changed-list .file-desc {
-  color: var(--text-secondary);
-  font-size: 13px;
+  word-break: break-all;
 }
 
 /* ===== Code Block ===== */
