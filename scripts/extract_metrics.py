@@ -4,7 +4,6 @@ import re
 import subprocess
 import sys
 from collections import defaultdict
-from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -74,11 +73,17 @@ def extract_subagent_tokens(entries):
     return total, by_model
 
 
+_git_warned = False
+
 def run_git(args):
+    global _git_warned
     try:
         result = subprocess.run(["git"] + args, capture_output=True, text=True)
         return result.stdout if result.returncode == 0 else ""
-    except Exception:
+    except FileNotFoundError:
+        if not _git_warned:
+            print("Warning: git not found; file change stats will be empty", file=sys.stderr)
+            _git_warned = True
         return ""
 
 
@@ -87,9 +92,8 @@ def get_diff_stats():
     if run_git(["rev-parse", "HEAD~1"]).strip():
         diff_base = "HEAD~1"
     elif run_git(["rev-parse", "HEAD"]).strip():
-        empty_tree = run_git(["hash-object", "-t", "tree", "/dev/null"]).strip()
-        if empty_tree:
-            diff_base = empty_tree
+        # 4b825dc... is git's canonical empty-tree SHA — stable across all git versions
+        diff_base = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
     if not diff_base:
         return 0, 0, 0, []
