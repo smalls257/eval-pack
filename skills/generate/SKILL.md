@@ -68,12 +68,26 @@ Identify and run appropriate tests for the changes made in this session:
    Run this Python snippet to find screenshots in `.playwright-mcp/` that fall within the session window (using `firstTimestamp`/`lastTimestamp` from `${PACK_DIR}/metrics.json`):
 
    ```python
-   import json, pathlib, datetime, os
+   import json, pathlib, datetime, zipfile, re
    metrics = json.loads(pathlib.Path("${PACK_DIR}/metrics.json").read_text())
    start = datetime.datetime.fromisoformat(metrics.get("firstTimestamp","").replace("Z","+00:00")) if metrics.get("firstTimestamp") else None
    end   = datetime.datetime.fromisoformat(metrics.get("lastTimestamp","").replace("Z","+00:00"))  if metrics.get("lastTimestamp")  else None
-   candidates = []
+
+   # names already in pack_dir or in any previous round in the zip
    already = {p.name for p in pathlib.Path("${PACK_DIR}/screenshots").glob("*.png")}
+   zip_path = pathlib.Path("${OUTPUT_DIR}/${ZIP_NAME}.zip")
+   if zip_path.is_file():
+       with zipfile.ZipFile(zip_path) as z:
+           for name in z.namelist():
+               if name.endswith("data.json"):
+                   prev = json.loads(z.read(name))
+                   if prev.get("sessionId") == "${SESSION_ID}":
+                       for r in prev.get("rounds", []):
+                           for s in r.get("screenshots", []):
+                               already.add(pathlib.Path(s.get("path","")).name)
+                   break
+
+   candidates = []
    for png in sorted(pathlib.Path(".playwright-mcp").glob("*.png")):
        if png.name in already: continue
        mtime = datetime.datetime.fromtimestamp(png.stat().st_mtime, tz=datetime.timezone.utc)
