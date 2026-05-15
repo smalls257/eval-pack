@@ -191,10 +191,24 @@ def main():
             print("Warning: extract_tools.py failed; tool data will be empty", file=sys.stderr)
         _collect_screenshots_from_transcript(transcript_file, screenshots_dir)
 
+    analysis_path = pack_dir / "analysis.json"
+    if not analysis_path.is_file():
+        print(
+            f"Error: analysis.json not found in {pack_dir}. Run Step 4 (Analyze) before rendering.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    analysis_data = read_json(analysis_path)
+    if not analysis_data.get("title"):
+        print(
+            "Error: analysis.json is empty or missing required fields. Run Step 4 (Analyze) before rendering.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     for name, default in [
         ("metrics.json", "{}"),
         ("patterns.json", "{}"),
-        ("analysis.json", "{}"),
         ("test-results.json", "{}"),
         ("tools.json", "{}"),
     ]:
