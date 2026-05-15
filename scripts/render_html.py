@@ -194,57 +194,6 @@ def main():
             print(f"Warning: could not read prior zip {zip_path}; starting fresh", file=sys.stderr)
             prev_data = {}
 
-    # Determine session time window from metrics.json for screenshot filtering.
-    # metrics.json may have been pre-populated by extract_metrics.py before render runs,
-    # or may be the empty default written above — fall back to prev_data if empty.
-    metrics_data = read_json(pack_dir / "metrics.json")
-    if not metrics_data.get("firstTimestamp"):
-        # try to get timestamps from the most recent previous round
-        prev_rounds = prev_data.get("rounds") or []
-        if prev_rounds:
-            metrics_data = prev_rounds[-1].get("metrics") or metrics_data
-    session_start_str = metrics_data.get("firstTimestamp", "")
-    session_end_str = metrics_data.get("lastTimestamp", "")
-    try:
-        session_start = datetime.fromisoformat(session_start_str.replace("Z", "+00:00")) if session_start_str else None
-        session_end = datetime.fromisoformat(session_end_str.replace("Z", "+00:00")) if session_end_str else None
-    except ValueError:
-        session_start = session_end = None
-
-    # Timestamp pattern in screenshot filenames: YYYY-MM-DDTHH-MM-SS
-    _ts_re = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})")
-
-    def screenshot_in_session(png_path):
-        if session_start is None:
-            return True
-        # Try ISO timestamp embedded in filename first
-        m = _ts_re.search(png_path.name)
-        if m:
-            try:
-                raw = m.group(1)
-                date_part, time_part = raw.split("T")
-                ts_str = date_part + "T" + time_part.replace("-", ":") + "+00:00"
-                ts = datetime.fromisoformat(ts_str)
-                if session_end:
-                    return session_start <= ts <= session_end
-                return ts >= session_start
-            except ValueError:
-                pass
-        # Fall back to file mtime
-        try:
-            mtime = datetime.fromtimestamp(png_path.stat().st_mtime, tz=timezone.utc)
-            if session_end:
-                return session_start <= mtime <= session_end
-            return mtime >= session_start
-        except OSError:
-            return True
-
-    playwright_dir = plugin_root / ".playwright-mcp"
-    if playwright_dir.is_dir():
-        for png in playwright_dir.glob("*.png"):
-            if screenshot_in_session(png):
-                shutil.copy(png, pack_dir / "screenshots" / png.name)
-
     prev_screenshot_names = {
         Path(s.get("path", "")).name
         for r in (prev_data.get("rounds") or [])
@@ -254,8 +203,6 @@ def main():
     if screenshots_dir.is_dir():
         for png in sorted(screenshots_dir.glob("*.png")):
             if png.name in prev_screenshot_names:
-                continue
-            if not screenshot_in_session(png):
                 continue
             stem = png.stem
             label = stem.replace("-", " ").replace("_", " ")
