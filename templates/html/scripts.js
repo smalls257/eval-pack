@@ -541,6 +541,26 @@ function renderTestsNew(analysis) {
   }
 }
 
+function renderReviewFindings(analysis) {
+  const tbody = document.getElementById('review-findings-tbody');
+  if (!tbody) return;
+  const rows = analysis.reviewFindings || [];
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No review findings recorded.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => {
+    const sev = escapeHtml(r.severity || 'suggestion');
+    return `<tr>
+      <td>${renderMarkdown(r.issue)}</td>
+      <td><span class="review-severity review-severity-${sev}">${sev}</span></td>
+      <td>${escapeHtml(r.foundIn || '—')}</td>
+      <td>${renderMarkdown(r.resolution || '—')}</td>
+      <td>${r.commit ? `<code class="review-commit">${escapeHtml(r.commit)}</code>` : '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
 function renderFriction(analysis) {
   const tbody = document.getElementById('friction-tbody');
   if (!tbody) return;
@@ -800,6 +820,7 @@ function renderRound(data, round) {
   renderProof(analysis);
   renderTestsExisting(analysis);
   renderTestsNew(analysis);
+  renderReviewFindings(analysis);
   renderFriction(analysis);
   renderDiff(analysis);
   renderTools(round.tools);

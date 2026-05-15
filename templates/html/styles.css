@@ -646,6 +646,21 @@ main.container {
 .diff-badge.present { background: rgba(23, 177, 105, 0.12); color: var(--green); border: 1px solid rgba(23, 177, 105, 0.25); }
 .diff-badge.absent { background: rgba(136, 136, 136, 0.1); color: var(--text-secondary); border: 1px solid var(--border); }
 
+.review-severity {
+  display: inline-block;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.review-severity-critical { background: rgba(229, 72, 77, 0.12); color: var(--red); border: 1px solid rgba(229, 72, 77, 0.25); }
+.review-severity-important { background: rgba(245, 166, 35, 0.12); color: var(--amber); border: 1px solid rgba(245, 166, 35, 0.25); }
+.review-severity-suggestion { background: rgba(136, 136, 136, 0.1); color: var(--text-secondary); border: 1px solid var(--border); }
+.review-commit { font-family: var(--font-mono); font-size: 12px; }
+
 .files-changed-list {
   list-style: none;
   padding: 0;

@@ -120,6 +120,9 @@ If enabled, read the transcript, metrics.json, and patterns.json. Write `${PACK_
     "narrative": "Paragraph describing any new tests added.",
     "newTests": ["test name or description", "..."]
   },
+  "reviewFindings": [
+    {"issue": "Short description of what the reviewer found", "severity": "critical|important|suggestion", "foundIn": "Task N — filename.py or section name", "resolution": "How it was fixed", "commit": "commit message or short SHA (optional)"}
+  ],
   "frictionLog": [
     {"friction": "what slowed things down", "evidence": "specific transcript moment or pattern", "type": "tooling|structure|naming|docs|other", "resolution": "how it was resolved or what the impact was"}
   ],

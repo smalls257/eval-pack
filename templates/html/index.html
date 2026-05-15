@@ -117,6 +117,7 @@
         <button class="tab-btn" data-panel="tests-existing" role="tab" aria-selected="false">Tests: Existing</button>
         <button class="tab-btn" data-panel="tests-new" role="tab" aria-selected="false">Tests: New</button>
         <button class="tab-btn" data-panel="friction" role="tab" aria-selected="false">Friction</button>
+        <button class="tab-btn" data-panel="review-findings" role="tab" aria-selected="false">Review Findings</button>
         <button class="tab-btn" data-panel="diff" role="tab" aria-selected="false">Diff</button>
         <button class="tab-btn" data-panel="repo-improvements" role="tab" aria-selected="false">Repo Improvements</button>
         <button class="tab-btn" data-panel="user-improvements" role="tab" aria-selected="false">User Improvements</button>
@@ -211,6 +212,22 @@
     <section class="tab-panel card" id="panel-tests-new" role="tabpanel" style="display:none;">
       <p class="narrative" id="tests-new-narrative"></p>
       <ul class="bullet-list" id="tests-new-list"></ul>
+    </section>
+
+    <!-- Review Findings -->
+    <section class="tab-panel card" id="panel-review-findings" role="tabpanel" style="display:none;">
+      <table class="data-table" id="review-findings-table">
+        <thead>
+          <tr>
+            <th>Issue</th>
+            <th>Severity</th>
+            <th>Found In</th>
+            <th>Resolution</th>
+            <th>Commit</th>
+          </tr>
+        </thead>
+        <tbody id="review-findings-tbody"></tbody>
+      </table>
     </section>
 
     <!-- Friction -->
