@@ -157,6 +157,37 @@ def _collect_screenshots_from_transcript(transcript_file, screenshots_dir):
         print(f"Collected {copied} screenshot(s) from transcript tool calls")
 
 
+def _sweep_playwright_dir(plugin_root, screenshots_dir, metrics_data):
+    playwright_dir = plugin_root / ".playwright-mcp"
+    if not playwright_dir.is_dir():
+        return
+    start_str = metrics_data.get("firstTimestamp", "")
+    end_str = metrics_data.get("lastTimestamp", "")
+    try:
+        session_start = datetime.fromisoformat(start_str.replace("Z", "+00:00")) if start_str else None
+        session_end = datetime.fromisoformat(end_str.replace("Z", "+00:00")) if end_str else None
+    except ValueError:
+        session_start = session_end = None
+    copied = 0
+    for png in playwright_dir.glob("*.png"):
+        dest = screenshots_dir / png.name
+        if dest.exists():
+            continue
+        if session_start is not None:
+            try:
+                mtime = datetime.fromtimestamp(png.stat().st_mtime, tz=timezone.utc)
+                if mtime < session_start:
+                    continue
+                if session_end and mtime > session_end:
+                    continue
+            except OSError:
+                continue
+        shutil.copy(png, dest)
+        copied += 1
+    if copied:
+        print(f"Swept {copied} screenshot(s) from .playwright-mcp via session timestamps")
+
+
 def main():
     if len(sys.argv) < 4:
         print(
@@ -189,6 +220,9 @@ def main():
         if not ok:
             print("Warning: extract_tools.py failed; tool data will be empty", file=sys.stderr)
         _collect_screenshots_from_transcript(transcript_file, screenshots_dir)
+
+    metrics_data = read_json(pack_dir / "metrics.json")
+    _sweep_playwright_dir(plugin_root, screenshots_dir, metrics_data)
 
     for name, default in [
         ("metrics.json", "{}"),
