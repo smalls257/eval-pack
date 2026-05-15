@@ -6,15 +6,19 @@ from pathlib import Path
 
 def load_jsonl(path):
     entries = []
+    skipped = 0
     with open(path, encoding="utf-8") as f:
-        for line in f:
+        for line_no, line in enumerate(f, 1):
             line = line.strip()
             if not line:
                 continue
             try:
                 entries.append(json.loads(line))
             except json.JSONDecodeError:
-                pass
+                skipped += 1
+                print(f"Warning: skipping malformed JSON on line {line_no}", file=sys.stderr)
+    if skipped:
+        print(f"Warning: {skipped} line(s) skipped due to JSON parse errors", file=sys.stderr)
     return entries
 
 
