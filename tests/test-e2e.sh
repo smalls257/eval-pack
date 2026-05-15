@@ -30,7 +30,7 @@ JSONL
 
 # Step 1: Extract metrics
 echo "--- Step 1: Extract metrics ---"
-"$PLUGIN_ROOT/scripts/extract-metrics.sh" "$TEST_DIR/transcript.jsonl" "$TEST_DIR/$SESSION_ID"
+python3 "$PLUGIN_ROOT/scripts/extract_metrics.py" "$TEST_DIR/transcript.jsonl" "$TEST_DIR/$SESSION_ID"
 
 if [[ ! -f "$TEST_DIR/$SESSION_ID/metrics.json" ]]; then
   echo "FAIL: metrics.json not created" >&2
@@ -54,7 +54,7 @@ echo "  PASS"
 # Step 2: Detect patterns
 echo ""
 echo "--- Step 2: Detect patterns ---"
-"$PLUGIN_ROOT/scripts/detect-patterns.sh" "$TEST_DIR/transcript.jsonl" "$TEST_DIR/$SESSION_ID"
+python3 "$PLUGIN_ROOT/scripts/detect_patterns.py" "$TEST_DIR/transcript.jsonl" "$TEST_DIR/$SESSION_ID"
 
 if [[ ! -f "$TEST_DIR/$SESSION_ID/patterns.json" ]]; then
   echo "FAIL: patterns.json not created" >&2
@@ -76,7 +76,7 @@ echo "  PASS"
 # Step 2.5: Extract tool usage
 echo ""
 echo "--- Step 2.5: Extract tool usage ---"
-"$PLUGIN_ROOT/scripts/extract-tools.sh" "$TEST_DIR/transcript.jsonl" "$TEST_DIR/$SESSION_ID"
+python3 "$PLUGIN_ROOT/scripts/extract_tools.py" "$TEST_DIR/transcript.jsonl" "$TEST_DIR/$SESSION_ID"
 
 if [[ ! -f "$TEST_DIR/$SESSION_ID/tools.json" ]]; then
   echo "FAIL: tools.json not created" >&2
@@ -185,49 +185,70 @@ echo "  PASS"
 # Step 5: Render HTML
 echo ""
 echo "--- Step 5: Render HTML ---"
-"$PLUGIN_ROOT/scripts/render-html.sh" "$TEST_DIR" "$SESSION_ID" "$PLUGIN_ROOT" "$TEST_DIR/transcript.jsonl"
+python3 "$PLUGIN_ROOT/scripts/render_html.py" "$TEST_DIR" "$SESSION_ID" "$PLUGIN_ROOT" "$TEST_DIR/transcript.jsonl"
 
-EXPECTED_FILES=("index.html" "styles.css" "scripts.js" "data.json" "transcript.jsonl")
-for f in "${EXPECTED_FILES[@]}"; do
-  if [[ ! -f "$TEST_DIR/$SESSION_ID/$f" ]]; then
-    echo "FAIL: $f not found in pack" >&2
-    exit 1
-  fi
-done
+# Determine zip name — render uses git branch (from TEST_DIR first, then cwd), or session-id as fallback
+ZIP_NAME=$(git -C "$TEST_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null | tr '/' '-' | tr ' ' '-' | sed 's/[^a-zA-Z0-9._-]/-/g' || true)
+if [[ -z "$ZIP_NAME" ]]; then
+  ZIP_NAME=$(git rev-parse --abbrev-ref HEAD 2>/dev/null | tr '/' '-' | tr ' ' '-' | sed 's/[^a-zA-Z0-9._-]/-/g' || true)
+fi
+ZIP_NAME="${ZIP_NAME:-$SESSION_ID}"
+ZIP_PATH="$TEST_DIR/$ZIP_NAME.zip"
 
-# Verify data.json structure
-ROUNDS=$(jq '.rounds | length' "$TEST_DIR/$SESSION_ID/data.json")
-HAS_TRANSCRIPT=$(jq '.transcript | length' "$TEST_DIR/$SESSION_ID/data.json")
-
-echo "  Rounds: $ROUNDS"
-echo "  Transcript entries: $HAS_TRANSCRIPT"
-
-if [[ "$ROUNDS" -ne 1 ]]; then
-  echo "FAIL: should have exactly 1 round" >&2
+if [[ ! -f "$ZIP_PATH" ]]; then
+  echo "FAIL: zip not found at $ZIP_PATH" >&2
   exit 1
 fi
 
-HAS_TOOLS=$(jq '.rounds[0].tools.toolCalls | length' "$TEST_DIR/$SESSION_ID/data.json")
-if [[ "$HAS_TOOLS" -lt 1 ]]; then
-  echo "FAIL: tools should appear in data.json round" >&2
-  exit 1
-fi
-echo "  Tools in data.json: $HAS_TOOLS tool types"
-echo "  PASS"
+python3 - "$ZIP_PATH" "$SESSION_ID" << 'PYEOF'
+import sys, zipfile, json
+
+zip_path, session_id = sys.argv[1], sys.argv[2]
+zf = zipfile.ZipFile(zip_path)
+names = zf.namelist()
+
+required = ["index.html", "styles.css", "scripts.js", "data.json"]
+for f in required:
+    if not any(n.endswith(f) for n in names):
+        print(f"FAIL: {f} not found in zip", file=sys.stderr)
+        sys.exit(1)
+
+data_entry = next(n for n in names if n.endswith("data.json"))
+data = json.loads(zf.read(data_entry))
+
+rounds = data.get("rounds", [])
+if len(rounds) != 1:
+    print(f"FAIL: expected 1 round, got {len(rounds)}", file=sys.stderr)
+    sys.exit(1)
+
+tools = rounds[0].get("tools", {}).get("toolCalls", [])
+if not tools:
+    print("FAIL: tools should appear in data.json round", file=sys.stderr)
+    sys.exit(1)
+
+print(f"  Rounds: {len(rounds)}")
+print(f"  Tools in data.json: {len(tools)} tool types")
+print("  PASS")
+PYEOF
 
 # Step 6: Test regeneration (round 2)
 echo ""
 echo "--- Step 6: Test regeneration (round 2) ---"
-"$PLUGIN_ROOT/scripts/render-html.sh" "$TEST_DIR" "$SESSION_ID" "$PLUGIN_ROOT" "$TEST_DIR/transcript.jsonl"
+python3 "$PLUGIN_ROOT/scripts/render_html.py" "$TEST_DIR" "$SESSION_ID" "$PLUGIN_ROOT" "$TEST_DIR/transcript.jsonl"
 
-ROUNDS=$(jq '.rounds | length' "$TEST_DIR/$SESSION_ID/data.json")
-echo "  Rounds after regeneration: $ROUNDS"
+python3 - "$ZIP_PATH" << 'PYEOF'
+import sys, zipfile, json
 
-if [[ "$ROUNDS" -ne 2 ]]; then
-  echo "FAIL: should have 2 rounds after regeneration" >&2
-  exit 1
-fi
-echo "  PASS"
+zf = zipfile.ZipFile(sys.argv[1])
+data_entry = next(n for n in zf.namelist() if n.endswith("data.json"))
+data = json.loads(zf.read(data_entry))
+rounds = data.get("rounds", [])
+if len(rounds) != 2:
+    print(f"FAIL: expected 2 rounds after regeneration, got {len(rounds)}", file=sys.stderr)
+    sys.exit(1)
+print(f"  Rounds after regeneration: {len(rounds)}")
+print("  PASS")
+PYEOF
 
 echo ""
 echo "=== ALL TESTS PASSED ==="
