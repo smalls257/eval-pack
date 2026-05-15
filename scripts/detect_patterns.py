@@ -8,7 +8,12 @@ from pathlib import Path
 def load_jsonl(path):
     entries = []
     skipped = 0
-    with open(path, encoding="utf-8") as f:
+    try:
+        f_handle = open(path, encoding="utf-8")
+    except OSError as exc:
+        print(f"Error: could not open {path}: {exc}", file=sys.stderr)
+        sys.exit(1)
+    with f_handle as f:
         for line_no, line in enumerate(f, 1):
             line = line.strip()
             if not line:
@@ -82,7 +87,11 @@ def check_scope_drift(output_dir):
     try:
         data = json.loads(metrics_path.read_text(encoding="utf-8"))
         return (data.get("filesChanged") or 0) > 10
-    except Exception:
+    except json.JSONDecodeError as exc:
+        print(f"Warning: could not parse metrics.json — scope drift unknown: {exc}", file=sys.stderr)
+        return False
+    except OSError as exc:
+        print(f"Warning: could not read metrics.json — scope drift unknown: {exc}", file=sys.stderr)
         return False
 
 
@@ -127,7 +136,11 @@ def main():
     }
 
     out_path = output_dir / "patterns.json"
-    out_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    try:
+        out_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    except OSError as exc:
+        print(f"Error: could not write {out_path}: {exc}", file=sys.stderr)
+        sys.exit(1)
     print(f"Patterns written to {out_path}")
 
 
