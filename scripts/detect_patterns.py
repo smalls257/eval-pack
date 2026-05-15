@@ -80,6 +80,17 @@ def detect_test_failures(entries):
     )
 
 
+def tests_passed_at_end(output_dir):
+    results_path = Path(output_dir) / "test-results.json"
+    if not results_path.is_file():
+        return False
+    try:
+        data = json.loads(results_path.read_text(encoding="utf-8"))
+        return data.get("verdict") == "pass"
+    except (json.JSONDecodeError, OSError):
+        return False
+
+
 def check_scope_drift(output_dir):
     metrics_path = Path(output_dir) / "metrics.json"
     if not metrics_path.is_file():
@@ -115,8 +126,10 @@ def main():
     test_failures = detect_test_failures(entries)
     scope_drift = check_scope_drift(output_dir)
 
+    final_pass = tests_passed_at_end(output_dir)
+
     flags = []
-    if test_failures > 0:
+    if test_failures > 0 and not final_pass:
         flags.append({"level": "red", "label": "Test failures during session", "count": test_failures})
     if false_completions:
         flags.append({"level": "amber", "label": "False completions", "count": len(false_completions)})
