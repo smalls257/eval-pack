@@ -63,7 +63,32 @@ Identify and run appropriate tests for the changes made in this session:
    - Save test output to `${PACK_DIR}/logs/test-output.log`
    - Save build output to `${PACK_DIR}/logs/build-output.log` if a build was run
    - Save screenshots to `${PACK_DIR}/screenshots/` with descriptive filenames
-4. Write test results to `${PACK_DIR}/test-results.json`:
+4. Sweep for additional screenshots from the session:
+
+   Run this Python snippet to find screenshots in `.playwright-mcp/` that fall within the session window (using `firstTimestamp`/`lastTimestamp` from `${PACK_DIR}/metrics.json`):
+
+   ```python
+   import json, pathlib, datetime, os
+   metrics = json.loads(pathlib.Path("${PACK_DIR}/metrics.json").read_text())
+   start = datetime.datetime.fromisoformat(metrics.get("firstTimestamp","").replace("Z","+00:00")) if metrics.get("firstTimestamp") else None
+   end   = datetime.datetime.fromisoformat(metrics.get("lastTimestamp","").replace("Z","+00:00"))  if metrics.get("lastTimestamp")  else None
+   candidates = []
+   already = {p.name for p in pathlib.Path("${PACK_DIR}/screenshots").glob("*.png")}
+   for png in sorted(pathlib.Path(".playwright-mcp").glob("*.png")):
+       if png.name in already: continue
+       mtime = datetime.datetime.fromtimestamp(png.stat().st_mtime, tz=datetime.timezone.utc)
+       if start and mtime < start: continue
+       if end   and mtime > end:   continue
+       candidates.append(png)
+   for c in candidates:
+       print(c.name)
+   ```
+
+   If candidates are found, show the list to the user and ask: **"These screenshots from `.playwright-mcp/` fall within the session window. Include any in the eval pack?"** Copy confirmed ones to `${PACK_DIR}/screenshots/`.
+
+   If no candidates, continue.
+
+5. Write test results to `${PACK_DIR}/test-results.json`:
 
 ```json
 {
