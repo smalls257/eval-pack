@@ -127,6 +127,36 @@ def render_transcript_html(transcript_path, pack_dir):
     (pack_dir / "transcript.html").write_text(page, encoding="utf-8")
 
 
+def _collect_screenshots_from_transcript(transcript_file, screenshots_dir):
+    copied = 0
+    for entry in load_jsonl(transcript_file):
+        msg = entry.get("message") or entry
+        content = msg.get("content") or []
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") != "tool_use":
+                continue
+            if not block.get("name", "").endswith("browser_take_screenshot"):
+                continue
+            filename = (block.get("input") or {}).get("filename")
+            if not filename:
+                continue
+            src = Path(filename)
+            if not src.is_absolute():
+                src = Path.cwd() / src
+            if not src.is_file():
+                continue
+            dest = screenshots_dir / src.name
+            if not dest.exists():
+                shutil.copy(src, dest)
+                copied += 1
+    if copied:
+        print(f"Collected {copied} screenshot(s) from transcript tool calls")
+
+
 def main():
     if len(sys.argv) < 4:
         print(
@@ -158,6 +188,7 @@ def main():
         ok = run_script(scripts_dir / "extract_tools.py", [transcript_file, pack_dir])
         if not ok:
             print("Warning: extract_tools.py failed; tool data will be empty", file=sys.stderr)
+        _collect_screenshots_from_transcript(transcript_file, screenshots_dir)
 
     for name, default in [
         ("metrics.json", "{}"),
