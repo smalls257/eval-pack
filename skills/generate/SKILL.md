@@ -5,6 +5,16 @@ tags: ["eval", "review", "metrics"]
 
 # Generate Eval Pack
 
+## Prerequisites
+
+Verify Python 3 is available before running any scripts:
+
+```bash
+python3 --version
+```
+
+If this fails, stop and tell the user: `"Error: Python 3 is required by eval-pack. Install from python.org and ensure python3 is in your PATH."`
+
 You are generating an eval pack for the current session. Follow these steps in order.
 
 ## Step 1: Extract Metrics
@@ -12,7 +22,7 @@ You are generating an eval pack for the current session. Follow these steps in o
 Run the extract-metrics script against the current session transcript:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/extract-metrics.sh" "${TRANSCRIPT_PATH}" "${PACK_DIR}"
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/extract_metrics.py" "${TRANSCRIPT_PATH}" "${PACK_DIR}"
 ```
 
 Where:
@@ -26,7 +36,7 @@ If the transcript path is not available, read the conversation history from cont
 Run the detect-patterns script:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/detect-patterns.sh" "${TRANSCRIPT_PATH}" "${PACK_DIR}"
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/detect_patterns.py" "${TRANSCRIPT_PATH}" "${PACK_DIR}"
 ```
 
 ## Step 2.5: Extract Tool Usage
@@ -34,10 +44,10 @@ Run the detect-patterns script:
 Run the extract-tools script:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/extract-tools.sh" "${TRANSCRIPT_PATH}" "${PACK_DIR}"
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/extract_tools.py" "${TRANSCRIPT_PATH}" "${PACK_DIR}"
 ```
 
-If the transcript path is not available or the script fails, continue — `render-html.sh` will fall back to `{}` automatically.
+If the transcript path is not available or the script fails, continue — `render_html.py` will fall back to `{}` automatically.
 
 ## Step 3: Run Tests
 
@@ -147,7 +157,7 @@ Be specific and actionable. Reference actual files, patterns, and moments from t
 Run the render script:
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/render-html.sh" "${OUTPUT_DIR}" "${SESSION_ID}" "${CLAUDE_PLUGIN_ROOT}" "${TRANSCRIPT_PATH}"
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/render_html.py" "${OUTPUT_DIR}" "${SESSION_ID}" "${CLAUDE_PLUGIN_ROOT}" "${TRANSCRIPT_PATH}"
 ```
 
 This assembles the final eval pack with all data, handles round detection for regeneration, and copies template files.
