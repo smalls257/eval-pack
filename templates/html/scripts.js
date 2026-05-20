@@ -720,7 +720,7 @@ function renderVerdictStatement(analysis) {
   if (!card || !el) return;
   if (analysis.verdictStatement) {
     card.style.display = 'block';
-    el.innerHTML = renderMarkdown(analysis.verdictStatement);
+    el.innerHTML = html`${safe(renderMarkdown(analysis.verdictStatement))}`;
   } else {
     card.style.display = 'none';
   }
