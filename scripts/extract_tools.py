@@ -2,8 +2,8 @@
 import json
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent))
-from constants import SKILL_ARGS_MAX_LEN
+sys.path.insert(0, str(Path(__file__).parent))  # noqa: E402
+from constants import SKILL_ARGS_MAX_LEN  # noqa: E402
 
 
 def load_jsonl(path):
