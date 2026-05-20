@@ -31,7 +31,6 @@ JSONL
 # Step 1: Extract metrics
 echo "--- Step 1: Extract metrics ---"
 python3 "$PLUGIN_ROOT/scripts/extract_metrics.py" "$TEST_DIR/transcript.jsonl" "$TEST_DIR/$SESSION_ID" \
-  --branch "test-branch" \
   --insertions 10 \
   --deletions 3 \
   --files-changed 2 \

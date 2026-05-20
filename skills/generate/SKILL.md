@@ -33,7 +33,7 @@ INSERTIONS=$(echo "$DIFF_STAT" | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+'
 DELETIONS=$(echo "$DIFF_STAT" | grep -oE '[0-9]+ deletion' | grep -oE '[0-9]+' || echo "0")
 FILES_CHANGED=$(git diff --name-only "$DIFF_BASE" 2>/dev/null | wc -l | tr -d ' ' || echo "0")
 CHANGED_FILES=$(git diff --name-only "$DIFF_BASE" 2>/dev/null \
-  | python3 -c "import sys,json; print(json.dumps(sys.stdin.read().splitlines()))" \
+  | python3 -c "import sys,json; lines=[l for l in sys.stdin.read().splitlines() if l.strip()]; print(json.dumps(lines))" \
   || echo "[]")
 ```
 
@@ -45,7 +45,6 @@ Run the extract-metrics script against the current session transcript:
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/extract_metrics.py" "${TRANSCRIPT_PATH}" "${PACK_DIR}" \
-  --branch "${BRANCH}" \
   --insertions "${INSERTIONS}" \
   --deletions "${DELETIONS}" \
   --files-changed "${FILES_CHANGED}" \

@@ -85,10 +85,9 @@ def main():
     parser = argparse.ArgumentParser(description="Extract session metrics from transcript")
     parser.add_argument("transcript_file", type=Path)
     parser.add_argument("output_dir", type=Path)
-    parser.add_argument("--branch", default="", help="Git branch name")
-    parser.add_argument("--insertions", type=int, default=0)
-    parser.add_argument("--deletions", type=int, default=0)
-    parser.add_argument("--files-changed", type=int, default=0, dest="files_changed")
+    parser.add_argument("--insertions", type=int, default=0, help="Lines inserted (from git diff --stat)")
+    parser.add_argument("--deletions", type=int, default=0, help="Lines deleted (from git diff --stat)")
+    parser.add_argument("--files-changed", type=int, default=0, dest="files_changed", help="Number of files changed (from git diff --name-only | wc -l)")
     parser.add_argument(
         "--changed-files", default="[]", dest="changed_files_json",
         help="JSON array of changed file paths",
