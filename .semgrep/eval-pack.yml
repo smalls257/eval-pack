@@ -1,0 +1,69 @@
+rules:
+  - id: no-shell-true
+    patterns:
+      - pattern: subprocess.run(..., shell=True, ...)
+      - pattern: subprocess.call(..., shell=True, ...)
+      - pattern: subprocess.Popen(..., shell=True, ...)
+    message: >
+      Command injection risk: shell=True allows injection via untrusted input.
+      Use list form: subprocess.run(["cmd", arg1, arg2]).
+    languages: [python]
+    severity: ERROR
+    paths:
+      include:
+        - scripts/
+
+  - id: no-silent-except
+    pattern: |
+      try:
+        ...
+      except:
+        pass
+    message: >
+      Silent Fallback: bare except/pass swallows errors invisibly.
+      Log with context or re-raise. See extract_metrics.py for correct pattern.
+    languages: [python]
+    severity: ERROR
+    paths:
+      include:
+        - scripts/
+
+  - id: no-git-in-scripts
+    pattern-either:
+      - pattern: subprocess.run(["git", ...], ...)
+      - pattern: subprocess.run(["git"] + $ARGS, ...)
+    message: >
+      Infected Core: git subprocess inside scripts/ violates the Airplane Test.
+      Git calls belong in the skill orchestration layer (SKILL.md).
+      Pass results as --branch / --insertions / --deletions CLI args.
+    languages: [python]
+    severity: ERROR
+    paths:
+      include:
+        - scripts/
+
+  - id: no-path-from-argv
+    pattern-either:
+      - pattern: Path(sys.argv[$N])
+      - pattern: $BASE / sys.argv[$N]
+    message: >
+      Path traversal risk: sys.argv values used directly in path construction.
+      Validate with re.match(r'^[a-zA-Z0-9._-]+$', value) before use.
+    languages: [python]
+    severity: ERROR
+    paths:
+      include:
+        - scripts/
+
+  - id: no-innerHTML-concat
+    pattern-either:
+      - pattern: $EL.innerHTML = $A + $B
+      - pattern: $EL.innerHTML += $A
+    message: >
+      XSS risk: innerHTML via string concatenation bypasses escaping.
+      Use the html`` tagged template: el.innerHTML = html`<span>${value}</span>`.
+    languages: [javascript]
+    severity: ERROR
+    paths:
+      include:
+        - templates/

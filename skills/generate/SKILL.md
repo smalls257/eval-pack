@@ -17,12 +17,38 @@ If this fails, stop and tell the user: `"Error: Python 3 is required by eval-pac
 
 You are generating an eval pack for the current session. Follow these steps in order.
 
+## Step 0: Gather Git Context
+
+Run these commands to collect git metadata. Store results as shell variables — pass them as arguments to extraction scripts.
+
+```bash
+BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+if git rev-parse HEAD~1 >/dev/null 2>&1; then
+    DIFF_BASE="HEAD~1"
+else
+    DIFF_BASE="4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+fi
+DIFF_STAT=$(git diff --stat "$DIFF_BASE" 2>/dev/null || echo "")
+INSERTIONS=$(echo "$DIFF_STAT" | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo "0")
+DELETIONS=$(echo "$DIFF_STAT" | grep -oE '[0-9]+ deletion' | grep -oE '[0-9]+' || echo "0")
+FILES_CHANGED=$(git diff --name-only "$DIFF_BASE" 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+CHANGED_FILES=$(git diff --name-only "$DIFF_BASE" 2>/dev/null \
+  | python3 -c "import sys,json; lines=[l for l in sys.stdin.read().splitlines() if l.strip()]; print(json.dumps(lines))" \
+  || echo "[]")
+```
+
+If git is unavailable, all variables default to empty/zero — scripts proceed with blank git stats.
+
 ## Step 1: Extract Metrics
 
 Run the extract-metrics script against the current session transcript:
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/extract_metrics.py" "${TRANSCRIPT_PATH}" "${PACK_DIR}"
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/extract_metrics.py" "${TRANSCRIPT_PATH}" "${PACK_DIR}" \
+  --insertions "${INSERTIONS}" \
+  --deletions "${DELETIONS}" \
+  --files-changed "${FILES_CHANGED}" \
+  --changed-files "${CHANGED_FILES}"
 ```
 
 Where:
@@ -199,7 +225,8 @@ Be specific and actionable. Reference actual files, patterns, and moments from t
 Run the render script:
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/render_html.py" "${OUTPUT_DIR}" "${SESSION_ID}" "${CLAUDE_PLUGIN_ROOT}" "${TRANSCRIPT_PATH}"
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/render_html.py" "${OUTPUT_DIR}" "${SESSION_ID}" "${CLAUDE_PLUGIN_ROOT}" "${TRANSCRIPT_PATH}" \
+  --branch "${BRANCH}"
 ```
 
 This assembles the final eval pack with all data, handles round detection for regeneration, and copies template files.

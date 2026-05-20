@@ -30,7 +30,11 @@ JSONL
 
 # Step 1: Extract metrics
 echo "--- Step 1: Extract metrics ---"
-python3 "$PLUGIN_ROOT/scripts/extract_metrics.py" "$TEST_DIR/transcript.jsonl" "$TEST_DIR/$SESSION_ID"
+python3 "$PLUGIN_ROOT/scripts/extract_metrics.py" "$TEST_DIR/transcript.jsonl" "$TEST_DIR/$SESSION_ID" \
+  --insertions 10 \
+  --deletions 3 \
+  --files-changed 2 \
+  --changed-files '["login.ts", "auth.test.ts"]'
 
 if [[ ! -f "$TEST_DIR/$SESSION_ID/metrics.json" ]]; then
   echo "FAIL: metrics.json not created" >&2
@@ -180,19 +184,16 @@ cat > "$TEST_DIR/$SESSION_ID/analysis.json" << 'JSON'
   "verdictStatement": "The auth token boundary fix is correctly implemented and verified by the test suite, though the false completion pattern indicates the agent should run edge case tests proactively before claiming completion."
 }
 JSON
+cp "$TEST_DIR/$SESSION_ID/analysis.json" "$TEST_DIR/analysis_backup.json"
 echo "  PASS"
 
 # Step 5: Render HTML
 echo ""
 echo "--- Step 5: Render HTML ---"
-python3 "$PLUGIN_ROOT/scripts/render_html.py" "$TEST_DIR" "$SESSION_ID" "$PLUGIN_ROOT" "$TEST_DIR/transcript.jsonl"
+python3 "$PLUGIN_ROOT/scripts/render_html.py" "$TEST_DIR" "$SESSION_ID" "$PLUGIN_ROOT" "$TEST_DIR/transcript.jsonl" \
+  --branch "test-branch"
 
-# Determine zip name — render uses git branch (from TEST_DIR first, then cwd), or session-id as fallback
-ZIP_NAME=$(git -C "$TEST_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null | tr '/' '-' | tr ' ' '-' | sed 's/[^a-zA-Z0-9._-]/-/g' || true)
-if [[ -z "$ZIP_NAME" ]]; then
-  ZIP_NAME=$(git rev-parse --abbrev-ref HEAD 2>/dev/null | tr '/' '-' | tr ' ' '-' | sed 's/[^a-zA-Z0-9._-]/-/g' || true)
-fi
-ZIP_NAME="${ZIP_NAME:-$SESSION_ID}"
+ZIP_NAME="test-branch"
 ZIP_PATH="$TEST_DIR/$ZIP_NAME.zip"
 
 if [[ ! -f "$ZIP_PATH" ]]; then
@@ -234,7 +235,11 @@ PYEOF
 # Step 6: Test regeneration (round 2)
 echo ""
 echo "--- Step 6: Test regeneration (round 2) ---"
-python3 "$PLUGIN_ROOT/scripts/render_html.py" "$TEST_DIR" "$SESSION_ID" "$PLUGIN_ROOT" "$TEST_DIR/transcript.jsonl"
+# Recreate analysis.json — pack_dir was cleaned up after Step 5 zip
+mkdir -p "$TEST_DIR/$SESSION_ID"
+cp "$TEST_DIR/analysis_backup.json" "$TEST_DIR/$SESSION_ID/analysis.json"
+python3 "$PLUGIN_ROOT/scripts/render_html.py" "$TEST_DIR" "$SESSION_ID" "$PLUGIN_ROOT" "$TEST_DIR/transcript.jsonl" \
+  --branch "test-branch"
 
 python3 - "$ZIP_PATH" << 'PYEOF'
 import sys, zipfile, json

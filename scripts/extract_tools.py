@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
+import argparse
 import json
 import sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent))  # noqa: E402
+from constants import SKILL_ARGS_MAX_LEN  # noqa: E402
 
 
 def load_jsonl(path):
@@ -35,12 +38,13 @@ def extract_tool_uses(entries):
 
 
 def main():
-    if len(sys.argv) < 3:
-        print("Usage: extract_tools.py <transcript.jsonl> <output-dir>", file=sys.stderr)
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Extract tool uses from transcript")
+    parser.add_argument("transcript", help="Path to transcript.jsonl")
+    parser.add_argument("output_dir", help="Directory to write tool output")
+    args = parser.parse_args()
 
-    transcript_file = Path(sys.argv[1])
-    output_dir = Path(sys.argv[2])
+    transcript_file = Path(args.transcript)
+    output_dir = Path(args.output_dir)
 
     if not transcript_file.is_file():
         print(f"Error: transcript file not found: {transcript_file}", file=sys.stderr)
@@ -82,7 +86,7 @@ def main():
         args = inp.get("args", "") or ""
         if not isinstance(args, str):
             args = json.dumps(args)
-        skills.append({"name": name, "args": args[:200]})
+        skills.append({"name": name, "args": args[:SKILL_ARGS_MAX_LEN]})
 
     result = {
         "toolCalls": tool_calls,

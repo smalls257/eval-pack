@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
+import argparse
 import json
 import re
 import sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent))  # noqa: E402
+from constants import SCOPE_DRIFT_FILE_THRESHOLD, RETRY_AMBER_THRESHOLD  # noqa: E402
 
 
 def load_jsonl(path):
@@ -83,21 +86,31 @@ def detect_test_failures(entries):
 def tests_passed_at_end(output_dir):
     results_path = Path(output_dir) / "test-results.json"
     if not results_path.is_file():
+        print(
+            f"Warning: test-results.json not found at {results_path}; "
+            "assuming tests not passed",
+            file=sys.stderr,
+        )
         return False
     try:
         data = json.loads(results_path.read_text(encoding="utf-8"))
         return data.get("verdict") == "pass"
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"Warning: could not read test-results.json: {exc}", file=sys.stderr)
         return False
 
 
 def check_scope_drift(output_dir):
     metrics_path = Path(output_dir) / "metrics.json"
     if not metrics_path.is_file():
+        print(
+            f"Warning: metrics.json not found at {metrics_path}; scope drift unknown",
+            file=sys.stderr,
+        )
         return False
     try:
         data = json.loads(metrics_path.read_text(encoding="utf-8"))
-        return (data.get("filesChanged") or 0) > 10
+        return (data.get("filesChanged") or 0) > SCOPE_DRIFT_FILE_THRESHOLD
     except json.JSONDecodeError as exc:
         print(f"Warning: could not parse metrics.json — scope drift unknown: {exc}", file=sys.stderr)
         return False
@@ -107,12 +120,13 @@ def check_scope_drift(output_dir):
 
 
 def main():
-    if len(sys.argv) < 3:
-        print("Usage: detect_patterns.py <transcript.jsonl> <output-dir>", file=sys.stderr)
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Detect heuristic patterns in transcript")
+    parser.add_argument("transcript", help="Path to transcript.jsonl")
+    parser.add_argument("output_dir", help="Directory to write pattern output")
+    args = parser.parse_args()
 
-    transcript_file = Path(sys.argv[1])
-    output_dir = Path(sys.argv[2])
+    transcript_file = Path(args.transcript)
+    output_dir = Path(args.output_dir)
 
     if not transcript_file.is_file():
         print(f"Error: transcript file not found: {transcript_file}", file=sys.stderr)
@@ -131,9 +145,11 @@ def main():
     flags = []
     if test_failures > 0 and not final_pass:
         flags.append({"level": "red", "label": "Test failures during session", "count": test_failures})
+    elif test_failures > 0 and final_pass:
+        flags.append({"level": "green", "label": "Test failures fixed before completion", "count": test_failures})
     if false_completions:
         flags.append({"level": "amber", "label": "False completions", "count": len(false_completions)})
-    if retry_count > 3:
+    if retry_count >= RETRY_AMBER_THRESHOLD:
         flags.append({"level": "amber", "label": "High retry count", "count": retry_count})
     if scope_drift:
         flags.append({"level": "amber", "label": "Scope drift — many files changed"})
