@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 import html as htmllib
 import json
 import re
@@ -19,19 +20,6 @@ def run_script(script_path, args):
     if result.returncode != 0:
         print(result.stderr, file=sys.stderr, end="")
     return result.returncode == 0
-
-
-def run_git(args, cwd=None):
-    try:
-        result = subprocess.run(
-            ["git"] + args,
-            capture_output=True,
-            text=True,
-            cwd=str(cwd) if cwd else None,
-        )
-        return result.stdout.strip() if result.returncode == 0 else ""
-    except FileNotFoundError:
-        return ""
 
 
 def read_json(path, default=None):
@@ -159,23 +147,25 @@ def _collect_screenshots_from_transcript(transcript_file, screenshots_dir):
 
 
 def main():
-    if len(sys.argv) < 4:
-        print(
-            "Usage: render_html.py <output-dir> <session-id> <plugin-root> [transcript-file]",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Render eval pack HTML report")
+    parser.add_argument("output_dir", type=Path)
+    parser.add_argument("session_id")
+    parser.add_argument("plugin_root", type=Path)
+    parser.add_argument("transcript_file", type=Path, nargs="?")
+    parser.add_argument("--branch", default="", help="Git branch name for zip filename")
+    args = parser.parse_args()
 
-    output_dir = Path(sys.argv[1])
-    session_id = sys.argv[2]
+    output_dir = args.output_dir
+    session_id = args.session_id
+    plugin_root = args.plugin_root
+    transcript_file = args.transcript_file
+
     if not re.match(r"^[a-zA-Z0-9._-]+$", session_id):
         print(
             f"Error: invalid session_id {session_id!r} — must match [a-zA-Z0-9._-]+",
             file=sys.stderr,
         )
         sys.exit(1)
-    plugin_root = Path(sys.argv[3])
-    transcript_file = Path(sys.argv[4]) if len(sys.argv) > 4 else None
 
     pack_dir = output_dir / session_id
     template_dir = plugin_root / "templates" / "html"
@@ -222,11 +212,7 @@ def main():
         if not p.exists():
             p.write_text(default, encoding="utf-8")
 
-    git_branch = (
-        run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=output_dir)
-        or run_git(["rev-parse", "--abbrev-ref", "HEAD"])
-        or ""
-    )
+    git_branch = args.branch
     zip_name = slugify(git_branch) if git_branch else session_id
 
     prev_data = {}

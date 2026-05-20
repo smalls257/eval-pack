@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
+import argparse
 import json
 import re
-import subprocess
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -81,62 +81,32 @@ def extract_subagent_tokens(entries):
     return total, by_model
 
 
-_git_warned = False
-
-def run_git(args):
-    global _git_warned
-    try:
-        result = subprocess.run(["git"] + args, capture_output=True, text=True)
-        return result.stdout if result.returncode == 0 else ""
-    except FileNotFoundError:
-        if not _git_warned:
-            print("Warning: git not found; file change stats will be empty", file=sys.stderr)
-            _git_warned = True
-        return ""
-
-
-def get_diff_stats():
-    diff_base = ""
-    if run_git(["rev-parse", "HEAD~1"]).strip():
-        diff_base = "HEAD~1"
-    elif run_git(["rev-parse", "HEAD"]).strip():
-        # 4b825dc... is git's canonical empty-tree SHA — stable across all git versions
-        diff_base = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
-
-    if not diff_base:
-        return 0, 0, 0, []
-
-    diff_stat = run_git(["diff", "--stat", diff_base])
-    changed_names_raw = run_git(["diff", "--name-only", diff_base])
-
-    files_changed = diff_stat.count(" | ")
-
-    insertions = 0
-    deletions = 0
-    if diff_stat:
-        last_line = diff_stat.strip().split("\n")[-1]
-        m = re.search(r"(\d+) insertion", last_line)
-        if m:
-            insertions = int(m.group(1))
-        m = re.search(r"(\d+) deletion", last_line)
-        if m:
-            deletions = int(m.group(1))
-
-    changed_files = [f for f in changed_names_raw.splitlines() if f.strip()]
-    return files_changed, insertions, deletions, changed_files
-
-
 def main():
-    if len(sys.argv) < 3:
-        print("Usage: extract_metrics.py <transcript.jsonl> <output-dir>", file=sys.stderr)
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Extract session metrics from transcript")
+    parser.add_argument("transcript_file", type=Path)
+    parser.add_argument("output_dir", type=Path)
+    parser.add_argument("--branch", default="", help="Git branch name")
+    parser.add_argument("--insertions", type=int, default=0)
+    parser.add_argument("--deletions", type=int, default=0)
+    parser.add_argument("--files-changed", type=int, default=0, dest="files_changed")
+    parser.add_argument(
+        "--changed-files", default="[]", dest="changed_files_json",
+        help="JSON array of changed file paths",
+    )
+    args = parser.parse_args()
 
-    transcript_file = Path(sys.argv[1])
-    output_dir = Path(sys.argv[2])
+    transcript_file = args.transcript_file
+    output_dir = args.output_dir
 
     if not transcript_file.is_file():
         print(f"Error: transcript file not found: {transcript_file}", file=sys.stderr)
         sys.exit(1)
+
+    try:
+        changed_files = json.loads(args.changed_files_json)
+    except json.JSONDecodeError:
+        print("Warning: --changed-files is not valid JSON; using []", file=sys.stderr)
+        changed_files = []
 
     output_dir.mkdir(parents=True, exist_ok=True)
     entries = load_jsonl(transcript_file)
@@ -171,7 +141,11 @@ def main():
     token_by_model = [{"model": k, **v} for k, v in sorted(model_map.items())]
 
     subagent_total_tokens, subagent_tokens_by_model = extract_subagent_tokens(entries)
-    files_changed, insertions, deletions, changed_files = get_diff_stats()
+
+    files_changed = args.files_changed
+    insertions = args.insertions
+    deletions = args.deletions
+    # changed_files already set above from --changed-files arg
 
     result = {
         "lastModel": model,
