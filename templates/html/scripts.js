@@ -121,9 +121,10 @@ function focusCurrent() {
 
 // ── renderers ─────────────────────────────────────────────────────────────────
 
-function renderPageHeader(data, round) {
-  const m = round.metrics || {};
-  const a = round.analysis || {};
+function renderPageHeader(data) {
+  const m = data.metrics || {};
+  const a = data.analysis || {};
+  const latestRound = (data.rounds || []).slice(-1)[0] || {};
   const title = a.title || data.sessionId || 'Eval Pack';
 
   setText('page-title', title);
@@ -137,7 +138,7 @@ function renderPageHeader(data, round) {
   setText('header-stat-messages-value', m.turnCount != null ? m.turnCount : '—');
   setText('header-stat-files-value', m.filesChanged != null ? m.filesChanged : '—');
   setText('header-stat-tokens-value', formatNumber((m.inputTokens || 0) + (m.outputTokens || 0) + (m.subagentTotalTokens || 0)));
-  setText('header-stat-branch-value', round.gitBranch || '—');
+  setText('header-stat-branch-value', latestRound.gitBranch || '—');
 
   const genAt = document.getElementById('generated-at');
   if (genAt && data.generatedAt) {
@@ -219,8 +220,8 @@ function renderHighlights(analysis) {
   }
 }
 
-function renderVerdict(round) {
-  const p = round.patterns || {};
+function renderVerdict(data) {
+  const p = data.patterns || {};
   const flags = p.flags || [];
   const banner = document.getElementById('verdict-banner');
   const icon = document.getElementById('verdict-icon');
@@ -255,8 +256,7 @@ function renderVerdict(round) {
   if (icon) icon.textContent = iconChar;
   if (text) text.textContent = summaryText;
 
-  const a = round.analysis || {};
-  const h = a.highlights || {};
+  const h = (data.analysis || {}).highlights || {};
   const highlightParts = [
     h.strongestEvidence,
     h.mainRisk ? 'Risk: ' + h.mainRisk : null
@@ -268,8 +268,8 @@ function renderVerdict(round) {
   }
 }
 
-function renderStats(round) {
-  const m = round.metrics || {};
+function renderStats(data) {
+  const m = data.metrics || {};
   const statsRow = document.getElementById('stats-row');
   if (!statsRow) return;
   const ctrlCost = estimateCost(m.lastModel, m.inputTokens, m.outputTokens);
@@ -438,8 +438,8 @@ function renderVisualEvidence(data) {
   showRound(activeIdx);
 }
 
-function renderFlags(round) {
-  const flags = (round.patterns || {}).flags || [];
+function renderFlags(data) {
+  const flags = (data.patterns || {}).flags || [];
   const row = document.getElementById('flags-row');
   if (!row) return;
   if (flags.length === 0) {
@@ -828,14 +828,14 @@ function renderTools(tools) {
 
 // ── main render ───────────────────────────────────────────────────────────────
 
-function renderRound(data, round) {
-  const analysis = round.analysis || {};
+function renderSession(data) {
+  const analysis = data.analysis || {};
 
-  renderPageHeader(data, round);
+  renderPageHeader(data);
   renderHighlights(analysis);
-  renderVerdict(round);
-  renderStats(round);
-  renderFlags(round);
+  renderVerdict(data);
+  renderStats(data);
+  renderFlags(data);
   renderSummary(analysis);
   renderProof(analysis);
   renderTestsExisting(analysis);
@@ -843,7 +843,7 @@ function renderRound(data, round) {
   renderReviewFindings(analysis);
   renderFriction(analysis);
   renderDiff(analysis);
-  renderTools(round.tools);
+  renderTools(data.tools);
   renderImprovements(analysis);
   renderPromptPattern(analysis);
   renderSessionArtifacts(analysis);
@@ -852,10 +852,7 @@ function renderRound(data, round) {
 }
 
 function init(data) {
-  const rounds = data.rounds || [];
-  const latestRound = rounds.length > 0 ? rounds[rounds.length - 1] : {};
-
-  renderRound(data, latestRound);
+  renderSession(data);
   renderVisualEvidence(data);
   renderTranscript(data.transcript);
 

@@ -217,14 +217,24 @@ for f in required:
 data_entry = next(n for n in names if n.endswith("data.json"))
 data = json.loads(zf.read(data_entry))
 
+for key in ("analysis", "metrics", "patterns", "tools"):
+    if not data.get(key):
+        print(f"FAIL: {key} should be at top level of data.json", file=sys.stderr)
+        sys.exit(1)
+
 rounds = data.get("rounds", [])
 if len(rounds) != 1:
     print(f"FAIL: expected 1 round, got {len(rounds)}", file=sys.stderr)
     sys.exit(1)
 
-tools = rounds[0].get("tools", {}).get("toolCalls", [])
+for key in ("analysis", "metrics", "patterns", "tools"):
+    if rounds[0].get(key):
+        print(f"FAIL: {key} should not appear inside rounds", file=sys.stderr)
+        sys.exit(1)
+
+tools = data.get("tools", {}).get("toolCalls", [])
 if not tools:
-    print("FAIL: tools should appear in data.json round", file=sys.stderr)
+    print("FAIL: tools.toolCalls missing from top-level data.json", file=sys.stderr)
     sys.exit(1)
 
 print(f"  Rounds: {len(rounds)}")

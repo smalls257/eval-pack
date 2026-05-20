@@ -289,11 +289,6 @@ def main():
     screenshots = collect_new_screenshots(pack_dir / "screenshots", prev_screenshot_names)
 
     new_round = {
-        "metrics": read_json(pack_dir / "metrics.json"),
-        "patterns": read_json(pack_dir / "patterns.json"),
-        "analysis": read_json(pack_dir / "analysis.json"),
-        "testResults": read_json(pack_dir / "test-results.json"),
-        "tools": read_json(pack_dir / "tools.json"),
         "screenshots": screenshots,
         "gitBranch": git_branch,
         "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -303,6 +298,11 @@ def main():
     data = {
         "sessionId": args.session_id,
         "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "analysis": read_json(pack_dir / "analysis.json"),
+        "metrics": read_json(pack_dir / "metrics.json"),
+        "patterns": read_json(pack_dir / "patterns.json"),
+        "testResults": read_json(pack_dir / "test-results.json"),
+        "tools": read_json(pack_dir / "tools.json"),
         "rounds": list(prev_data.get("rounds") or []) + [new_round],
         "transcript": load_jsonl(transcript_jsonl) if transcript_jsonl.is_file() else [],
     }
