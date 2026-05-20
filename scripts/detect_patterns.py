@@ -145,6 +145,8 @@ def main():
     flags = []
     if test_failures > 0 and not final_pass:
         flags.append({"level": "red", "label": "Test failures during session", "count": test_failures})
+    elif test_failures > 0 and final_pass:
+        flags.append({"level": "green", "label": "Test failures fixed before completion", "count": test_failures})
     if false_completions:
         flags.append({"level": "amber", "label": "False completions", "count": len(false_completions)})
     if retry_count >= RETRY_AMBER_THRESHOLD:
