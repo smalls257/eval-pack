@@ -60,7 +60,9 @@ def extract_subagent_tokens(entries):
                 continue
             if block.get("type") == "tool_result":
                 tid = block.get("tool_use_id", "")
-                model = tool_model.get(tid, "unknown")
+                if tid not in tool_model:  # not an Agent call — skip silently
+                    continue
+                model = tool_model[tid]
                 inner = block.get("content", "")
                 if isinstance(inner, list):
                     inner = " ".join(b.get("text", "") for b in inner if isinstance(b, dict))
@@ -69,7 +71,7 @@ def extract_subagent_tokens(entries):
                     model_tokens[model] += int(m.group(1))
                 else:
                     print(
-                        f"WARNING: could not parse total_tokens from Agent tool_result "
+                        f"Warning: could not parse total_tokens from Agent tool_result "
                         f"(tool_use_id={tid!r}); subagent cost for this call will be 0",
                         file=sys.stderr,
                     )

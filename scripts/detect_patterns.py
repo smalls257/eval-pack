@@ -86,7 +86,7 @@ def tests_passed_at_end(output_dir):
     results_path = Path(output_dir) / "test-results.json"
     if not results_path.is_file():
         print(
-            f"WARNING: test-results.json not found in {output_dir}; "
+            f"Warning: test-results.json not found at {results_path}; "
             "assuming tests not passed",
             file=sys.stderr,
         )
@@ -95,13 +95,17 @@ def tests_passed_at_end(output_dir):
         data = json.loads(results_path.read_text(encoding="utf-8"))
         return data.get("verdict") == "pass"
     except (json.JSONDecodeError, OSError) as exc:
-        print(f"WARNING: could not read test-results.json: {exc}", file=sys.stderr)
+        print(f"Warning: could not read test-results.json: {exc}", file=sys.stderr)
         return False
 
 
 def check_scope_drift(output_dir):
     metrics_path = Path(output_dir) / "metrics.json"
     if not metrics_path.is_file():
+        print(
+            f"Warning: metrics.json not found at {metrics_path}; scope drift unknown",
+            file=sys.stderr,
+        )
         return False
     try:
         data = json.loads(metrics_path.read_text(encoding="utf-8"))
