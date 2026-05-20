@@ -67,6 +67,12 @@ def extract_subagent_tokens(entries):
                 m = re.search(r"total_tokens: (\d+)", str(inner))
                 if m:
                     model_tokens[model] += int(m.group(1))
+                else:
+                    print(
+                        f"WARNING: could not parse total_tokens from Agent tool_result "
+                        f"(tool_use_id={tid!r}); subagent cost for this call will be 0",
+                        file=sys.stderr,
+                    )
 
     total = sum(model_tokens.values())
     by_model = [{"model": k, "totalTokens": v} for k, v in sorted(model_tokens.items())]

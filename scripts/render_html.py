@@ -168,6 +168,12 @@ def main():
 
     output_dir = Path(sys.argv[1])
     session_id = sys.argv[2]
+    if not re.match(r"^[a-zA-Z0-9._-]+$", session_id):
+        print(
+            f"Error: invalid session_id {session_id!r} — must match [a-zA-Z0-9._-]+",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     plugin_root = Path(sys.argv[3])
     transcript_file = Path(sys.argv[4]) if len(sys.argv) > 4 else None
 
