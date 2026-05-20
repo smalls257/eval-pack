@@ -2,6 +2,8 @@
 import json
 import sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent))
+from constants import SKILL_ARGS_MAX_LEN
 
 
 def load_jsonl(path):
@@ -82,7 +84,7 @@ def main():
         args = inp.get("args", "") or ""
         if not isinstance(args, str):
             args = json.dumps(args)
-        skills.append({"name": name, "args": args[:200]})
+        skills.append({"name": name, "args": args[:SKILL_ARGS_MAX_LEN]})
 
     result = {
         "toolCalls": tool_calls,

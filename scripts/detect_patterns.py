@@ -3,6 +3,8 @@ import json
 import re
 import sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent))
+from constants import SCOPE_DRIFT_FILE_THRESHOLD, RETRY_AMBER_THRESHOLD
 
 
 def load_jsonl(path):
@@ -97,7 +99,7 @@ def check_scope_drift(output_dir):
         return False
     try:
         data = json.loads(metrics_path.read_text(encoding="utf-8"))
-        return (data.get("filesChanged") or 0) > 10
+        return (data.get("filesChanged") or 0) > SCOPE_DRIFT_FILE_THRESHOLD
     except json.JSONDecodeError as exc:
         print(f"Warning: could not parse metrics.json — scope drift unknown: {exc}", file=sys.stderr)
         return False
@@ -133,7 +135,7 @@ def main():
         flags.append({"level": "red", "label": "Test failures during session", "count": test_failures})
     if false_completions:
         flags.append({"level": "amber", "label": "False completions", "count": len(false_completions)})
-    if retry_count > 3:
+    if retry_count > RETRY_AMBER_THRESHOLD:
         flags.append({"level": "amber", "label": "High retry count", "count": retry_count})
     if scope_drift:
         flags.append({"level": "amber", "label": "Scope drift — many files changed"})
