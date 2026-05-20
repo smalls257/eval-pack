@@ -171,7 +171,7 @@ function renderHighlights(analysis) {
     confCard.className = `highlight-card confidence-card confidence-${tier}`;
     confCard.style.display = '';
     if (confVal) confVal.innerHTML =
-      `${n}%<div class="confidence-bar"><div class="confidence-bar-fill" style="width:${n}%"></div></div>`;
+      html`${n}%<div class="confidence-bar"><div class="confidence-bar-fill" style="width:${n}%"></div></div>`;
     if (confNotes) confNotes.textContent = h.confidenceNotes || '';
   } else if (confCard) {
     confCard.style.display = 'none';
@@ -371,7 +371,7 @@ function attachScreenshotClicks(container) {
     item.addEventListener('click', () => {
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay';
-      overlay.innerHTML = `<img src="${item.dataset.src}" alt="">`;
+      overlay.innerHTML = html`<img src="${item.dataset.src}" alt="">`;
       overlay.addEventListener('click', () => overlay.remove());
       document.body.appendChild(overlay);
     });
@@ -409,8 +409,8 @@ function renderVisualEvidence(data) {
     // Also update proof-screenshots-area if present
     const proofArea = document.getElementById('proof-screenshots-area');
     if (proofArea && screenshots.length > 0) {
-      proofArea.innerHTML = `<h3 class="section-subheading">Screenshots</h3>
-        <div class="screenshot-grid">${screenshots.map(makeScreenshotItem).join('')}</div>`;
+      proofArea.innerHTML = html`<h3 class="section-subheading">Screenshots</h3>
+        <div class="screenshot-grid">${safe(screenshots.map(makeScreenshotItem).join(''))}</div>`;
       attachScreenshotClicks(proofArea);
     }
   }
@@ -521,7 +521,7 @@ function renderProof(analysis) {
 function renderTestsExisting(analysis) {
   const t = analysis.testsExisting || {};
   const narr = document.getElementById('tests-existing-narrative');
-  if (narr) narr.innerHTML = renderMarkdown(t.narrative || '');
+  if (narr) narr.innerHTML = html`${safe(renderMarkdown(t.narrative || ''))}`;
 
   const tbody = document.getElementById('tests-existing-tbody');
   if (tbody) {
@@ -548,7 +548,7 @@ function renderTestsExisting(analysis) {
 function renderTestsNew(analysis) {
   const t = analysis.testsNew || {};
   const narr = document.getElementById('tests-new-narrative');
-  if (narr) narr.innerHTML = renderMarkdown(t.narrative || '');
+  if (narr) narr.innerHTML = html`${safe(renderMarkdown(t.narrative || ''))}`;
 
   const list = document.getElementById('tests-new-list');
   if (list) {
