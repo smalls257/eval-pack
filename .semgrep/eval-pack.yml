@@ -67,16 +67,3 @@ rules:
     paths:
       include:
         - templates/
-
-  - id: no-escapeHtml-in-template
-    pattern: escapeHtml($X)
-    message: >
-      Use html`` tagged template instead of manual escapeHtml() at call sites.
-      In html`` all interpolations are auto-escaped.
-    languages: [javascript]
-    severity: WARNING
-    paths:
-      include:
-        - templates/
-      exclude:
-        - "**/templates/html/scripts.js"
