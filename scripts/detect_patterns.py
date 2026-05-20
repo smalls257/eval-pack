@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 import json
 import re
 import sys
@@ -119,12 +120,13 @@ def check_scope_drift(output_dir):
 
 
 def main():
-    if len(sys.argv) < 3:
-        print("Usage: detect_patterns.py <transcript.jsonl> <output-dir>", file=sys.stderr)
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Detect heuristic patterns in transcript")
+    parser.add_argument("transcript", help="Path to transcript.jsonl")
+    parser.add_argument("output_dir", help="Directory to write pattern output")
+    args = parser.parse_args()
 
-    transcript_file = Path(sys.argv[1])
-    output_dir = Path(sys.argv[2])
+    transcript_file = Path(args.transcript)
+    output_dir = Path(args.output_dir)
 
     if not transcript_file.is_file():
         print(f"Error: transcript file not found: {transcript_file}", file=sys.stderr)
