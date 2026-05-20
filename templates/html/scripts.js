@@ -10,6 +10,24 @@ function escapeHtml(s) {
     .replace(/'/g, '&#39;');
 }
 
+class SafeHtml { constructor(s) { this.s = String(s == null ? '' : s); } }
+
+// Mark a string as already-escaped HTML — skips auto-escaping in html``
+function safe(s) { return new SafeHtml(s == null ? '' : String(s)); }
+
+// Tagged template: auto-escapes all interpolated values; wrap in safe() to opt out
+function html(strings, ...values) {
+  let result = strings[0];
+  for (let i = 0; i < values.length; i++) {
+    const val = values[i];
+    result += val instanceof SafeHtml
+      ? val.s
+      : escapeHtml(val == null ? '' : val);
+    result += strings[i + 1];
+  }
+  return result;
+}
+
 function renderMarkdown(text) {
   if (!text) return '';
   const escaped = escapeHtml(text);
@@ -138,7 +156,7 @@ function renderHighlights(analysis) {
   if (card && cs.label) {
     const color = /^(green|amber|red)$/.test(cs.color || '') ? cs.color : 'green';
     card.className = `highlight-card completion-card completion-${color}`;
-    if (val) val.innerHTML = `<span class="completion-dot"></span>${escapeHtml(cs.label)}`;
+    if (val) val.innerHTML = html`<span class="completion-dot"></span>${cs.label}`;
     if (notes) notes.textContent = cs.notes || '';
   }
 
@@ -181,7 +199,7 @@ function renderHighlights(analysis) {
   if (mitCard && steps.length > 0) {
     mitCard.style.display = '';
     if (mitVal) mitVal.innerHTML = steps.map(s =>
-      `<div class="mitigation-step">${escapeHtml(s)}</div>`
+      html`<div class="mitigation-step">${s}</div>`
     ).join('');
   } else if (mitCard) {
     mitCard.style.display = 'none';
@@ -282,10 +300,10 @@ function renderStats(round) {
     : [{ label: 'Controller', value: formatCost(ctrlCost) }];
   const subagentCostItems = subagentTokensByModel.length > 0
     ? subagentTokensByModel.map(r => ({
-        label: shortModelName(r.model) + ' ~',
-        value: formatCost(estimateSubagentCost(r.model, r.totalTokens))
+        label: shortModelName(r.model),
+        value: '~' + formatCost(estimateSubagentCost(r.model, r.totalTokens))
       }))
-    : [{ label: 'Subagents ~', value: formatCost(agentCost) }];
+    : [{ label: 'Subagents', value: '~' + formatCost(agentCost) }];
   const costItems = [...ctrlCostItems, ...subagentCostItems, { label: 'Total *', value: formatCost(totalCost) }];
 
   const groups = [
@@ -303,11 +321,11 @@ function renderStats(round) {
     }
   ];
   statsRow.innerHTML = groups.map(g =>
-    `<div class="stat-group">
-      <div class="stat-group-heading">${escapeHtml(g.heading)}</div>
-      <div class="stat-group-items">${g.items.map(s =>
-        `<div class="stat-item"><div class="stat-value">${escapeHtml(String(s.value))}</div><div class="stat-label">${escapeHtml(s.label)}</div></div>`
-      ).join('')}</div>
+    html`<div class="stat-group">
+      <div class="stat-group-heading">${g.heading}</div>
+      <div class="stat-group-items">${safe(g.items.map(s =>
+        html`<div class="stat-item"><div class="stat-value">${String(s.value)}</div><div class="stat-label">${s.label}</div></div>`
+      ).join(''))}</div>
     </div>`
   ).join('');
 
@@ -319,7 +337,7 @@ function renderStats(round) {
       note.className = 'cost-note';
       card.appendChild(note);
     }
-    note.textContent = `* Claude API rates as of ${COST_RATES_DATE}. Controller cost uses input/output tokens only (excludes prompt cache). Subagent cost from <usage> tags assumes 90/10 input/output split.`;
+    note.textContent = `* Claude API rates as of ${COST_RATES_DATE}. Controller cost is exact (input/output tokens). Subagent cost (~) assumes 90/10 input/output split — only total_tokens reported.`;
   }
 }
 
@@ -332,17 +350,17 @@ function renderTimeline(analysis) {
     return;
   }
   container.innerHTML = events.map((event, i) =>
-    `<div class="tl-entry">
+    html`<div class="tl-entry">
       <span class="tl-index">${i + 1}</span>
-      <span class="tl-text">${escapeHtml(event)}</span>
+      <span class="tl-text">${event}</span>
     </div>`
   ).join('');
 }
 
 function makeScreenshotItem(s) {
-  const path = escapeHtml(s.path || '');
-  const label = escapeHtml(s.label || s.path || '');
-  return `<div class="screenshot-item" data-src="${path}">
+  const path = s.path || '';
+  const label = s.label || s.path || '';
+  return html`<div class="screenshot-item" data-src="${path}">
     <img src="${path}" alt="${label}" loading="lazy">
     <div class="screenshot-label">${label}</div>
   </div>`;
@@ -404,9 +422,9 @@ function renderVisualEvidence(data) {
         const time = r.generatedAt
           ? new Date(r.generatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           : '';
-        return `<button class="round-btn${i === activeIdx ? ' active' : ''}" data-round="${i}">` +
-          `<span class="round-btn-num">Round ${i + 1}</span>` +
-          (time ? `<span class="round-btn-time">${escapeHtml(time)}</span>` : '') +
+        return html`<button class="round-btn${i === activeIdx ? ' active' : ''}" data-round="${i}">` +
+          html`<span class="round-btn-num">Round ${i + 1}</span>` +
+          (time ? html`<span class="round-btn-time">${time}</span>` : '') +
           `</button>`;
       }).join('');
       filterNav.querySelectorAll('.round-btn').forEach(btn => {
@@ -430,7 +448,7 @@ function renderFlags(round) {
   }
   row.innerHTML = flags.map(f => {
     const count = f.count != null ? ` (${f.count})` : '';
-    return `<span class="flag-chip ${escapeHtml(f.level)}">${escapeHtml(f.label)}${count}</span>`;
+    return html`<span class="flag-chip ${f.level}">${f.label}${count}</span>`;
   }).join('');
 }
 
@@ -443,7 +461,7 @@ function renderSummary(analysis) {
   const notProven = document.getElementById('summary-not-proven');
 
   const makeList = arr => (arr && arr.length > 0)
-    ? '<ul>' + arr.map(item => `<li>${renderMarkdown(item)}</li>`).join('') + '</ul>'
+    ? '<ul>' + arr.map(item => html`<li>${safe(renderMarkdown(item))}</li>`).join('') + '</ul>'
     : '<p class="empty-state">Nothing recorded.</p>';
 
   if (whatChanged) whatChanged.innerHTML = makeList(s.whatChanged);
@@ -462,10 +480,12 @@ function renderProof(analysis) {
       invEl.innerHTML = '<li class="empty-state">No artifacts recorded.</li>';
     } else {
       invEl.innerHTML = items.map(item =>
-        `<li class="artifact-item">
-          <strong>${escapeHtml(item.name || '')}</strong>
-          ${item.path && isSafePath(item.path) ? ` — <a href="${escapeHtml(item.path)}">${escapeHtml(item.path)}</a>` : (item.path ? ` — ${escapeHtml(item.path)}` : '')}
-          ${item.description ? `<div class="artifact-desc">${renderMarkdown(item.description)}</div>` : ''}
+        html`<li class="artifact-item">
+          <strong>${item.name || ''}</strong>${safe(
+            item.path && isSafePath(item.path)
+              ? html` — <a href="${item.path}">${item.path}</a>`
+              : item.path ? html` — ${item.path}` : ''
+          )}${safe(item.description ? `<div class="artifact-desc">${renderMarkdown(item.description)}</div>` : '')}
         </li>`
       ).join('');
     }
@@ -479,7 +499,7 @@ function renderProof(analysis) {
       tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No evidence recorded.</td></tr>';
     } else {
       tbody.innerHTML = rows.map(r =>
-        `<tr><td>${renderMarkdown(r.point)}</td><td>${renderMarkdown(r.where)}</td><td>${renderMarkdown(r.whyItMatters)}</td></tr>`
+        html`<tr><td>${safe(renderMarkdown(r.point))}</td><td>${safe(renderMarkdown(r.where))}</td><td>${safe(renderMarkdown(r.whyItMatters))}</td></tr>`
       ).join('');
     }
   }
@@ -492,7 +512,7 @@ function renderProof(analysis) {
       excerpts.innerHTML = '<li class="empty-state">No excerpts recorded.</li>';
     } else {
       excerpts.innerHTML = items.map(ex =>
-        `<li>${renderMarkdown(ex)}</li>`
+        html`<li>${safe(renderMarkdown(ex))}</li>`
       ).join('');
     }
   }
@@ -510,7 +530,7 @@ function renderTestsExisting(analysis) {
       tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No validation data.</td></tr>';
     } else {
       tbody.innerHTML = rows.map(r =>
-        `<tr><td>${renderMarkdown(r.validation)}</td><td>${renderMarkdown(r.observedResult)}</td><td>${renderMarkdown(r.interpretation)}</td></tr>`
+        html`<tr><td>${safe(renderMarkdown(r.validation))}</td><td>${safe(renderMarkdown(r.observedResult))}</td><td>${safe(renderMarkdown(r.interpretation))}</td></tr>`
       ).join('');
     }
   }
@@ -518,7 +538,7 @@ function renderTestsExisting(analysis) {
   const coveredWell = document.getElementById('tests-covered-well');
   const notCovered = document.getElementById('tests-not-covered');
   const makeList = arr => (arr && arr.length > 0)
-    ? '<ul>' + arr.map(item => `<li>${renderMarkdown(item)}</li>`).join('') + '</ul>'
+    ? '<ul>' + arr.map(item => html`<li>${safe(renderMarkdown(item))}</li>`).join('') + '</ul>'
     : '<p class="empty-state">Nothing recorded.</p>';
 
   if (coveredWell) coveredWell.innerHTML = makeList(t.coveredWell);
@@ -536,7 +556,7 @@ function renderTestsNew(analysis) {
     if (items.length === 0) {
       list.innerHTML = '<li class="empty-state">No new tests recorded.</li>';
     } else {
-      list.innerHTML = items.map(item => `<li>${renderMarkdown(item)}</li>`).join('');
+      list.innerHTML = items.map(item => html`<li>${safe(renderMarkdown(item))}</li>`).join('');
     }
   }
 }
@@ -550,13 +570,13 @@ function renderReviewFindings(analysis) {
     return;
   }
   tbody.innerHTML = rows.map(r => {
-    const sev = escapeHtml(r.severity || 'suggestion');
-    return `<tr>
-      <td>${renderMarkdown(r.issue)}</td>
+    const sev = r.severity || 'suggestion';
+    return html`<tr>
+      <td>${safe(renderMarkdown(r.issue))}</td>
       <td><span class="review-severity review-severity-${sev}">${sev}</span></td>
-      <td>${escapeHtml(r.foundIn || '—')}</td>
-      <td>${renderMarkdown(r.resolution || '—')}</td>
-      <td>${r.commit ? `<code class="review-commit">${escapeHtml(r.commit)}</code>` : '—'}</td>
+      <td>${r.foundIn || '—'}</td>
+      <td>${safe(renderMarkdown(r.resolution || '—'))}</td>
+      <td>${safe(r.commit ? html`<code class="review-commit">${r.commit}</code>` : '—')}</td>
     </tr>`;
   }).join('');
 }
@@ -570,11 +590,11 @@ function renderFriction(analysis) {
     return;
   }
   tbody.innerHTML = rows.map(r =>
-    `<tr>
-      <td>${renderMarkdown(r.friction)}</td>
-      <td>${renderMarkdown(r.evidence)}</td>
-      <td><span class="friction-type friction-${escapeHtml(r.type || '')}">${escapeHtml(r.type || '—')}</span></td>
-      <td>${renderMarkdown(r.resolution)}</td>
+    html`<tr>
+      <td>${safe(renderMarkdown(r.friction))}</td>
+      <td>${safe(renderMarkdown(r.evidence))}</td>
+      <td><span class="friction-type friction-${r.type || ''}">${r.type || '—'}</span></td>
+      <td>${safe(renderMarkdown(r.resolution))}</td>
     </tr>`
   ).join('');
 }
@@ -590,12 +610,12 @@ function renderDiff(analysis) {
       { label: 'Diff stat', key: 'hasDiffStat' },
       { label: 'Diff patch', key: 'hasDiffPatch' }
     ];
-    let html = badges.map(b => {
+    let badgeHtml = badges.map(b => {
       const present = st[b.key];
-      return `<span class="diff-badge ${present ? 'present' : 'absent'}">${escapeHtml(b.label)}: ${present ? 'Yes' : 'No'}</span>`;
+      return html`<span class="diff-badge ${present ? 'present' : 'absent'}">${b.label}: ${present ? 'Yes' : 'No'}</span>`;
     }).join('');
-    if (st.note) html += `<p class="diff-note">${renderMarkdown(st.note)}</p>`;
-    statusEl.innerHTML = html;
+    if (st.note) badgeHtml += html`<p class="diff-note">${safe(renderMarkdown(st.note))}</p>`;
+    statusEl.innerHTML = badgeHtml;
   }
 
   // Files changed list
@@ -608,7 +628,7 @@ function renderDiff(analysis) {
       filesEl.innerHTML = files.map(f => {
         const path = typeof f === 'string' ? f : (f.file || '');
         const desc = typeof f === 'object' ? (f.description || '') : '';
-        return `<li><code>${escapeHtml(path)}</code>${desc ? ` — ${renderMarkdown(desc)}` : ''}</li>`;
+        return html`<li><code>${path}</code>${safe(desc ? ` — ${renderMarkdown(desc)}` : '')}</li>`;
       }).join('');
     }
   }
@@ -621,7 +641,7 @@ function renderDiff(analysis) {
       tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No changes recorded.</td></tr>';
     } else {
       tbody.innerHTML = rows.map(r =>
-        `<tr><td>${renderMarkdown(r.area)}</td><td>${renderMarkdown(r.evidenceInTranscript)}</td><td>${renderMarkdown(r.observedEffect)}</td></tr>`
+        html`<tr><td>${safe(renderMarkdown(r.area))}</td><td>${safe(renderMarkdown(r.evidenceInTranscript))}</td><td>${safe(renderMarkdown(r.observedEffect))}</td></tr>`
       ).join('');
     }
   }
@@ -644,8 +664,8 @@ function renderImprovements(analysis) {
     const items = analysis.repoImprovements || [];
     repoEl.innerHTML = items.length > 0
       ? items.map(item => {
-          if (typeof item === 'string') return `<li>${renderMarkdown(item)}</li>`;
-          return `<li><strong>${escapeHtml(item.title || '')}</strong>${item.detail ? `<br><span class="improvement-detail">${renderMarkdown(item.detail)}</span>` : ''}</li>`;
+          if (typeof item === 'string') return html`<li>${safe(renderMarkdown(item))}</li>`;
+          return html`<li><strong>${item.title || ''}</strong>${safe(item.detail ? `<br><span class="improvement-detail">${renderMarkdown(item.detail)}</span>` : '')}</li>`;
         }).join('')
       : '<li class="empty-state">No improvements recorded.</li>';
   }
@@ -655,8 +675,8 @@ function renderImprovements(analysis) {
     const items = analysis.userImprovements || [];
     userEl.innerHTML = items.length > 0
       ? items.map(item => {
-          if (typeof item === 'string') return `<li>${renderMarkdown(item)}</li>`;
-          return `<li><strong>${escapeHtml(item.title || '')}</strong>${item.detail ? `<br><span class="improvement-detail">${renderMarkdown(item.detail)}</span>` : ''}</li>`;
+          if (typeof item === 'string') return html`<li>${safe(renderMarkdown(item))}</li>`;
+          return html`<li><strong>${item.title || ''}</strong>${safe(item.detail ? `<br><span class="improvement-detail">${renderMarkdown(item.detail)}</span>` : '')}</li>`;
         }).join('')
       : '<li class="empty-state">No improvements recorded.</li>';
   }
@@ -688,9 +708,9 @@ function renderSessionArtifacts(analysis) {
   }
   list.innerHTML = items.map(item => {
     if (item.path && isSafePath(item.path)) {
-      return `<li><a href="${escapeHtml(item.path)}" target="_blank">${escapeHtml(item.name || item.label || item.path)}</a></li>`;
+      return html`<li><a href="${item.path}" target="_blank">${item.name || item.label || item.path}</a></li>`;
     }
-    return `<li>${escapeHtml(item.name || item.label || item.path || String(item))}</li>`;
+    return html`<li>${item.name || item.label || item.path || String(item)}</li>`;
   }).join('');
 }
 
@@ -736,16 +756,16 @@ function renderTranscript(transcript) {
       : '';
 
     const ts = entry.timestamp
-      ? `<span class="transcript-ts">${escapeHtml(new Date(entry.timestamp).toLocaleTimeString())}</span>`
+      ? html`<span class="transcript-ts">${new Date(entry.timestamp).toLocaleTimeString()}</span>`
       : '';
 
-    return `<div class="transcript-entry transcript-${escapeHtml(role)}">
+    return html`<div class="transcript-entry transcript-${role}">
       <div class="transcript-header">
-        <span class="transcript-role">${escapeHtml(role)}</span>
-        ${ts}
-        ${usageLine}
+        <span class="transcript-role">${role}</span>
+        ${safe(ts)}
+        ${safe(usageLine)}
       </div>
-      <div class="transcript-body">${renderMarkdown(content)}</div>
+      <div class="transcript-body">${safe(renderMarkdown(content))}</div>
     </div>`;
   }).join('');
 }
@@ -763,10 +783,10 @@ function renderTools(tools) {
       const max = calls[0].count;
       callList.innerHTML = calls.map(t => {
         const pct = max > 0 ? Math.round((t.count / max) * 100) : 0;
-        return `<div class="tool-bar-row">
-          <span class="tool-bar-name">${escapeHtml(t.name)}</span>
+        return html`<div class="tool-bar-row">
+          <span class="tool-bar-name">${t.name}</span>
           <div class="tool-bar-track"><div class="tool-bar-fill" style="width:${pct}%"></div></div>
-          <span class="tool-bar-count">${escapeHtml(String(t.count))}</span>
+          <span class="tool-bar-count">${String(t.count)}</span>
         </div>`;
       }).join('');
     }
@@ -779,11 +799,11 @@ function renderTools(tools) {
       subagentsEl.innerHTML = '<p class="empty-state">No subagents dispatched.</p>';
     } else {
       subagentsEl.innerHTML = subagents.map(s =>
-        `<div class="subagent-card">
-          <div class="subagent-desc">${escapeHtml(s.description)}</div>
+        html`<div class="subagent-card">
+          <div class="subagent-desc">${s.description}</div>
           <div class="subagent-meta">
-            ${s.model ? `<span class="subagent-badge">${escapeHtml(s.model)}</span>` : ''}
-            ${s.subagentType && s.subagentType !== 'general-purpose' ? `<span class="subagent-badge">${escapeHtml(s.subagentType)}</span>` : ''}
+            ${safe(s.model ? html`<span class="subagent-badge">${s.model}</span>` : '')}
+            ${safe(s.subagentType && s.subagentType !== 'general-purpose' ? html`<span class="subagent-badge">${s.subagentType}</span>` : '')}
           </div>
         </div>`
       ).join('');
@@ -800,7 +820,7 @@ function renderTools(tools) {
         const truncated = s.args && s.args.length > 80
           ? s.args.slice(0, 80) + '\u2026'
           : (s.args || '');
-        return `<li><code class="skill-name">${escapeHtml(s.name)}</code>${truncated ? `<span class="skill-args">${escapeHtml(truncated)}</span>` : ''}</li>`;
+        return html`<li><code class="skill-name">${s.name}</code>${safe(truncated ? html`<span class="skill-args">${truncated}</span>` : '')}</li>`;
       }).join('');
     }
   }
@@ -877,9 +897,9 @@ if (window.__EVAL_PACK_DATA__) {
     .then(r => r.json())
     .then(init)
     .catch(err => {
-      document.body.innerHTML = `<div style="padding:2rem;font-family:monospace;color:#e74c3c">
+      document.body.innerHTML = html`<div style="padding:2rem;font-family:monospace;color:#e74c3c">
         <h2>Failed to load eval pack data</h2>
-        <p>${escapeHtml(String(err))}</p>
+        <p>${String(err)}</p>
       </div>`;
     });
 }
