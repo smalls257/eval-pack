@@ -140,85 +140,45 @@ Identify and run appropriate tests for the changes made in this session:
 }
 ```
 
-## Step 4: Analyze (if enabled)
+## Step 4: Analyze (independent evaluator)
 
-Check if analysis is enabled (plugin config `analysis` option, default true).
+The analysis must NOT be written by you — you did the work, and a self-graded
+evaluation is not trustworthy evidence. Dispatch an independent evaluator instead.
 
-If enabled, read the transcript, metrics.json, and patterns.json. Write `${PACK_DIR}/analysis.json` with this schema:
+First compute the diff base (same logic as Step 0):
 
-```json
-{
-  "title": "Short task description for page heading (1 sentence, no period)",
-  "highlights": {
-    "completionStatus": { "label": "Completion below", "color": "green", "notes": "One sentence on what was achieved" },
-    "confidencePercent": 85,
-    "confidenceNotes": "One sentence explaining the confidence score — what evidence supports it or limits it",
-    "businessRisk": { "level": "low|medium|high", "notes": "One sentence on why this risk level was assigned" },
-    "riskMitigation": ["Step to reduce risk", "Step to reduce risk"],
-    "bestProof": { "badges": ["Screenshots", "Passing"], "note": "One sentence on strongest evidence type" },
-    "strongestEvidence": "One sentence naming the single most convincing proof point",
-    "mainRisk": "One sentence on the biggest remaining uncertainty or gap"
-  },
-  "summary": {
-    "whatChanged": ["bullet: what changed in the extension/codebase", "..."],
-    "whatTranscriptProves": ["point: what the session transcript directly demonstrates", "..."],
-    "whatStillNotProven": ["gap: what was not verified or remains uncertain", "..."]
-  },
-  "proof": {
-    "artifactInventory": [
-      {"name": "Transcript", "path": "transcript.jsonl", "type": "transcript", "description": "Primary source for commands, failures, and outputs"}
-    ],
-    "evidenceTable": [
-      {"point": "evidence point", "where": "transcript line / command / file", "whyItMatters": "why this evidence is significant"}
-    ],
-    "transcriptExcerpts": ["verbatim or paraphrased high-signal line from transcript", "..."]
-  },
-  "testsExisting": {
-    "narrative": "Paragraph describing what existing tests cover and what was validated.",
-    "validationTable": [
-      {"validation": "command or test name", "observedResult": "what happened", "interpretation": "what this means"}
-    ],
-    "coveredWell": ["area covered by existing tests", "..."],
-    "notCovered": ["gap in test coverage", "..."]
-  },
-  "testsNew": {
-    "narrative": "Paragraph describing any new tests added.",
-    "newTests": ["test name or description", "..."]
-  },
-  "reviewFindings": [
-    {"issue": "Short description of what the reviewer found", "severity": "critical|important|suggestion", "foundIn": "Task N — filename.py or section name", "resolution": "How it was fixed", "commit": "commit message or short SHA (optional)"}
-  ],
-  "frictionLog": [
-    {"friction": "what slowed things down", "evidence": "specific transcript moment or pattern", "type": "tooling|structure|naming|docs|other", "resolution": "how it was resolved or what the impact was"}
-  ],
-  "diff": {
-    "artifactStatus": { "hasDiffStat": false, "hasDiffPatch": false, "note": "Why diff artifacts are absent or what they show" },
-    "filesChanged": [{"file": "path/to/file", "description": "what changed and why"}],
-    "changeTable": [{"area": "logical area changed", "evidenceInTranscript": "command or message proving this", "observedEffect": "what the change does"}],
-    "representativeCommands": ["git commit -m ...", "npm test", "..."]
-  },
-  "repoImprovements": [
-    {"title": "Short title for improvement", "detail": "Full paragraph explaining the improvement and its impact."}
-  ],
-  "userImprovements": [
-    {"title": "Short title for improvement", "detail": "Full paragraph explaining the improvement and its impact."}
-  ],
-  "promptPattern": "Example prompt that would have reduced friction — include file names and context clues that would have front-loaded the right information.",
-  "sessionTimeline": [
-    "User asked to X — brief neutral description of the opening prompt",
-    "Agent and user brainstormed Y — key decisions made",
-    "Agent implemented Z using subagents",
-    "Code review caught issues, fixes applied",
-    "Session concluded with outcome"
-  ],
-  "sessionArtifacts": [
-    {"name": "artifact name", "path": "relative/path/in/pack", "description": "what this artifact contains"}
-  ],
-  "verdictStatement": "Closing italic sentence summarizing the session outcome and its trustworthiness as evidence."
-}
+- If `HEAD~1` exists, `DIFF_BASE=HEAD~1`; otherwise `DIFF_BASE=4b825dc642cb6eb9a060e54bf8d69288fbee4904` (empty tree).
+
+**If analysis is enabled** (plugin config `analysis` option, default true):
+
+Dispatch the `eval-pack-evaluator` agent with the `Agent` tool, `subagent_type:
+eval-pack-evaluator`. Pass it only the artifact location — not your own reasoning:
+
+> Write the eval-pack analysis. PACK_DIR is `${PACK_DIR}`. DIFF_BASE is `${DIFF_BASE}`.
+> Read transcript.jsonl, metrics.json, patterns.json, and test-results.json from PACK_DIR,
+> inspect the git diff against DIFF_BASE, and write `${PACK_DIR}/analysis.json` per your schema.
+
+Wait for the agent to finish. Confirm `${PACK_DIR}/analysis.json` exists and has a
+`title`. If it is missing or empty, the evaluator failed — re-dispatch once; if it
+fails again, stop and tell the user the analysis step failed. Do NOT write the
+analysis yourself as a fallback — that reintroduces the bias this step exists to remove.
+
+**If analysis is disabled** (`analysis` option is false):
+
+Do not dispatch the evaluator. Write a minimal, honest stub so the dashboard shows a
+clear "analysis disabled" banner rather than a fabricated score:
+
+```bash
+python3 - "${PACK_DIR}" << 'PY'
+import json, sys, pathlib
+pack = pathlib.Path(sys.argv[1])
+pack.mkdir(parents=True, exist_ok=True)
+(pack / "analysis.json").write_text(json.dumps({
+    "title": "Analysis disabled — heuristic flags only",
+    "disabled": True,
+}), encoding="utf-8")
+PY
 ```
-
-Be specific and actionable. Reference actual files, patterns, and moments from the transcript. Do not include empty arrays or null fields — omit sections for which there is no data.
 
 ## Step 5: Render HTML
 
@@ -237,5 +197,6 @@ Tell the user:
 - Where the eval pack was written
 - The verdict (pass/fail/none)
 - Key flags detected
-- That they can open `index.html` in a browser to view the full report
+- The `Open: file://…/index.html` path that `render_html.py` printed — they can open it directly in a browser, no unzip needed
+- That the committed zip in `<outputDir>/` is the portable copy for PRs
 - That they can run `/eval-pack:review` to create a PR with the eval pack attached
