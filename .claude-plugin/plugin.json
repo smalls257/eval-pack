@@ -11,6 +11,7 @@
   "license": "MIT",
   "keywords": ["eval", "review", "metrics", "reporting"],
   "skills": "./skills/",
+  "agents": "./agents/",
   "userConfig": {
     "outputDir": {
       "type": "string",
