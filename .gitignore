@@ -2,6 +2,7 @@
 .playwright-mcp/
 docs/superpowers/
 node_modules/
+__pycache__/
 
 # Eval packs live on PR branches, not main
 .eval-packs/
