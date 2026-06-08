@@ -1032,3 +1032,13 @@ details[open] .collapsible-trigger::before { content: '▾ '; }
   .header-stats { grid-template-columns: repeat(2, 1fr); }
   .tab-nav-wrapper { margin: 0 -12px; padding: 0 12px; }
 }
+
+.disabled-banner {
+  margin: 16px 0;
+  padding: 12px 16px;
+  border-left: 4px solid #c9923b;
+  background: rgba(201, 146, 59, 0.12);
+  color: #c9923b;
+  border-radius: 4px;
+  font-size: 14px;
+}

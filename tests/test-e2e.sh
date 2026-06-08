@@ -287,5 +287,22 @@ print(f"  Rounds after regeneration: {len(rounds)}")
 print("  PASS")
 PYEOF
 
+# Step 7: disabled analysis renders honestly (no hard-fail, no fake score)
+echo ""
+echo "--- Step 7: Disabled analysis ---"
+# Note: asserts the disabled flag round-trips into data.json (data contract).
+# The browser-side banner/verdict toggle is JS and is not exercised headlessly here.
+rm -rf "$TEST_DIR/$SESSION_ID"
+mkdir -p "$TEST_DIR/$SESSION_ID"
+echo '{"title":"Disabled run","disabled":true}' > "$TEST_DIR/$SESSION_ID/analysis.json"
+python3 "$PLUGIN_ROOT/scripts/render_html.py" "$TEST_DIR" "$SESSION_ID" "$PLUGIN_ROOT" "$TEST_DIR/transcript.jsonl" \
+  --branch "test-branch" --open-base "$TEST_DIR/open"
+DIS=$(jq '.analysis.disabled' "$TEST_DIR/open/eval-pack-$SESSION_ID/data.json")
+if [[ "$DIS" != "true" ]]; then
+  echo "FAIL: disabled flag should be carried into data.json, got $DIS" >&2
+  exit 1
+fi
+echo "  PASS"
+
 echo ""
 echo "=== ALL TESTS PASSED ==="

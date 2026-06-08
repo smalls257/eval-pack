@@ -246,6 +246,10 @@ function renderVerdict(data) {
     level = 'green';
     iconChar = '✓';
     summaryText = greenFlags[0].label;
+  } else if ((data.analysis || {}).disabled) {
+    level = 'green';
+    iconChar = 'ℹ';
+    summaryText = 'Analysis disabled — heuristic flags only';
   } else {
     level = 'green';
     iconChar = '✓';
@@ -826,10 +830,17 @@ function renderTools(tools) {
   }
 }
 
+function renderDisabledBanner(analysis) {
+  const el = document.getElementById('disabled-banner');
+  if (!el) return;
+  el.style.display = analysis && analysis.disabled ? 'block' : 'none';
+}
+
 // ── main render ───────────────────────────────────────────────────────────────
 
 function renderSession(data) {
   const analysis = data.analysis || {};
+  renderDisabledBanner(analysis);
 
   renderPageHeader(data);
   renderHighlights(analysis);
