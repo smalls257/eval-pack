@@ -151,14 +151,23 @@ First compute the diff base (same logic as Step 0):
 
 **If analysis is enabled** (plugin config `analysis` option, default true):
 
+Resolve `PACK_DIR` to an absolute path and capture the repo root before dispatching, so
+the sub-agent (which may run from a different working directory) resolves files and git
+correctly:
+
+- `ABS_PACK_DIR=$(cd "${PACK_DIR}" && pwd)`
+- `REPO_ROOT=$(git rev-parse --show-toplevel)`
+
 Dispatch the `eval-pack-evaluator` agent with the `Agent` tool, `subagent_type:
 eval-pack-evaluator`. Pass it only the artifact location — not your own reasoning:
 
-> Write the eval-pack analysis. PACK_DIR is `${PACK_DIR}`. DIFF_BASE is `${DIFF_BASE}`.
+> Write the eval-pack analysis. PACK_DIR is `${ABS_PACK_DIR}` (absolute). REPO_ROOT is
+> `${REPO_ROOT}`. DIFF_BASE is `${DIFF_BASE}`.
 > Read transcript.jsonl, metrics.json, patterns.json, and test-results.json from PACK_DIR,
-> inspect the git diff against DIFF_BASE, and write `${PACK_DIR}/analysis.json` per your schema.
+> run git from REPO_ROOT to inspect the diff against DIFF_BASE, and write
+> `${ABS_PACK_DIR}/analysis.json` per your schema.
 
-Wait for the agent to finish. Confirm `${PACK_DIR}/analysis.json` exists and has a
+Wait for the agent to finish. Confirm `${ABS_PACK_DIR}/analysis.json` exists and has a
 `title`. If it is missing or empty, the evaluator failed — re-dispatch once; if it
 fails again, stop and tell the user the analysis step failed. Do NOT write the
 analysis yourself as a fallback — that reintroduces the bias this step exists to remove.

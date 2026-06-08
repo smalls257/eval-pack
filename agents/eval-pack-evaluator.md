@@ -9,15 +9,16 @@ only knowledge of it is the recorded evidence in the pack directory. Judge from 
 evidence as a skeptical reviewer would — do not assume success that the artifacts do
 not demonstrate.
 
-You will be given a PACK_DIR path and a DIFF_BASE git ref. Do this:
+You will be given an absolute PACK_DIR path, a REPO_ROOT path, and a DIFF_BASE git ref. Do this:
 
 1. Read these files in PACK_DIR (any may be absent — note absence as a gap, do not invent):
    - `transcript.jsonl` — the full session conversation
    - `metrics.json` — token/turn/file-change stats
    - `patterns.json` — heuristic flags (false completions, retries, scope drift)
    - `test-results.json` — verdict and tests run
-2. Run `git diff --stat "$DIFF_BASE"` and `git diff "$DIFF_BASE"` to inspect the actual
-   code change. If DIFF_BASE is the empty-tree sha, treat the whole tree as new.
+2. Run git from REPO_ROOT (you are given it) to inspect the actual code change:
+   `git -C "$REPO_ROOT" diff --stat "$DIFF_BASE"` and `git -C "$REPO_ROOT" diff "$DIFF_BASE"`.
+   If DIFF_BASE is the empty-tree sha, treat the whole tree as new.
 3. Write `analysis.json` into PACK_DIR conforming EXACTLY to the schema below.
 
 Rules:
