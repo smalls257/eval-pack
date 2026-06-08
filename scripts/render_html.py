@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -246,14 +247,26 @@ def inject_into_template(pack_dir, data):
     )
 
 
-def assemble_zip(pack_dir, zip_path, session_id):
-    """Write zip from pack_dir contents (excluding .jsonl), then remove pack_dir."""
+def write_zip(pack_dir, zip_path, session_id):
+    """Write zip from pack_dir contents (excluding .jsonl)."""
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for f in pack_dir.rglob("*"):
             if f.is_file() and f.suffix != ".jsonl":
                 zf.write(f, f"{session_id}/{f.relative_to(pack_dir)}")
-    shutil.rmtree(pack_dir)
-    print(f"Eval pack rendered to {zip_path}")
+
+
+def publish_openable(pack_dir, session_id, open_base):
+    """Copy rendered pack to an openable dir outside the repo; return that dir.
+
+    Sensor: the dashboard must be readable without a decompress step. The copy
+    lives outside the repo (system temp by default) so it is never pushed.
+    """
+    open_base.mkdir(parents=True, exist_ok=True)
+    open_dir = open_base / f"eval-pack-{session_id}"
+    if open_dir.exists():
+        shutil.rmtree(open_dir)
+    shutil.copytree(pack_dir, open_dir, ignore=shutil.ignore_patterns("*.jsonl"))
+    return open_dir
 
 
 def main():
@@ -263,6 +276,11 @@ def main():
     parser.add_argument("plugin_root", type=Path)
     parser.add_argument("transcript_file", type=Path, nargs="?")
     parser.add_argument("--branch", default="", help="Git branch name for zip filename")
+    parser.add_argument(
+        "--open-base",
+        default="",
+        help="Base dir for the openable copy (default: system temp)",
+    )
     args = parser.parse_args()
 
     if not re.match(r"^[a-zA-Z0-9._-]+$", args.session_id):
@@ -308,7 +326,20 @@ def main():
     }
 
     inject_into_template(pack_dir, data)
-    assemble_zip(pack_dir, zip_path, args.session_id)
+
+    write_zip(pack_dir, zip_path, args.session_id)
+    print(f"Eval pack rendered to {zip_path}")
+
+    open_base = Path(args.open_base) if args.open_base else Path(tempfile.gettempdir())
+    try:
+        open_dir = publish_openable(pack_dir, args.session_id, open_base)
+        print(f"Open: file://{open_dir}/index.html")
+    except Exception as ex:
+        # Buffer: the zip is the durable artifact; the openable copy is a
+        # convenience. Degrade loudly, never silently.
+        print(f"Warning: could not write openable copy: {ex}", file=sys.stderr)
+
+    shutil.rmtree(pack_dir)
 
 
 if __name__ == "__main__":

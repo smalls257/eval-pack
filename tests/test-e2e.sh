@@ -191,7 +191,7 @@ echo "  PASS"
 echo ""
 echo "--- Step 5: Render HTML ---"
 python3 "$PLUGIN_ROOT/scripts/render_html.py" "$TEST_DIR" "$SESSION_ID" "$PLUGIN_ROOT" "$TEST_DIR/transcript.jsonl" \
-  --branch "test-branch"
+  --branch "test-branch" --open-base "$TEST_DIR/open"
 
 ZIP_NAME="test-branch"
 ZIP_PATH="$TEST_DIR/$ZIP_NAME.zip"
@@ -242,6 +242,28 @@ print(f"  Tools in data.json: {len(tools)} tool types")
 print("  PASS")
 PYEOF
 
+# Step 5b: openable copy exists outside repo, zip still present, jsonl excluded
+echo ""
+echo "--- Step 5b: Openable dashboard copy ---"
+OPEN_DIR="$TEST_DIR/open/eval-pack-$SESSION_ID"
+if [[ ! -f "$OPEN_DIR/index.html" ]]; then
+  echo "FAIL: openable index.html not found at $OPEN_DIR" >&2
+  exit 1
+fi
+if ! grep -q "__EVAL_PACK_DATA__" "$OPEN_DIR/index.html"; then
+  echo "FAIL: openable index.html missing embedded data" >&2
+  exit 1
+fi
+if [[ -f "$OPEN_DIR/transcript.jsonl" ]]; then
+  echo "FAIL: transcript.jsonl should be excluded from openable copy" >&2
+  exit 1
+fi
+if [[ ! -f "$ZIP_PATH" ]]; then
+  echo "FAIL: zip should still exist alongside openable copy" >&2
+  exit 1
+fi
+echo "  PASS"
+
 # Step 6: Test regeneration (round 2)
 echo ""
 echo "--- Step 6: Test regeneration (round 2) ---"
@@ -249,7 +271,7 @@ echo "--- Step 6: Test regeneration (round 2) ---"
 mkdir -p "$TEST_DIR/$SESSION_ID"
 cp "$TEST_DIR/analysis_backup.json" "$TEST_DIR/$SESSION_ID/analysis.json"
 python3 "$PLUGIN_ROOT/scripts/render_html.py" "$TEST_DIR" "$SESSION_ID" "$PLUGIN_ROOT" "$TEST_DIR/transcript.jsonl" \
-  --branch "test-branch"
+  --branch "test-branch" --open-base "$TEST_DIR/open"
 
 python3 - "$ZIP_PATH" << 'PYEOF'
 import sys, zipfile, json
