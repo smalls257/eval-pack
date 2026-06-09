@@ -106,6 +106,7 @@ In your project's `.claude/settings.json`:
 | `outputDir` | string | `.eval-packs` | Directory where eval packs are written, relative to project root |
 | `includeTranscript` | boolean | `true` | Include the full conversation transcript in the eval pack |
 | `analysis` | boolean | `true` | Enable Claude retrospective analysis. When false, only heuristic flags are included |
+| `ticketBaseUrl` | string | `""` | Prefix that turns a bare ticket key into a link in PR bodies (e.g. `https://YOURORG.atlassian.net/browse/`). Empty renders bare keys as plain text. |
 
 ## How It Works
 
@@ -127,6 +128,14 @@ what `/eval-pack:review` commits to a PR branch.
 The analysis is written by an independent `eval-pack-evaluator` sub-agent, not by the agent that
 did the work, so the evaluation is not self-graded. When the `analysis` option is `false`, the
 pack renders an explicit "analysis disabled" banner instead of an AI evaluation.
+
+## Ticket linking
+
+`/eval-pack:review` adds a `## Ticket` reference to the PR body. It auto-detects a ticket key
+matching `[A-Z][A-Z0-9]+-[0-9]+` (e.g. `PROJ-123`) from the branch name or this branch's commit
+messages; if none is found it asks once (answer with a key, a full URL, or `none`). Set
+`ticketBaseUrl` to render detected keys as clickable links. The reference is added when the PR is
+first created.
 
 ## License
 
