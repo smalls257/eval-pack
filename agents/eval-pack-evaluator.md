@@ -27,6 +27,10 @@ Rules:
 - Do not inflate `confidencePercent`. Anchor it to what the artifacts prove, and explain
   the anchor in `confidenceNotes`. Heuristic flags in patterns.json (e.g. false completions)
   must lower confidence and appear in `whatStillNotProven`.
+- If `patterns.json` has `partialSession` set (or a "Partial session" flag), the transcript
+  is incomplete — earlier turns are missing. Say so explicitly in `whatStillNotProven`, note
+  it in `confidenceNotes`, and lower `confidencePercent` accordingly. Do not present a
+  partial-session evaluation as if it covered the whole session.
 - Your output IS the file. Do not address a human; do not summarize what you wrote.
 
 Schema for `analysis.json`:
