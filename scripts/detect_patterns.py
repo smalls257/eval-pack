@@ -83,6 +83,33 @@ def detect_test_failures(entries):
     )
 
 
+def detect_partial_session(entries):
+    """Detect a transcript that begins mid-conversation.
+
+    Sensor: a session resumed or handed off into a fresh file starts mid-thread,
+    so earlier turns live in a prior file and are absent here. An eval computed on
+    a partial transcript must declare its coverage, not silently report a fragment
+    as the whole session. Returns a detail dict when partial, else None.
+    """
+    uuids = {e.get("uuid") for e in entries if e.get("uuid")}
+    first_msg = None
+    for e in entries:
+        if e.get("type") in ("user", "assistant") and e.get("message"):
+            first_msg = e
+            break
+    if first_msg is None:
+        return None
+    parent = first_msg.get("parentUuid")
+    starts_mid_thread = bool(parent) and parent not in uuids
+    starts_with_compact_summary = bool(first_msg.get("isCompactSummary"))
+    if not (starts_mid_thread or starts_with_compact_summary):
+        return None
+    return {
+        "startsMidThread": starts_mid_thread,
+        "startsWithCompactSummary": starts_with_compact_summary,
+    }
+
+
 def tests_passed_at_end(output_dir):
     results_path = Path(output_dir) / "test-results.json"
     if not results_path.is_file():
@@ -139,6 +166,7 @@ def main():
     retry_count = detect_retries(entries)
     test_failures = detect_test_failures(entries)
     scope_drift = check_scope_drift(output_dir)
+    partial_session = detect_partial_session(entries)
 
     final_pass = tests_passed_at_end(output_dir)
 
@@ -153,6 +181,11 @@ def main():
         flags.append({"level": "amber", "label": "High retry count", "count": retry_count})
     if scope_drift:
         flags.append({"level": "amber", "label": "Scope drift — many files changed"})
+    if partial_session:
+        flags.append({
+            "level": "amber",
+            "label": "Partial session — earlier turns may be missing",
+        })
     if not flags:
         flags.append({"level": "green", "label": "Clean first-pass implementation"})
 
@@ -161,6 +194,7 @@ def main():
         "retryCount": retry_count,
         "testFailureCount": test_failures,
         "scopeDrift": scope_drift,
+        "partialSession": partial_session or False,
         "flags": flags,
     }
 

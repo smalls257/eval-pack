@@ -304,5 +304,36 @@ if [[ "$DIS" != "true" ]]; then
 fi
 echo "  PASS"
 
+# Step 8: partial-session sensor — a transcript that starts mid-thread is flagged
+echo ""
+echo "--- Step 8: Partial session detection ---"
+PART_DIR="$TEST_DIR/partial"
+mkdir -p "$PART_DIR"
+cat > "$TEST_DIR/partial-transcript.jsonl" << 'JSONL'
+{"type":"user","uuid":"u1","parentUuid":"EXTERNAL-uuid-from-prior-file","timestamp":"2026-05-10T12:00:00Z","message":{"role":"user","content":"continue where we left off"}}
+{"type":"assistant","uuid":"a1","parentUuid":"u1","timestamp":"2026-05-10T12:01:00Z","message":{"model":"claude-opus-4-6","usage":{"input_tokens":10,"output_tokens":10},"content":[{"type":"text","text":"Resuming."}]}}
+JSONL
+python3 "$PLUGIN_ROOT/scripts/detect_patterns.py" "$TEST_DIR/partial-transcript.jsonl" "$PART_DIR"
+PARTIAL_FLAG=$(jq '[.flags[] | select(.label | startswith("Partial session"))] | length' "$PART_DIR/patterns.json")
+if [[ "$PARTIAL_FLAG" -ne 1 ]]; then
+  echo "FAIL: expected a 'Partial session' flag for a mid-thread transcript, got $PARTIAL_FLAG" >&2
+  exit 1
+fi
+PSOBJ=$(jq '.partialSession.startsMidThread' "$PART_DIR/patterns.json")
+if [[ "$PSOBJ" != "true" ]]; then
+  echo "FAIL: partialSession.startsMidThread should be true, got $PSOBJ" >&2
+  exit 1
+fi
+# Negative: the normal transcript (no parentUuids) must NOT be flagged partial
+NEG_DIR="$TEST_DIR/negative"
+mkdir -p "$NEG_DIR"
+python3 "$PLUGIN_ROOT/scripts/detect_patterns.py" "$TEST_DIR/transcript.jsonl" "$NEG_DIR" 2>/dev/null
+NEG=$(jq '[.flags[] | select(.label | startswith("Partial session"))] | length' "$NEG_DIR/patterns.json")
+if [[ "$NEG" -ne 0 ]]; then
+  echo "FAIL: normal transcript should not be flagged partial, got $NEG" >&2
+  exit 1
+fi
+echo "  PASS"
+
 echo ""
 echo "=== ALL TESTS PASSED ==="
