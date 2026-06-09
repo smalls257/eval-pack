@@ -30,6 +30,12 @@
       "title": "Enable Claude analysis",
       "description": "Have Claude write retrospective, friction report, and prompt quality analysis. When false, only heuristic flags are included.",
       "default": true
+    },
+    "ticketBaseUrl": {
+      "type": "string",
+      "title": "Ticket base URL",
+      "description": "Prefix used to turn a bare ticket key into a link in PR bodies, e.g. https://YOURORG.atlassian.net/browse/ — leave empty to render bare keys as plain text.",
+      "default": ""
     }
   }
 }
