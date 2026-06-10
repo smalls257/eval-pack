@@ -89,6 +89,12 @@ Identify and run appropriate tests for the changes made in this session:
    - Save test output to `${PACK_DIR}/logs/test-output.log`
    - Save build output to `${PACK_DIR}/logs/build-output.log` if a build was run
    - Save screenshots to `${PACK_DIR}/screenshots/` with descriptive filenames
+   - For any screenshot produced by an **automated test run** (not the agent driving the
+     browser), record its provenance so the report does not have to guess: append an entry
+     to `${PACK_DIR}/screenshots/sources.json` mapping the filename to `"test"`, e.g.
+     `{"login-flow.png": "test"}`. Screenshots the agent captured via `browser_take_screenshot`
+     are detected automatically from the transcript and need no entry. Anything unrecorded
+     renders as "Unknown source".
 4. Sweep for additional screenshots from the session:
 
    Run this Python snippet to find screenshots in `.playwright-mcp/` that fall within the session window (using `firstTimestamp`/`lastTimestamp` from `${PACK_DIR}/metrics.json`):
