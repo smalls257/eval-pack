@@ -35,12 +35,59 @@ Check if a PR already exists for the current branch:
 EXISTING_PR=$(gh pr list --head "$(git branch --show-current)" --json number --jq '.[0].number // empty')
 ```
 
-If a PR exists, the push above already updated it.
+If a PR exists, the push above already updated it. Note: the ticket reference below is
+added on PR **creation** only; an existing PR's body is not rewritten on later runs.
 
-If no PR exists, create one:
+If no PR exists, first discover the work ticket, then create the PR.
+
+### Discover the ticket
+
+A PR with no ticket link forces the reviewer to leave the PR and hunt the tracker for
+the *why*. Find the ticket key in this order, stopping at the first hit:
+
+1. **Branch name** — match the default ticket pattern `[A-Z][A-Z0-9]+-[0-9]+` against the
+   current branch:
+
+   ```bash
+   BRANCH=$(git branch --show-current)
+   TICKET=$(printf '%s' "$BRANCH" | grep -oE '[A-Z][A-Z0-9]+-[0-9]+' | head -1)
+   ```
+
+2. **Commit messages** — if `TICKET` is empty, scan this branch's commits for the same
+   pattern or a `Ticket:` trailer:
+
+   ```bash
+   if [ -z "$TICKET" ]; then
+     BASE=$(git merge-base HEAD main 2>/dev/null || git merge-base HEAD master 2>/dev/null || echo "")
+     RANGE=${BASE:+$BASE..HEAD}
+     TICKET=$(git log $RANGE --format='%B' 2>/dev/null | grep -oE '[A-Z][A-Z0-9]+-[0-9]+' | head -1)
+   fi
+   ```
+
+3. **Ask the user once** — if `TICKET` is still empty, ask:
+   *"Ticket for this PR? Provide a key (e.g. PROJ-123), a full URL, or 'none'."*
+   - If they give a key, set `TICKET` to it.
+   - If they give a full URL, set `TICKET_URL` to that URL (skip the link-building below).
+   - If they answer `none`, leave both empty and omit the Ticket section.
+
+### Build the ticket line
+
+- If you have a full `TICKET_URL` (user pasted a URL): the line is `Ticket: <TICKET_URL>`.
+- Else if you have a bare `TICKET` key AND the plugin config `ticketBaseUrl` is non-empty:
+  the line is `Ticket: [<TICKET>](<ticketBaseUrl><TICKET>)`.
+- Else if you have a bare `TICKET` key and no `ticketBaseUrl`: the line is `Ticket: <TICKET>`.
+- Else (no ticket): omit the entire `## Ticket` section from the body.
+
+### Create the PR
+
+Include the `## Ticket` section above `## Summary` only when a ticket was found:
 
 ```bash
 gh pr create --title "<appropriate title based on work done>" --body "$(cat <<'EOF'
+## Ticket
+
+Ticket: <the ticket line you built, or omit this whole section if none>
+
 ## Summary
 
 <summarize what was accomplished in this session>

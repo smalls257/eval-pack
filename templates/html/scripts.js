@@ -246,6 +246,10 @@ function renderVerdict(data) {
     level = 'green';
     iconChar = '✓';
     summaryText = greenFlags[0].label;
+  } else if ((data.analysis || {}).disabled) {
+    level = 'green';
+    iconChar = 'ℹ';
+    summaryText = 'Analysis disabled — heuristic flags only';
   } else {
     level = 'green';
     iconChar = '✓';
@@ -360,7 +364,15 @@ function renderTimeline(analysis) {
 function makeScreenshotItem(s) {
   const path = s.path || '';
   const label = s.label || s.path || '';
+  const src = s.source || 'unknown';
+  const badgeText = src === 'agent' ? 'Agent-captured'
+    : src === 'test' ? 'Automated test'
+    : 'Unknown source';
+  const badgeCls = src === 'agent' ? 'badge-agent'
+    : src === 'test' ? 'badge-test'
+    : 'badge-unknown';
   return html`<div class="screenshot-item" data-src="${path}">
+    <span class="screenshot-badge ${badgeCls}">${badgeText}</span>
     <img src="${path}" alt="${label}" loading="lazy">
     <div class="screenshot-label">${label}</div>
   </div>`;
@@ -826,10 +838,17 @@ function renderTools(tools) {
   }
 }
 
+function renderDisabledBanner(analysis) {
+  const el = document.getElementById('disabled-banner');
+  if (!el) return;
+  el.style.display = analysis && analysis.disabled ? 'block' : 'none';
+}
+
 // ── main render ───────────────────────────────────────────────────────────────
 
 function renderSession(data) {
   const analysis = data.analysis || {};
+  renderDisabledBanner(analysis);
 
   renderPageHeader(data);
   renderHighlights(analysis);

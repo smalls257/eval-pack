@@ -51,7 +51,6 @@ def is_human(entry):
 DONE_RE = re.compile(r"(?i)(done|complete|finished|all set|that should|looks good now)")
 CORRECTION_RE = re.compile(r"(?i)(no|not|wrong|still|actually|but|fix|fail|error|broken|issue)")
 RETRY_RE = re.compile(r"(?i)(try again|retry|let me try|another approach|different approach)")
-FAILURE_RE = re.compile(r"(?i)(FAIL|test failed|tests? failing|assertion.?error|expect.* to |error:.*test)")
 
 
 def detect_false_completions(entries):
@@ -76,28 +75,54 @@ def detect_retries(entries):
     )
 
 
-def detect_test_failures(entries):
-    return sum(
-        1 for e in entries
-        if e.get("type") == "assistant" and FAILURE_RE.search(entry_text(e))
-    )
+def detect_partial_session(entries):
+    """Detect a transcript that begins mid-conversation.
+
+    Sensor: a session resumed or handed off into a fresh file starts mid-thread,
+    so earlier turns live in a prior file and are absent here. An eval computed on
+    a partial transcript must declare its coverage, not silently report a fragment
+    as the whole session. Returns a detail dict when partial, else None.
+    """
+    uuids = {e.get("uuid") for e in entries if e.get("uuid")}
+    first_msg = None
+    for e in entries:
+        if e.get("type") in ("user", "assistant") and e.get("message"):
+            first_msg = e
+            break
+    if first_msg is None:
+        return None
+    parent = first_msg.get("parentUuid")
+    starts_mid_thread = bool(parent) and parent not in uuids
+    starts_with_compact_summary = bool(first_msg.get("isCompactSummary"))
+    if not (starts_mid_thread or starts_with_compact_summary):
+        return None
+    return {
+        "startsMidThread": starts_mid_thread,
+        "startsWithCompactSummary": starts_with_compact_summary,
+    }
 
 
-def tests_passed_at_end(output_dir):
+def read_test_verdict(output_dir):
+    """Return the final test verdict from test-results.json.
+
+    Returns the recorded verdict string ('pass' | 'fail' | 'none'), or None when the
+    file is missing or unreadable (logged, not silently swallowed). The test flag is
+    derived from this real end-state — not from counting failure words in the transcript
+    (a Paper Tiger signal that fires on normal TDD red→green chatter).
+    """
     results_path = Path(output_dir) / "test-results.json"
     if not results_path.is_file():
         print(
-            f"Warning: test-results.json not found at {results_path}; "
-            "assuming tests not passed",
+            f"Warning: test-results.json not found at {results_path}; no test flag",
             file=sys.stderr,
         )
-        return False
+        return None
     try:
         data = json.loads(results_path.read_text(encoding="utf-8"))
-        return data.get("verdict") == "pass"
     except (json.JSONDecodeError, OSError) as exc:
         print(f"Warning: could not read test-results.json: {exc}", file=sys.stderr)
-        return False
+        return None
+    return data.get("verdict")
 
 
 def check_scope_drift(output_dir):
@@ -137,30 +162,35 @@ def main():
 
     false_completions = detect_false_completions(entries)
     retry_count = detect_retries(entries)
-    test_failures = detect_test_failures(entries)
     scope_drift = check_scope_drift(output_dir)
+    partial_session = detect_partial_session(entries)
 
-    final_pass = tests_passed_at_end(output_dir)
+    test_verdict = read_test_verdict(output_dir)
 
     flags = []
-    if test_failures > 0 and not final_pass:
-        flags.append({"level": "red", "label": "Test failures during session", "count": test_failures})
-    elif test_failures > 0 and final_pass:
-        flags.append({"level": "green", "label": "Test failures fixed before completion", "count": test_failures})
+    if test_verdict == "fail":
+        flags.append({"level": "red", "label": "Tests failing at completion"})
+    elif test_verdict == "pass":
+        flags.append({"level": "green", "label": "Tests passing at completion"})
     if false_completions:
         flags.append({"level": "amber", "label": "False completions", "count": len(false_completions)})
     if retry_count >= RETRY_AMBER_THRESHOLD:
         flags.append({"level": "amber", "label": "High retry count", "count": retry_count})
     if scope_drift:
         flags.append({"level": "amber", "label": "Scope drift — many files changed"})
+    if partial_session:
+        flags.append({
+            "level": "amber",
+            "label": "Partial session — earlier turns may be missing",
+        })
     if not flags:
         flags.append({"level": "green", "label": "Clean first-pass implementation"})
 
     result = {
         "falseCompletions": false_completions,
         "retryCount": retry_count,
-        "testFailureCount": test_failures,
         "scopeDrift": scope_drift,
+        "partialSession": partial_session or False,
         "flags": flags,
     }
 

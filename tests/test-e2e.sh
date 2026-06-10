@@ -191,7 +191,7 @@ echo "  PASS"
 echo ""
 echo "--- Step 5: Render HTML ---"
 python3 "$PLUGIN_ROOT/scripts/render_html.py" "$TEST_DIR" "$SESSION_ID" "$PLUGIN_ROOT" "$TEST_DIR/transcript.jsonl" \
-  --branch "test-branch"
+  --branch "test-branch" --open-base "$TEST_DIR/open"
 
 ZIP_NAME="test-branch"
 ZIP_PATH="$TEST_DIR/$ZIP_NAME.zip"
@@ -242,6 +242,28 @@ print(f"  Tools in data.json: {len(tools)} tool types")
 print("  PASS")
 PYEOF
 
+# Step 5b: openable copy exists outside repo, zip still present, jsonl excluded
+echo ""
+echo "--- Step 5b: Openable dashboard copy ---"
+OPEN_DIR="$TEST_DIR/open/eval-pack-$SESSION_ID"
+if [[ ! -f "$OPEN_DIR/index.html" ]]; then
+  echo "FAIL: openable index.html not found at $OPEN_DIR" >&2
+  exit 1
+fi
+if ! grep -q "__EVAL_PACK_DATA__" "$OPEN_DIR/index.html"; then
+  echo "FAIL: openable index.html missing embedded data" >&2
+  exit 1
+fi
+if [[ -f "$OPEN_DIR/transcript.jsonl" ]]; then
+  echo "FAIL: transcript.jsonl should be excluded from openable copy" >&2
+  exit 1
+fi
+if [[ ! -f "$ZIP_PATH" ]]; then
+  echo "FAIL: zip should still exist alongside openable copy" >&2
+  exit 1
+fi
+echo "  PASS"
+
 # Step 6: Test regeneration (round 2)
 echo ""
 echo "--- Step 6: Test regeneration (round 2) ---"
@@ -249,7 +271,7 @@ echo "--- Step 6: Test regeneration (round 2) ---"
 mkdir -p "$TEST_DIR/$SESSION_ID"
 cp "$TEST_DIR/analysis_backup.json" "$TEST_DIR/$SESSION_ID/analysis.json"
 python3 "$PLUGIN_ROOT/scripts/render_html.py" "$TEST_DIR" "$SESSION_ID" "$PLUGIN_ROOT" "$TEST_DIR/transcript.jsonl" \
-  --branch "test-branch"
+  --branch "test-branch" --open-base "$TEST_DIR/open"
 
 python3 - "$ZIP_PATH" << 'PYEOF'
 import sys, zipfile, json
@@ -264,6 +286,115 @@ if len(rounds) != 2:
 print(f"  Rounds after regeneration: {len(rounds)}")
 print("  PASS")
 PYEOF
+
+# Step 7: disabled analysis renders honestly (no hard-fail, no fake score)
+echo ""
+echo "--- Step 7: Disabled analysis ---"
+# Note: asserts the disabled flag round-trips into data.json (data contract).
+# The browser-side banner/verdict toggle is JS and is not exercised headlessly here.
+rm -rf "$TEST_DIR/$SESSION_ID"
+mkdir -p "$TEST_DIR/$SESSION_ID"
+echo '{"title":"Disabled run","disabled":true}' > "$TEST_DIR/$SESSION_ID/analysis.json"
+python3 "$PLUGIN_ROOT/scripts/render_html.py" "$TEST_DIR" "$SESSION_ID" "$PLUGIN_ROOT" "$TEST_DIR/transcript.jsonl" \
+  --branch "test-branch" --open-base "$TEST_DIR/open"
+DIS=$(jq '.analysis.disabled' "$TEST_DIR/open/eval-pack-$SESSION_ID/data.json")
+if [[ "$DIS" != "true" ]]; then
+  echo "FAIL: disabled flag should be carried into data.json, got $DIS" >&2
+  exit 1
+fi
+echo "  PASS"
+
+# Step 8: partial-session sensor — a transcript that starts mid-thread is flagged
+echo ""
+echo "--- Step 8: Partial session detection ---"
+PART_DIR="$TEST_DIR/partial"
+mkdir -p "$PART_DIR"
+cat > "$TEST_DIR/partial-transcript.jsonl" << 'JSONL'
+{"type":"user","uuid":"u1","parentUuid":"EXTERNAL-uuid-from-prior-file","timestamp":"2026-05-10T12:00:00Z","message":{"role":"user","content":"continue where we left off"}}
+{"type":"assistant","uuid":"a1","parentUuid":"u1","timestamp":"2026-05-10T12:01:00Z","message":{"model":"claude-opus-4-6","usage":{"input_tokens":10,"output_tokens":10},"content":[{"type":"text","text":"Resuming."}]}}
+JSONL
+python3 "$PLUGIN_ROOT/scripts/detect_patterns.py" "$TEST_DIR/partial-transcript.jsonl" "$PART_DIR"
+PARTIAL_FLAG=$(jq '[.flags[] | select(.label | startswith("Partial session"))] | length' "$PART_DIR/patterns.json")
+if [[ "$PARTIAL_FLAG" -ne 1 ]]; then
+  echo "FAIL: expected a 'Partial session' flag for a mid-thread transcript, got $PARTIAL_FLAG" >&2
+  exit 1
+fi
+PSOBJ=$(jq '.partialSession.startsMidThread' "$PART_DIR/patterns.json")
+if [[ "$PSOBJ" != "true" ]]; then
+  echo "FAIL: partialSession.startsMidThread should be true, got $PSOBJ" >&2
+  exit 1
+fi
+# Negative: the normal transcript (no parentUuids) must NOT be flagged partial
+NEG_DIR="$TEST_DIR/negative"
+mkdir -p "$NEG_DIR"
+python3 "$PLUGIN_ROOT/scripts/detect_patterns.py" "$TEST_DIR/transcript.jsonl" "$NEG_DIR" 2>/dev/null
+NEG=$(jq '[.flags[] | select(.label | startswith("Partial session"))] | length' "$NEG_DIR/patterns.json")
+if [[ "$NEG" -ne 0 ]]; then
+  echo "FAIL: normal transcript should not be flagged partial, got $NEG" >&2
+  exit 1
+fi
+echo "  PASS"
+
+# Step 9: screenshot provenance — agent / test / unknown sources land in data.json
+echo ""
+echo "--- Step 9: Screenshot provenance ---"
+SS_SESSION="ss-provenance"
+SS_PACK="$TEST_DIR/$SS_SESSION"
+mkdir -p "$SS_PACK/screenshots"
+echo '{"title":"Screenshot provenance test"}' > "$SS_PACK/analysis.json"
+: > "$SS_PACK/screenshots/agent-shot.png"
+: > "$SS_PACK/screenshots/test-shot.png"
+: > "$SS_PACK/screenshots/mystery-shot.png"
+echo '{"test-shot.png":"test"}' > "$SS_PACK/screenshots/sources.json"
+cat > "$TEST_DIR/ss-transcript.jsonl" << 'JSONL'
+{"type":"assistant","timestamp":"2026-05-10T10:00:00Z","message":{"model":"x","content":[{"type":"tool_use","name":"mcp__playwright__browser_take_screenshot","id":"s1","input":{"filename":"agent-shot.png"}}]}}
+JSONL
+python3 "$PLUGIN_ROOT/scripts/render_html.py" "$TEST_DIR" "$SS_SESSION" "$PLUGIN_ROOT" "$TEST_DIR/ss-transcript.jsonl" \
+  --branch "ss" --open-base "$TEST_DIR/open"
+python3 - "$TEST_DIR/open/eval-pack-$SS_SESSION/data.json" << 'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+src = {s["path"].split("/")[-1]: s.get("source")
+       for r in d.get("rounds", []) for s in (r.get("screenshots") or [])}
+expected = {"agent-shot.png": "agent", "test-shot.png": "test", "mystery-shot.png": "unknown"}
+for name, want in expected.items():
+    if src.get(name) != want:
+        print(f"FAIL: {name} source = {src.get(name)!r}, expected {want!r}", file=sys.stderr)
+        sys.exit(1)
+print("  screenshot sources:", src)
+PY
+echo "  PASS"
+
+# Step 10: test flag is driven by the final verdict, not failure chatter
+echo ""
+echo "--- Step 10: Verdict-driven test flag ---"
+VDIR="$TEST_DIR/verdict"
+mkdir -p "$VDIR"
+echo '{"verdict":"fail"}' > "$VDIR/test-results.json"
+python3 "$PLUGIN_ROOT/scripts/detect_patterns.py" "$TEST_DIR/transcript.jsonl" "$VDIR"
+RED=$(jq '[.flags[]|select(.label=="Tests failing at completion" and .level=="red")]|length' "$VDIR/patterns.json")
+if [[ "$RED" -ne 1 ]]; then
+  echo "FAIL: verdict 'fail' should give 1 red 'Tests failing at completion', got $RED" >&2; exit 1
+fi
+echo '{"verdict":"pass"}' > "$VDIR/test-results.json"
+python3 "$PLUGIN_ROOT/scripts/detect_patterns.py" "$TEST_DIR/transcript.jsonl" "$VDIR"
+GREEN=$(jq '[.flags[]|select(.label=="Tests passing at completion" and .level=="green")]|length' "$VDIR/patterns.json")
+if [[ "$GREEN" -ne 1 ]]; then
+  echo "FAIL: verdict 'pass' should give 1 green 'Tests passing at completion', got $GREEN" >&2; exit 1
+fi
+echo '{"verdict":"none"}' > "$VDIR/test-results.json"
+python3 "$PLUGIN_ROOT/scripts/detect_patterns.py" "$TEST_DIR/transcript.jsonl" "$VDIR"
+NONEC=$(jq '[.flags[]|select(.label|startswith("Tests "))]|length' "$VDIR/patterns.json")
+if [[ "$NONEC" -ne 0 ]]; then
+  echo "FAIL: verdict 'none' should give no 'Tests ...' flag, got $NONEC" >&2; exit 1
+fi
+rm -f "$VDIR/test-results.json"
+python3 "$PLUGIN_ROOT/scripts/detect_patterns.py" "$TEST_DIR/transcript.jsonl" "$VDIR"
+MISSING=$(jq '[.flags[]|select(.label|startswith("Tests "))]|length' "$VDIR/patterns.json")
+if [[ "$MISSING" -ne 0 ]]; then
+  echo "FAIL: missing test-results.json should give no 'Tests ...' flag, got $MISSING" >&2; exit 1
+fi
+echo "  PASS"
 
 echo ""
 echo "=== ALL TESTS PASSED ==="

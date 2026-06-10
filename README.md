@@ -24,9 +24,7 @@ A Claude Code plugin that generates eval packs — polished HTML reports capturi
 
 ## Requirements
 
-- **Python 3** — required by the generation scripts (`extract-metrics.sh`, `render-html.sh`)
-- **jq** — used for JSON processing throughout
-- **zip** — used to package the eval pack output
+- **Python 3** — required by the generation scripts (`extract_metrics.py`, `detect_patterns.py`, `extract_tools.py`, `render_html.py`); JSON parsing and zip packaging use the Python standard library, so no extra CLI tools are needed
 - **gh** CLI — required by `/eval-pack:review` to create PRs and post comments
 
 ## Install
@@ -94,6 +92,8 @@ In your project's `.claude/settings.json`:
   "pluginConfigs": {
     "eval-pack": {
       "options": {
+        "outputDir": ".eval-packs",
+        "includeTranscript": true,
         "analysis": true
       }
     }
@@ -103,7 +103,10 @@ In your project's `.claude/settings.json`:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `analysis` | boolean | `true` | Enable Claude retrospective analysis |
+| `outputDir` | string | `.eval-packs` | Directory where eval packs are written, relative to project root |
+| `includeTranscript` | boolean | `true` | Include the full conversation transcript in the eval pack |
+| `analysis` | boolean | `true` | Enable Claude retrospective analysis. When false, only heuristic flags are included |
+| `ticketBaseUrl` | string | `""` | Prefix that turns a bare ticket key into a link in PR bodies (e.g. `https://YOURORG.atlassian.net/browse/`). Empty renders bare keys as plain text. |
 
 ## How It Works
 
@@ -114,6 +117,25 @@ In your project's `.claude/settings.json`:
 5. HTML report is rendered with all data, zipped to `.eval-packs/<session-id>.zip`
 6. `/eval-pack:review` commits the zip to the branch and creates a PR
 7. Reviewer downloads zip from the branch, extracts, opens `index.html`
+
+## Output
+
+`/eval-pack:generate` writes a portable `.zip` into your `outputDir` (default `.eval-packs/`)
+**and** an uncompressed, openable copy into your system temp directory. The command prints an
+`Open: file://…/index.html` path — open it directly in a browser, no unzip required. The zip is
+what `/eval-pack:review` commits to a PR branch.
+
+The analysis is written by an independent `eval-pack-evaluator` sub-agent, not by the agent that
+did the work, so the evaluation is not self-graded. When the `analysis` option is `false`, the
+pack renders an explicit "analysis disabled" banner instead of an AI evaluation.
+
+## Ticket linking
+
+`/eval-pack:review` adds a `## Ticket` reference to the PR body. It auto-detects a ticket key
+matching `[A-Z][A-Z0-9]+-[0-9]+` (e.g. `PROJ-123`) from the branch name or this branch's commit
+messages; if none is found it asks once (answer with a key, a full URL, or `none`). Set
+`ticketBaseUrl` to render detected keys as clickable links. The reference is added when the PR is
+first created.
 
 ## License
 
