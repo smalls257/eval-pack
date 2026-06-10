@@ -52,6 +52,7 @@ def render_transcript_html(transcript_path, pack_dir, screenshots_dir):
     """Render transcript HTML and collect browser screenshots in a single pass."""
     rows = []
     copied = 0
+    agent_screenshot_names = set()
     try:
         for entry in load_jsonl(transcript_path):
             role = entry.get("type") or (entry.get("message") or {}).get("role", "")
@@ -111,6 +112,7 @@ def render_transcript_html(transcript_path, pack_dir, screenshots_dir):
                     filename = (block.get("input") or {}).get("filename")
                     if not filename:
                         continue
+                    agent_screenshot_names.add(Path(filename).name)
                     src = Path(filename)
                     if not src.is_absolute():
                         src = Path.cwd() / src
@@ -141,6 +143,7 @@ def render_transcript_html(transcript_path, pack_dir, screenshots_dir):
         + "</body></html>"
     )
     (pack_dir / "transcript.html").write_text(page, encoding="utf-8")
+    return agent_screenshot_names
 
 
 def build_directory_structure(pack_dir, template_dir):
@@ -210,15 +213,60 @@ def load_prior_rounds(zip_path, session_id):
     return prev_data, prev_screenshot_names
 
 
-def collect_new_screenshots(screenshots_dir, prev_screenshot_names):
-    """Build screenshot list for this round, excluding prior-round screenshots."""
+def _load_screenshot_sources(screenshots_dir):
+    """Read screenshots/sources.json — a flat {filename: 'agent'|'test'} map.
+
+    Sensor: provenance must be explicit. A missing or malformed file degrades to an
+    empty map (logged, not silently swallowed); callers fall back to the agent set.
+    """
+    path = screenshots_dir / "sources.json"
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"Warning: could not read {path}: {exc}", file=sys.stderr)
+        return {}
+    if not isinstance(data, dict):
+        print(f"Warning: {path} is not a JSON object; ignoring", file=sys.stderr)
+        return {}
+    valid = {}
+    for name, source in data.items():
+        if source in ("agent", "test"):
+            valid[name] = source
+        else:
+            print(
+                f"Warning: {path} entry {name!r} has unrecognized source {source!r} "
+                "(expected 'agent' or 'test'); ignoring",
+                file=sys.stderr,
+            )
+    return valid
+
+
+def collect_new_screenshots(screenshots_dir, prev_screenshot_names, agent_names):
+    """Build screenshot list for this round, excluding prior-round screenshots.
+
+    Each screenshot is tagged with a source: 'agent' if it matches a
+    browser_take_screenshot call (or sources.json says so), 'test' if sources.json
+    marks it, else 'unknown' — never guess a provenance we cannot prove.
+    """
     screenshots = []
+    sources = _load_screenshot_sources(screenshots_dir)
     if screenshots_dir.is_dir():
         for png in sorted(screenshots_dir.glob("*.png")):
             if png.name in prev_screenshot_names:
                 continue
             label = png.stem.replace("-", " ").replace("_", " ")
-            screenshots.append({"path": f"screenshots/{png.name}", "label": label})
+            mapped = sources.get(png.name)
+            if png.name in agent_names or mapped == "agent":
+                source = "agent"
+            elif mapped == "test":
+                source = "test"
+            else:
+                source = "unknown"
+            screenshots.append(
+                {"path": f"screenshots/{png.name}", "label": label, "source": source}
+            )
     return screenshots
 
 
@@ -297,14 +345,19 @@ def main():
     build_directory_structure(pack_dir, template_dir)
     load_round_inputs(pack_dir, args.transcript_file, scripts_dir)
 
+    agent_screenshot_names = set()
     if args.transcript_file and args.transcript_file.is_file():
-        render_transcript_html(args.transcript_file, pack_dir, pack_dir / "screenshots")
+        agent_screenshot_names = render_transcript_html(
+            args.transcript_file, pack_dir, pack_dir / "screenshots"
+        )
 
     git_branch = args.branch
     zip_name = slugify(git_branch) if git_branch else args.session_id
     zip_path = args.output_dir / f"{zip_name}.zip"
     prev_data, prev_screenshot_names = load_prior_rounds(zip_path, args.session_id)
-    screenshots = collect_new_screenshots(pack_dir / "screenshots", prev_screenshot_names)
+    screenshots = collect_new_screenshots(
+        pack_dir / "screenshots", prev_screenshot_names, agent_screenshot_names
+    )
 
     new_round = {
         "screenshots": screenshots,

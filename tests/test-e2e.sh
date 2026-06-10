@@ -335,5 +335,35 @@ if [[ "$NEG" -ne 0 ]]; then
 fi
 echo "  PASS"
 
+# Step 9: screenshot provenance — agent / test / unknown sources land in data.json
+echo ""
+echo "--- Step 9: Screenshot provenance ---"
+SS_SESSION="ss-provenance"
+SS_PACK="$TEST_DIR/$SS_SESSION"
+mkdir -p "$SS_PACK/screenshots"
+echo '{"title":"Screenshot provenance test"}' > "$SS_PACK/analysis.json"
+: > "$SS_PACK/screenshots/agent-shot.png"
+: > "$SS_PACK/screenshots/test-shot.png"
+: > "$SS_PACK/screenshots/mystery-shot.png"
+echo '{"test-shot.png":"test"}' > "$SS_PACK/screenshots/sources.json"
+cat > "$TEST_DIR/ss-transcript.jsonl" << 'JSONL'
+{"type":"assistant","timestamp":"2026-05-10T10:00:00Z","message":{"model":"x","content":[{"type":"tool_use","name":"mcp__playwright__browser_take_screenshot","id":"s1","input":{"filename":"agent-shot.png"}}]}}
+JSONL
+python3 "$PLUGIN_ROOT/scripts/render_html.py" "$TEST_DIR" "$SS_SESSION" "$PLUGIN_ROOT" "$TEST_DIR/ss-transcript.jsonl" \
+  --branch "ss" --open-base "$TEST_DIR/open"
+python3 - "$TEST_DIR/open/eval-pack-$SS_SESSION/data.json" << 'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+src = {s["path"].split("/")[-1]: s.get("source")
+       for r in d.get("rounds", []) for s in (r.get("screenshots") or [])}
+expected = {"agent-shot.png": "agent", "test-shot.png": "test", "mystery-shot.png": "unknown"}
+for name, want in expected.items():
+    if src.get(name) != want:
+        print(f"FAIL: {name} source = {src.get(name)!r}, expected {want!r}", file=sys.stderr)
+        sys.exit(1)
+print("  screenshot sources:", src)
+PY
+echo "  PASS"
+
 echo ""
 echo "=== ALL TESTS PASSED ==="
