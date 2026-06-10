@@ -364,7 +364,15 @@ function renderTimeline(analysis) {
 function makeScreenshotItem(s) {
   const path = s.path || '';
   const label = s.label || s.path || '';
+  const src = s.source || 'unknown';
+  const badgeText = src === 'agent' ? 'Agent-captured'
+    : src === 'test' ? 'Automated test'
+    : 'Unknown source';
+  const badgeCls = src === 'agent' ? 'badge-agent'
+    : src === 'test' ? 'badge-test'
+    : 'badge-unknown';
   return html`<div class="screenshot-item" data-src="${path}">
+    <span class="screenshot-badge ${badgeCls}">${badgeText}</span>
     <img src="${path}" alt="${label}" loading="lazy">
     <div class="screenshot-label">${label}</div>
   </div>`;

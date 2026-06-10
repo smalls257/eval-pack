@@ -1042,3 +1042,19 @@ details[open] .collapsible-trigger::before { content: '▾ '; }
   border-radius: 4px;
   font-size: 14px;
 }
+
+.screenshot-item { position: relative; }
+.screenshot-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  z-index: 1;
+}
+.badge-agent { background: #2e7d32; }
+.badge-test { background: #1565c0; }
+.badge-unknown { background: #616161; }
