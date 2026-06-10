@@ -365,5 +365,36 @@ print("  screenshot sources:", src)
 PY
 echo "  PASS"
 
+# Step 10: test flag is driven by the final verdict, not failure chatter
+echo ""
+echo "--- Step 10: Verdict-driven test flag ---"
+VDIR="$TEST_DIR/verdict"
+mkdir -p "$VDIR"
+echo '{"verdict":"fail"}' > "$VDIR/test-results.json"
+python3 "$PLUGIN_ROOT/scripts/detect_patterns.py" "$TEST_DIR/transcript.jsonl" "$VDIR"
+RED=$(jq '[.flags[]|select(.label=="Tests failing at completion" and .level=="red")]|length' "$VDIR/patterns.json")
+if [[ "$RED" -ne 1 ]]; then
+  echo "FAIL: verdict 'fail' should give 1 red 'Tests failing at completion', got $RED" >&2; exit 1
+fi
+echo '{"verdict":"pass"}' > "$VDIR/test-results.json"
+python3 "$PLUGIN_ROOT/scripts/detect_patterns.py" "$TEST_DIR/transcript.jsonl" "$VDIR"
+GREEN=$(jq '[.flags[]|select(.label=="Tests passing at completion" and .level=="green")]|length' "$VDIR/patterns.json")
+if [[ "$GREEN" -ne 1 ]]; then
+  echo "FAIL: verdict 'pass' should give 1 green 'Tests passing at completion', got $GREEN" >&2; exit 1
+fi
+echo '{"verdict":"none"}' > "$VDIR/test-results.json"
+python3 "$PLUGIN_ROOT/scripts/detect_patterns.py" "$TEST_DIR/transcript.jsonl" "$VDIR"
+NONEC=$(jq '[.flags[]|select(.label|startswith("Tests "))]|length' "$VDIR/patterns.json")
+if [[ "$NONEC" -ne 0 ]]; then
+  echo "FAIL: verdict 'none' should give no 'Tests ...' flag, got $NONEC" >&2; exit 1
+fi
+rm -f "$VDIR/test-results.json"
+python3 "$PLUGIN_ROOT/scripts/detect_patterns.py" "$TEST_DIR/transcript.jsonl" "$VDIR"
+MISSING=$(jq '[.flags[]|select(.label|startswith("Tests "))]|length' "$VDIR/patterns.json")
+if [[ "$MISSING" -ne 0 ]]; then
+  echo "FAIL: missing test-results.json should give no 'Tests ...' flag, got $MISSING" >&2; exit 1
+fi
+echo "  PASS"
+
 echo ""
 echo "=== ALL TESTS PASSED ==="
