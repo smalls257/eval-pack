@@ -11,7 +11,7 @@
   "license": "MIT",
   "keywords": ["eval", "review", "metrics", "reporting"],
   "skills": "./skills/",
-  "agents": "./agents/",
+  "agents": ["./agents/eval-pack-evaluator.md"],
   "userConfig": {
     "outputDir": {
       "type": "string",
