@@ -15,6 +15,7 @@ from pathlib import Path
 
 def _load(path):
     out = []
+    skipped = 0
     try:
         with open(path, encoding="utf-8") as f:
             for line in f:
@@ -24,9 +25,12 @@ def _load(path):
                 try:
                     out.append(json.loads(line))
                 except json.JSONDecodeError:
-                    pass
+                    skipped += 1
     except OSError as exc:
         print(f"Warning: could not read {path}: {exc}", file=sys.stderr)
+        return out
+    if skipped:
+        print(f"Warning: {skipped} malformed line(s) skipped in {path}", file=sys.stderr)
     return out
 
 

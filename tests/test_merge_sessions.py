@@ -54,6 +54,15 @@ class MergeTests(unittest.TestCase):
             merged = merge_sessions.merge([Path(d) / "missing.jsonl", a])
             self.assertEqual([e["uuid"] for e in merged], ["u1"])
 
+    def test_malformed_line_skipped_but_valid_kept(self):
+        with tempfile.TemporaryDirectory() as d:
+            a = Path(d) / "a.jsonl"
+            a.write_text(
+                '{"uuid":"u1","timestamp":"t"}\nNOT JSON\n{"uuid":"u2","timestamp":"u"}\n',
+                encoding="utf-8")
+            merged = merge_sessions.merge([a])
+            self.assertEqual([e["uuid"] for e in merged], ["u1", "u2"])
+
 
 if __name__ == "__main__":
     unittest.main()
