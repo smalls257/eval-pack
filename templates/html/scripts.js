@@ -482,29 +482,17 @@ const openLightbox = (() => {
 function makeScreenshotItem(s) {
   const path = s.path || '';
   const label = s.label || s.path || '';
-  const src = s.source || 'unknown';
-  const badgeText = src === 'agent' ? 'Agent-captured'
-    : src === 'test' ? 'Automated test'
-    : 'Unknown source';
-  const badgeCls = src === 'agent' ? 'badge-agent'
-    : src === 'test' ? 'badge-test'
-    : 'badge-unknown';
+  const badge = screenshotBadge(s.source);
   return html`<div class="screenshot-item" data-src="${path}">
-    <span class="screenshot-badge ${badgeCls}">${badgeText}</span>
+    <span class="screenshot-badge ${badge.cls}">${badge.text}</span>
     <img src="${path}" alt="${label}" loading="lazy">
     <div class="screenshot-label">${label}</div>
   </div>`;
 }
 
-function attachScreenshotClicks(container) {
-  container.querySelectorAll('.screenshot-item').forEach(item => {
-    item.addEventListener('click', () => {
-      const overlay = document.createElement('div');
-      overlay.className = 'modal-overlay';
-      overlay.innerHTML = html`<img src="${item.dataset.src}" alt="">`;
-      overlay.addEventListener('click', () => overlay.remove());
-      document.body.appendChild(overlay);
-    });
+function attachScreenshotClicks(container, rounds, roundIdx) {
+  container.querySelectorAll('.screenshot-item').forEach((item, i) => {
+    item.addEventListener('click', () => openLightbox(rounds, roundIdx, i));
   });
 }
 
@@ -529,7 +517,7 @@ function renderVisualEvidence(data) {
       grid.innerHTML = '<p class="empty-state">No screenshots for this round.</p>';
     } else {
       grid.innerHTML = screenshots.map(makeScreenshotItem).join('');
-      attachScreenshotClicks(grid);
+      attachScreenshotClicks(grid, rounds, idx);
     }
     if (filterNav) {
       filterNav.querySelectorAll('.round-btn').forEach((b, i) => {
@@ -541,7 +529,7 @@ function renderVisualEvidence(data) {
     if (proofArea && screenshots.length > 0) {
       proofArea.innerHTML = html`<h3 class="section-subheading">Screenshots</h3>
         <div class="screenshot-grid">${safe(screenshots.map(makeScreenshotItem).join(''))}</div>`;
-      attachScreenshotClicks(proofArea);
+      attachScreenshotClicks(proofArea, rounds, idx);
     }
   }
 
