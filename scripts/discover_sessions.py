@@ -109,20 +109,38 @@ def discover(cwd, config_dir=None):
 
     candidates = []
     seen = set()
-    for worktree in (_worktree_dirs(cwd) or [str(cwd)]):
-        proj = config_dir / "projects" / _encode_project_slug(worktree)
-        if not proj.is_dir():
-            continue
-        for jsonl in sorted(proj.glob("*.jsonl")):
-            sid = jsonl.stem
-            if sid in archived or sid in seen:
-                continue
-            seen.add(sid)
-            candidates.append({
-                "sessionId": sid,
-                "transcriptPath": str(jsonl),
-                **_session_preview(jsonl),
-            })
+    worktrees = _worktree_dirs(cwd) or [str(cwd)]
+    # Always include the raw cwd so that symlink-aliased paths (e.g. /var vs
+    # /private/var on macOS) are checked even when git normalises them away.
+    if str(cwd) not in worktrees:
+        worktrees = [str(cwd)] + worktrees
+    for worktree in worktrees:
+        # Claude Code names project dirs from the raw process.cwd() which may
+        # differ from the canonical path that git returns (e.g. /var vs
+        # /private/var on macOS).  Try both the raw path and the resolved path
+        # so that transcripts are found regardless of which alias was active.
+        worktree_path = Path(worktree)
+        candidate_slugs = {_encode_project_slug(worktree)}
+        try:
+            candidate_slugs.add(_encode_project_slug(worktree_path.resolve()))
+        except OSError:
+            pass
+        proj_dirs = [
+            config_dir / "projects" / slug
+            for slug in candidate_slugs
+            if (config_dir / "projects" / slug).is_dir()
+        ]
+        for proj in proj_dirs:
+            for jsonl in sorted(proj.glob("*.jsonl")):
+                sid = jsonl.stem
+                if sid in archived or sid in seen:
+                    continue
+                seen.add(sid)
+                candidates.append({
+                    "sessionId": sid,
+                    "transcriptPath": str(jsonl),
+                    **_session_preview(jsonl),
+                })
     candidates.sort(key=lambda c: (c["timeRange"][0] if c["timeRange"] else ""),
                     reverse=True)
     return candidates
