@@ -12,6 +12,7 @@
   "keywords": ["eval", "review", "metrics", "reporting"],
   "skills": "./skills/",
   "agents": ["./agents/eval-pack-evaluator.md"],
+  "hooks": "./hooks/hooks.json",
   "userConfig": {
     "outputDir": {
       "type": "string",

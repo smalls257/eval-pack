@@ -152,10 +152,12 @@ Identify and run appropriate tests for the changes made in this session:
            for name in z.namelist():
                if name.endswith("data.json"):
                    prev = json.loads(z.read(name))
-                   if prev.get("sessionId") == "${SESSION_ID}":
-                       for r in prev.get("rounds", []):
-                           for s in r.get("screenshots", []):
-                               already.add(pathlib.Path(s.get("path","")).name)
+                   # Branch-scoped: carry prior-round screenshots regardless of
+                   # session id (mirrors render_html.load_prior_rounds, which no
+                   # longer gates on sessionId across resumed sessions).
+                   for r in prev.get("rounds", []):
+                       for s in r.get("screenshots", []):
+                           already.add(pathlib.Path(s.get("path","")).name)
                    break
 
    candidates = []
