@@ -89,6 +89,31 @@ class ArchiveSessionTests(unittest.TestCase):
             })
             self.assertEqual(res["status"], "skipped-no-repo")
 
+    def test_worktree_maps_to_same_root(self):
+        with tempfile.TemporaryDirectory() as d:
+            repo = _init_repo(Path(d) / "repo")
+            (repo / "f.txt").write_text("x", encoding="utf-8")
+            _git(repo, "add", "-A")
+            _git(repo, "commit", "-qm", "init")
+            wt = Path(d) / "wt"
+            _git(repo, "worktree", "add", "-q", str(wt))
+            self.assertEqual(archive_session.resolve_repo_root(str(wt)),
+                             repo.resolve())
+
+    def test_skipped_invalid_session_id(self):
+        with tempfile.TemporaryDirectory() as d:
+            repo = _init_repo(Path(d) / "repo")
+            tr = Path(d) / "orig.jsonl"
+            self._make_transcript(tr, [{"uuid": "u1"}])
+            res = archive_session.archive_session(
+                self._payload(repo, tr, sid="../evil"))
+            self.assertEqual(res["status"], "skipped-invalid-session-id")
+
+    def test_skipped_missing_transcript_path(self):
+        res = archive_session.archive_session(
+            {"session_id": "s", "cwd": ".", "reason": "other"})
+        self.assertEqual(res["status"], "skipped-no-transcript")
+
 
 if __name__ == "__main__":
     unittest.main()

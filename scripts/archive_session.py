@@ -8,6 +8,7 @@ a repo archives into one place. Anchor: the conversation is preserved when the
 session ends, before Claude Code's 30-day prune can erase it.
 """
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -82,14 +83,20 @@ def _branch_of(transcript_path):
 def archive_session(payload):
     """Archive one session from a SessionEnd-hook payload dict.
 
-    Returns a status dict; never raises for expected conditions. Statuses:
-    skipped-no-transcript, skipped-no-repo, archived.
+    Returns a status dict; never raises. Statuses: skipped-no-transcript,
+    skipped-invalid-session-id, skipped-no-repo, error-write, archived.
     """
     session_id = payload.get("session_id") or ""
     transcript_path = payload.get("transcript_path") or ""
+    # cwd defaults to ".", the hook process's working directory, which Claude
+    # Code sets to the project dir — a safe fallback when the field is absent.
     cwd = payload.get("cwd") or "."
     if not session_id or not transcript_path:
         return {"status": "skipped-no-transcript"}
+    # session_id is untrusted hook input that becomes a filename. Constrain it
+    # to the charset render_html.py already enforces so it cannot escape the store.
+    if not re.match(r"^[a-zA-Z0-9._-]+$", session_id):
+        return {"status": "skipped-invalid-session-id"}
     src = Path(transcript_path)
     if not src.is_file():
         return {"status": "skipped-no-transcript"}
@@ -99,17 +106,19 @@ def archive_session(payload):
         return {"status": "skipped-no-repo"}
 
     sessions_dir, index_path = archive_paths(repo_root)
-    sessions_dir.mkdir(parents=True, exist_ok=True)
     dest = sessions_dir / f"{session_id}.jsonl"
-    shutil.copyfile(src, dest)
-
-    index = _read_index(index_path)
-    index["sessions"][session_id] = {
-        "branch": _branch_of(src),
-        "cwd": str(cwd),
-        "capturedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-    }
-    index_path.write_text(json.dumps(index, indent=2), encoding="utf-8")
+    try:
+        sessions_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dest)
+        index = _read_index(index_path)
+        index["sessions"][session_id] = {
+            "branch": _branch_of(dest),
+            "cwd": str(cwd),
+            "capturedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+        index_path.write_text(json.dumps(index, indent=2), encoding="utf-8")
+    except OSError as exc:
+        return {"status": "error-write", "exc": str(exc)}
     return {"status": "archived", "dest": str(dest)}
 
 
