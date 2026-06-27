@@ -463,6 +463,8 @@ const openLightbox = (() => {
   }
 
   function close() {
+    // Hide, don't destroy: the overlay is built once and reused across opens,
+    // so listeners bound in build() are never re-attached (no duplicate keydowns).
     if (overlay) overlay.style.display = 'none';
     document.removeEventListener('keydown', onKey);
   }

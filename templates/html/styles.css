@@ -930,7 +930,7 @@ details[open] .collapsible-trigger::before { content: '▾ '; }
   min-height: 0;
 }
 
-.lightbox-img {
+.modal-overlay .lightbox-img {
   max-width: 82vw;
   max-height: 72vh;
   border-radius: var(--radius);
