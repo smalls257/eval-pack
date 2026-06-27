@@ -361,32 +361,140 @@ function renderTimeline(analysis) {
   ).join('');
 }
 
+function screenshotBadge(source) {
+  const src = source || 'unknown';
+  if (src === 'agent') return { text: 'Agent-captured', cls: 'badge-agent' };
+  if (src === 'test') return { text: 'Automated test', cls: 'badge-test' };
+  return { text: 'Unknown source', cls: 'badge-unknown' };
+}
+
+function wrapIndex(i, n) {
+  if (n <= 0) return 0;
+  return ((i % n) + n) % n;
+}
+
+// One reusable enlarged-image viewer. Public surface: openLightbox(rounds, roundIdx, imgIdx).
+const openLightbox = (() => {
+  let overlay = null;
+  let rounds = [];
+  let roundIdx = 0;
+  let imgIdx = 0;
+
+  function shots() {
+    return (rounds[roundIdx] && rounds[roundIdx].screenshots) || [];
+  }
+
+  function build() {
+    overlay = document.createElement('div');
+    overlay.className = 'modal-overlay lightbox';
+    overlay.innerHTML = html`
+      <div class="lightbox-panel" role="dialog" aria-modal="true">
+        <div class="lightbox-bar">
+          <select class="lightbox-round" aria-label="Round"></select>
+          <button class="lightbox-close" type="button" aria-label="Close">✕</button>
+        </div>
+        <div class="lightbox-stage">
+          <button class="lightbox-nav lightbox-prev" type="button" aria-label="Previous">‹</button>
+          <img class="lightbox-img" alt="">
+          <button class="lightbox-nav lightbox-next" type="button" aria-label="Next">›</button>
+        </div>
+        <div class="lightbox-details">
+          <span class="screenshot-badge"></span>
+          <div class="lightbox-label"></div>
+          <div class="lightbox-counter"></div>
+        </div>
+      </div>`;
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    overlay.querySelector('.lightbox-close').addEventListener('click', close);
+    overlay.querySelector('.lightbox-prev').addEventListener('click', () => step(-1));
+    overlay.querySelector('.lightbox-next').addEventListener('click', () => step(1));
+    overlay.querySelector('.lightbox-round')
+      .addEventListener('change', e => selectRound(parseInt(e.target.value, 10)));
+    document.body.appendChild(overlay);
+  }
+
+  function onKey(e) {
+    if (e.key === 'ArrowLeft') step(-1);
+    else if (e.key === 'ArrowRight') step(1);
+    else if (e.key === 'Escape') close();
+  }
+
+  function buildRoundOptions() {
+    const sel = overlay.querySelector('.lightbox-round');
+    sel.innerHTML = rounds.map((r, i) => {
+      const time = r.generatedAt
+        ? new Date(r.generatedAt).toLocaleString([], {
+            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+          })
+        : '';
+      const label = `Round ${i + 1}` + (time ? ` — ${time}` : '');
+      return html`<option value="${i}">${label}</option>`;
+    }).join('');
+  }
+
+  function render() {
+    const list = shots();
+    const s = list[imgIdx] || {};
+    const badge = screenshotBadge(s.source);
+    const img = overlay.querySelector('.lightbox-img');
+    img.src = s.path || '';
+    img.alt = s.label || '';
+    const badgeEl = overlay.querySelector('.lightbox-details .screenshot-badge');
+    badgeEl.textContent = badge.text;
+    badgeEl.className = 'screenshot-badge ' + badge.cls;
+    overlay.querySelector('.lightbox-label').textContent = s.label || s.path || '';
+    overlay.querySelector('.lightbox-counter').textContent =
+      list.length ? `${imgIdx + 1} of ${list.length}` : '0 of 0';
+    overlay.querySelector('.lightbox-round').value = String(roundIdx);
+    const empty = list.length === 0;
+    overlay.querySelector('.lightbox-prev').disabled = empty;
+    overlay.querySelector('.lightbox-next').disabled = empty;
+  }
+
+  function step(delta) {
+    imgIdx = wrapIndex(imgIdx + delta, shots().length);
+    render();
+  }
+
+  function selectRound(idx) {
+    roundIdx = idx;
+    imgIdx = 0;
+    render();
+  }
+
+  function close() {
+    // Hide, don't destroy: the overlay is built once and reused across opens,
+    // so listeners bound in build() are never re-attached (no duplicate keydowns).
+    if (overlay) overlay.style.display = 'none';
+    document.removeEventListener('keydown', onKey);
+  }
+
+  return function open(allRounds, rIdx, iIdx) {
+    rounds = allRounds || [];
+    roundIdx = rIdx ?? 0;
+    imgIdx = iIdx ?? 0;
+    if (!overlay) build();
+    buildRoundOptions();
+    overlay.style.display = 'flex';
+    document.addEventListener('keydown', onKey);
+    render();
+  };
+})();
+
 function makeScreenshotItem(s) {
   const path = s.path || '';
   const label = s.label || s.path || '';
-  const src = s.source || 'unknown';
-  const badgeText = src === 'agent' ? 'Agent-captured'
-    : src === 'test' ? 'Automated test'
-    : 'Unknown source';
-  const badgeCls = src === 'agent' ? 'badge-agent'
-    : src === 'test' ? 'badge-test'
-    : 'badge-unknown';
-  return html`<div class="screenshot-item" data-src="${path}">
-    <span class="screenshot-badge ${badgeCls}">${badgeText}</span>
+  const badge = screenshotBadge(s.source);
+  return html`<div class="screenshot-item">
+    <span class="screenshot-badge ${badge.cls}">${badge.text}</span>
     <img src="${path}" alt="${label}" loading="lazy">
     <div class="screenshot-label">${label}</div>
   </div>`;
 }
 
-function attachScreenshotClicks(container) {
-  container.querySelectorAll('.screenshot-item').forEach(item => {
-    item.addEventListener('click', () => {
-      const overlay = document.createElement('div');
-      overlay.className = 'modal-overlay';
-      overlay.innerHTML = html`<img src="${item.dataset.src}" alt="">`;
-      overlay.addEventListener('click', () => overlay.remove());
-      document.body.appendChild(overlay);
-    });
+function attachScreenshotClicks(container, allRounds, roundIdx) {
+  container.querySelectorAll('.screenshot-item').forEach((item, i) => {
+    item.addEventListener('click', () => openLightbox(allRounds, roundIdx, i));
   });
 }
 
@@ -411,7 +519,7 @@ function renderVisualEvidence(data) {
       grid.innerHTML = '<p class="empty-state">No screenshots for this round.</p>';
     } else {
       grid.innerHTML = screenshots.map(makeScreenshotItem).join('');
-      attachScreenshotClicks(grid);
+      attachScreenshotClicks(grid, rounds, idx);
     }
     if (filterNav) {
       filterNav.querySelectorAll('.round-btn').forEach((b, i) => {
@@ -423,7 +531,7 @@ function renderVisualEvidence(data) {
     if (proofArea && screenshots.length > 0) {
       proofArea.innerHTML = html`<h3 class="section-subheading">Screenshots</h3>
         <div class="screenshot-grid">${safe(screenshots.map(makeScreenshotItem).join(''))}</div>`;
-      attachScreenshotClicks(proofArea);
+      attachScreenshotClicks(proofArea, rounds, idx);
     }
   }
 
@@ -906,16 +1014,22 @@ function init(data) {
 
 // ── bootstrap ─────────────────────────────────────────────────────────────────
 
-if (window.__EVAL_PACK_DATA__) {
-  init(window.__EVAL_PACK_DATA__);
-} else {
-  fetch('data.json')
-    .then(r => r.json())
-    .then(init)
-    .catch(err => {
-      document.body.innerHTML = html`<div style="padding:2rem;font-family:monospace;color:#e74c3c">
-        <h2>Failed to load eval pack data</h2>
-        <p>${String(err)}</p>
-      </div>`;
-    });
+if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
+  if (window.__EVAL_PACK_DATA__) {
+    init(window.__EVAL_PACK_DATA__);
+  } else {
+    fetch('data.json')
+      .then(r => r.json())
+      .then(init)
+      .catch(err => {
+        document.body.innerHTML = html`<div style="padding:2rem;font-family:monospace;color:#e74c3c">
+          <h2>Failed to load eval pack data</h2>
+          <p>${String(err)}</p>
+        </div>`;
+      });
+  }
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { screenshotBadge, wrapIndex };
 }

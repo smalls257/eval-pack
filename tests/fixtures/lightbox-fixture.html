@@ -1,0 +1,32 @@
+<!doctype html>
+<html data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="../../templates/html/styles.css">
+</head>
+<body>
+  <section class="card" id="screenshots-section" style="display:none">
+    <h2 class="card-title">Visual Evidence</h2>
+    <div class="rounds-nav" id="evidence-round-filter"></div>
+    <div class="screenshot-grid" id="screenshot-grid"></div>
+  </section>
+
+  <script>window.__EVAL_PACK_TEST__ = true;</script>
+  <script src="../../templates/html/scripts.js"></script>
+  <script>
+    const RED = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const BLU = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+    renderVisualEvidence({
+      rounds: [
+        { generatedAt: '2026-06-01T10:00:00Z', screenshots: [
+          { path: RED, label: 'login page', source: 'agent' },
+          { path: BLU, label: 'dashboard', source: 'test' },
+        ]},
+        { generatedAt: '2026-06-02T11:00:00Z', screenshots: [
+          { path: RED, label: 'settings', source: 'unknown' },
+        ]},
+      ],
+    });
+  </script>
+</body>
+</html>
