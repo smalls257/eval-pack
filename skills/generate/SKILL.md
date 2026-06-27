@@ -41,42 +41,40 @@ If git is unavailable, all variables default to empty/zero — scripts proceed w
 
 ## Step 0.6: Assemble the Whole Conversation
 
-Whole-conversation eval: evaluate the **entire** unit of work, not just the latest (possibly
-resumed) session. Archived sessions for this repo are always included; additional sessions found
-in Claude Code's own transcript store can be folded in after you confirm them.
+Evaluate the **whole** unit of work. Only the current session is included automatically;
+every prior session is **opt-in and prompted** — branch only decides what is pre-suggested.
 
-First, discover repo sessions that are present in Claude Code's store but NOT yet archived:
+List relevance-tagged candidates (archived + discovered, deduped, current excluded):
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/discover_sessions.py" "$(pwd)"
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/list_candidates.py" "$(pwd)" "${SESSION_ID}" "${BRANCH}"
 ```
 
-This prints a JSON array of candidates, each with `sessionId`, `transcriptPath`, `firstPrompt`,
-`branches`, `timeRange`, and `msgCount`.
+This prints a JSON array; each item has `sessionId`, `transcriptPath`, `source`
+(`archive`/`discovered`), `branches`, `firstPrompt`, `timeRange`, `msgCount`, and `relevant`
+(true when its branches include the current branch `${BRANCH}`).
 
-- **Interactive run (the default for `/eval-pack:generate` and `/eval-pack:review`):** if the array
-  is non-empty, show the candidates to the user as a short list (first prompt + branch + time
-  range + message count) and ask which belong to this unit of work. Pre-suggest those sharing the
-  current branch. Collect the `transcriptPath` of each confirmed candidate into repeated `--extra`
-  flags below. If the user declines all, pass no `--extra` flags.
-- **Non-interactive run (CI / headless, no user to ask):** do NOT prompt. Skip the `--extra` flags
-  (archived sessions are still included). Note in the run that coverage is archive-only.
-- **Honest coverage (Sensor):** if discovery prints `[]`, state "0 additional sessions found" —
-  do not imply the conversation is provably complete; a session opened outside this repo's
-  directories cannot be discovered and only the user knows it exists.
+- **Interactive run (default for `/eval-pack:generate` and `/eval-pack:review`):** if the array is
+  non-empty, present the candidates as a checklist — **pre-check the `relevant: true`** ones (same
+  branch) and leave the rest unchecked. Show first prompt + branch + time range + message count per
+  item. Ask the user to confirm or edit. The user MAY pick none. Collect the `transcriptPath` of
+  each confirmed item into repeated `--select` flags below.
+- **Non-interactive run (CI / headless):** do NOT prompt and pass NO `--select` flags — evaluate the
+  current session only. State that coverage is current-session-only.
+- **Honest coverage (Sensor):** if the list is empty, say "no prior sessions found"; never imply the
+  conversation is provably complete (a session outside this repo's dirs cannot be discovered).
 
-Then assemble the merged transcript (archived ∪ confirmed-extra ∪ current):
+Assemble the merged transcript (current + confirmed selections + their sub-agent transcripts):
 
 ```bash
 mkdir -p "${PACK_DIR}"
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/build_conversation.py" "$(pwd)" "${TRANSCRIPT_PATH}" "${PACK_DIR}/merged.jsonl" \
-  --extra "<transcriptPath of each confirmed candidate>"   # repeat --extra per candidate; omit if none
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/build_conversation.py" "${TRANSCRIPT_PATH}" "${SESSION_ID}" "${PACK_DIR}/merged.jsonl" \
+  --select "<transcriptPath of each confirmed candidate>"   # repeat --select per candidate; omit if none
 ```
 
 If `${PACK_DIR}/merged.jsonl` was written (`1` or more sessions), set
 `TRANSCRIPT_PATH="${PACK_DIR}/merged.jsonl"` and use it for every remaining step (Steps 1, 2, 2.5,
-the Step 4 analysis input, and Step 5 render). If `0 session(s)` were reported, keep the original
-`TRANSCRIPT_PATH`.
+the Step 4 analysis input, and Step 5 render). Otherwise keep the original `TRANSCRIPT_PATH`.
 
 ## Step 1: Extract Metrics
 
