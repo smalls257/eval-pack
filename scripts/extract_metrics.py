@@ -133,12 +133,17 @@ def main():
     first_ts = timestamps[0] if timestamps else None
     last_ts = timestamps[-1] if timestamps else None
 
-    model_map = defaultdict(lambda: {"inputTokens": 0, "outputTokens": 0})
+    model_map = defaultdict(lambda: {
+        "inputTokens": 0, "outputTokens": 0,
+        "cacheReadTokens": 0, "cacheWriteTokens": 0,
+    })
     for e in assistant_entries:
         m = get_model(e) or "unknown"
         u = get_usage(e)
         model_map[m]["inputTokens"] += u.get("input_tokens") or 0
         model_map[m]["outputTokens"] += u.get("output_tokens") or 0
+        model_map[m]["cacheReadTokens"] += u.get("cache_read_input_tokens") or 0
+        model_map[m]["cacheWriteTokens"] += u.get("cache_creation_input_tokens") or 0
     token_by_model = [{"model": k, **v} for k, v in sorted(model_map.items())]
 
     subagent_total_tokens, subagent_tokens_by_model = extract_subagent_tokens(entries)

@@ -47,11 +47,16 @@ function modelRates(model) {
   return                          { inRate: 3,    outRate: 15 }; // sonnet
 }
 
-function estimateCost(model, inputTokens, outputTokens) {
+// Cache pricing (Anthropic, 5-minute ephemeral): cache WRITE = 1.25x base input,
+// cache READ = 0.10x base input. Agentic sessions are cache-read dominated, so
+// omitting these (as the old formula did) undercounts controller cost massively.
+function estimateCost(model, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens) {
   const r = modelRates(model);
   const cost = (
-    (inputTokens  || 0) * r.inRate  +
-    (outputTokens || 0) * r.outRate
+    (inputTokens      || 0) * r.inRate +
+    (outputTokens     || 0) * r.outRate +
+    (cacheWriteTokens || 0) * r.inRate * 1.25 +
+    (cacheReadTokens  || 0) * r.inRate * 0.10
   ) / 1_000_000;
   return cost > 0 ? cost : null;
 }
@@ -276,7 +281,7 @@ function renderStats(data) {
   const m = data.metrics || {};
   const statsRow = document.getElementById('stats-row');
   if (!statsRow) return;
-  const ctrlCost = estimateCost(m.lastModel, m.inputTokens, m.outputTokens);
+  const ctrlCost = estimateCost(m.lastModel, m.inputTokens, m.outputTokens, m.cacheReadTokens, m.cacheWriteTokens);
   const agentCost = estimateSubagentCost(m.lastModel, m.subagentTotalTokens);
   const totalCost = (ctrlCost != null || agentCost != null)
     ? (ctrlCost || 0) + (agentCost || 0) : null;
@@ -299,7 +304,7 @@ function renderStats(data) {
   const ctrlCostItems = tokensByModel.length > 0
     ? tokensByModel.map(r => ({
         label: shortModelName(r.model),
-        value: formatCost(estimateCost(r.model, r.inputTokens, r.outputTokens))
+        value: formatCost(estimateCost(r.model, r.inputTokens, r.outputTokens, r.cacheReadTokens, r.cacheWriteTokens))
       }))
     : [{ label: 'Controller', value: formatCost(ctrlCost) }];
   const subagentCostItems = subagentTokensByModel.length > 0
@@ -341,7 +346,7 @@ function renderStats(data) {
       note.className = 'cost-note';
       card.appendChild(note);
     }
-    note.textContent = `* Claude API rates as of ${COST_RATES_DATE}. Controller cost is exact (input/output tokens). Subagent cost (~) assumes 90/10 input/output split — only total_tokens reported.`;
+    note.textContent = `* Claude API rates as of ${COST_RATES_DATE}. Controller cost includes input, output, and cache (write 1.25x, read 0.10x of base input). Subagent cost (~) assumes a 90/10 input/output split — only subagent_tokens is reported.`;
   }
 }
 
@@ -1031,5 +1036,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex };
+  module.exports = { screenshotBadge, wrapIndex, estimateCost, modelRates };
 }
