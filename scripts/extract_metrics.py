@@ -116,10 +116,13 @@ def main():
     turn_count = sum(1 for e in entries if e.get("type") in turn_types)
     assistant_entries = [e for e in entries if e.get("type") == "assistant"]
 
+    # "<synthetic>" tags Claude Code placeholder turns (e.g. "No response
+    # requested." after a local command) — no real inference, zero usage.
+    # Exclude it from model attribution so it doesn't show as a $0 model row.
     model = "unknown"
     for e in reversed(assistant_entries):
         m = get_model(e)
-        if m:
+        if m and m != "<synthetic>":
             model = m
             break
 
@@ -139,6 +142,8 @@ def main():
     })
     for e in assistant_entries:
         m = get_model(e) or "unknown"
+        if m == "<synthetic>":
+            continue
         u = get_usage(e)
         model_map[m]["inputTokens"] += u.get("input_tokens") or 0
         model_map[m]["outputTokens"] += u.get("output_tokens") or 0
