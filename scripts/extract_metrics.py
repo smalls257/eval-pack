@@ -66,12 +66,14 @@ def extract_subagent_tokens(entries):
                 inner = block.get("content", "")
                 if isinstance(inner, list):
                     inner = " ".join(b.get("text", "") for b in inner if isinstance(b, dict))
-                m = re.search(r"total_tokens: (\d+)", str(inner))
+                # Agent results report usage as `subagent_tokens: N`; older/other
+                # formats may use `total_tokens: N`. Accept either.
+                m = re.search(r"(?:subagent_tokens|total_tokens):\s*(\d+)", str(inner))
                 if m:
                     model_tokens[model] += int(m.group(1))
                 else:
                     print(
-                        f"Warning: could not parse total_tokens from Agent tool_result "
+                        f"Warning: could not parse subagent_tokens from Agent tool_result "
                         f"(tool_use_id={tid!r}); subagent cost for this call will be 0",
                         file=sys.stderr,
                     )
