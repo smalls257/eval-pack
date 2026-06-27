@@ -122,6 +122,13 @@ def archive_session(payload):
     try:
         sessions_dir.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(src, dest)
+        # Also archive the session's sub-agent transcripts, which live in a
+        # sibling <transcript-dir>/<session-id>/subagents/ directory. Anchor:
+        # the sub-agents did real work; preserve it alongside the main thread.
+        src_sub = src.parent / src.stem / "subagents"
+        if src_sub.is_dir():
+            dest_sub = sessions_dir / session_id / "subagents"
+            shutil.copytree(src_sub, dest_sub, dirs_exist_ok=True)
         index = _read_index(index_path)
         index["sessions"][session_id] = {
             "branch": _branch_of(dest),
