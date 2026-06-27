@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Assemble the whole-conversation transcript for an eval pack.
 
-Merges every session archived for this repo (the .eval-packs/sessions store,
-where the .jsonl files are the source of truth) with the current live
-transcript, deduped by uuid and time-ordered, into one merged JSONL. Anchor:
-the eval runs on the entire conversation, not just the latest resumed session.
+Merges the current session with an explicit, user-confirmed list of prior
+sessions (the Phase-4 picker) — nothing is auto-included except the current
+transcript. Each included session also contributes its sub-agent transcripts.
+Output is deduped by uuid and time-ordered. Anchor: the eval runs on the
+conversation the user confirms as relevant, not on whatever happens to be in
+the repo's session store.
 """
 import argparse
 import sys
@@ -31,6 +33,10 @@ def build(current_transcript, current_session_id, out_path,
     {"sessions": n, "entries": m, "subagentFiles": k, "paths": [...]}.
     Writes nothing when there is no current transcript and no selection.
     """
+    # current_session_id is accepted for CLI symmetry with list_candidates and
+    # to make the call site self-documenting; merge identity is handled by
+    # resolved-path dedup below, so it is intentionally not read here.
+    _ = current_session_id
     chosen = []
     seen = set()
     for raw in [current_transcript] + list(selected_paths or []):

@@ -62,6 +62,25 @@ class BuildConversationTests(unittest.TestCase):
                 str(current), "curid", out, selected_paths=[str(current)])
             self.assertEqual(res["sessions"], 1)
 
+    def test_subagents_excluded_when_disabled(self):
+        with tempfile.TemporaryDirectory() as d:
+            current = Path(d) / "cur.jsonl"
+            _write(current, [{"uuid": "c1", "timestamp": "2026-06-03T00:00:00Z"}])
+            picked = Path(d) / "picked.jsonl"
+            _write(picked, [{"uuid": "p1", "timestamp": "2026-06-01T00:00:00Z"}])
+            sub = Path(d) / "picked" / "subagents"
+            sub.mkdir(parents=True)
+            _write(sub / "agent-1.jsonl",
+                   [{"uuid": "sa1", "timestamp": "2026-06-01T00:30:00Z"}])
+            out = Path(d) / "merged.jsonl"
+            res = build_conversation.build(
+                str(current), "curid", out, selected_paths=[str(picked)],
+                include_subagents=False)
+            self.assertEqual(res["subagentFiles"], 0)
+            uuids = [json.loads(l)["uuid"]
+                     for l in out.read_text().splitlines() if l.strip()]
+            self.assertEqual(uuids, ["p1", "c1"])  # sa1 excluded
+
     def test_zero_when_nothing(self):
         with tempfile.TemporaryDirectory() as d:
             out = Path(d) / "merged.jsonl"
