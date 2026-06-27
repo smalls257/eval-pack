@@ -373,6 +373,109 @@ function wrapIndex(i, n) {
   return ((i % n) + n) % n;
 }
 
+// One reusable enlarged-image viewer. Public surface: openLightbox(rounds, roundIdx, imgIdx).
+const openLightbox = (() => {
+  let overlay = null;
+  let rounds = [];
+  let roundIdx = 0;
+  let imgIdx = 0;
+
+  function shots() {
+    return (rounds[roundIdx] && rounds[roundIdx].screenshots) || [];
+  }
+
+  function build() {
+    overlay = document.createElement('div');
+    overlay.className = 'modal-overlay lightbox';
+    overlay.innerHTML = html`
+      <div class="lightbox-panel" role="dialog" aria-modal="true">
+        <div class="lightbox-bar">
+          <select class="lightbox-round" aria-label="Round"></select>
+          <button class="lightbox-close" type="button" aria-label="Close">✕</button>
+        </div>
+        <div class="lightbox-stage">
+          <button class="lightbox-nav lightbox-prev" type="button" aria-label="Previous">‹</button>
+          <img class="lightbox-img" alt="">
+          <button class="lightbox-nav lightbox-next" type="button" aria-label="Next">›</button>
+        </div>
+        <div class="lightbox-details">
+          <span class="screenshot-badge"></span>
+          <div class="lightbox-label"></div>
+          <div class="lightbox-counter"></div>
+        </div>
+      </div>`;
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    overlay.querySelector('.lightbox-close').addEventListener('click', close);
+    overlay.querySelector('.lightbox-prev').addEventListener('click', () => step(-1));
+    overlay.querySelector('.lightbox-next').addEventListener('click', () => step(1));
+    overlay.querySelector('.lightbox-round')
+      .addEventListener('change', e => selectRound(parseInt(e.target.value, 10)));
+    document.body.appendChild(overlay);
+  }
+
+  function onKey(e) {
+    if (e.key === 'ArrowLeft') step(-1);
+    else if (e.key === 'ArrowRight') step(1);
+    else if (e.key === 'Escape') close();
+  }
+
+  function buildRoundOptions() {
+    const sel = overlay.querySelector('.lightbox-round');
+    sel.innerHTML = rounds.map((r, i) => {
+      const time = r.generatedAt
+        ? new Date(r.generatedAt).toLocaleString([], {
+            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+          })
+        : '';
+      const label = `Round ${i + 1}` + (time ? ` — ${time}` : '');
+      return html`<option value="${i}">${label}</option>`;
+    }).join('');
+  }
+
+  function render() {
+    const list = shots();
+    const s = list[imgIdx] || {};
+    const badge = screenshotBadge(s.source);
+    const img = overlay.querySelector('.lightbox-img');
+    img.src = s.path || '';
+    img.alt = s.label || '';
+    const badgeEl = overlay.querySelector('.lightbox-details .screenshot-badge');
+    badgeEl.textContent = badge.text;
+    badgeEl.className = 'screenshot-badge ' + badge.cls;
+    overlay.querySelector('.lightbox-label').textContent = s.label || s.path || '';
+    overlay.querySelector('.lightbox-counter').textContent =
+      list.length ? `${imgIdx + 1} of ${list.length}` : '0 of 0';
+    overlay.querySelector('.lightbox-round').value = String(roundIdx);
+  }
+
+  function step(delta) {
+    imgIdx = wrapIndex(imgIdx + delta, shots().length);
+    render();
+  }
+
+  function selectRound(idx) {
+    roundIdx = idx;
+    imgIdx = 0;
+    render();
+  }
+
+  function close() {
+    if (overlay) overlay.style.display = 'none';
+    document.removeEventListener('keydown', onKey);
+  }
+
+  return function open(allRounds, rIdx, iIdx) {
+    rounds = allRounds || [];
+    roundIdx = rIdx || 0;
+    imgIdx = iIdx || 0;
+    if (!overlay) build();
+    buildRoundOptions();
+    overlay.style.display = 'flex';
+    document.addEventListener('keydown', onKey);
+    render();
+  };
+})();
+
 function makeScreenshotItem(s) {
   const path = s.path || '';
   const label = s.label || s.path || '';
