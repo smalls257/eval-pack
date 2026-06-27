@@ -50,6 +50,18 @@ def archive_paths(repo_root):
     return sessions_dir, sessions_dir / "index.json"
 
 
+def list_archived_sessions(repo_root):
+    """Return sorted archived session .jsonl paths for a repo.
+
+    The .jsonl files are the source of truth — index.json is supplementary — so
+    a session orphaned by a partial index write is still discovered here.
+    """
+    sessions_dir, _ = archive_paths(repo_root)
+    if not sessions_dir.is_dir():
+        return []
+    return sorted(sessions_dir.glob("*.jsonl"))
+
+
 def _read_index(index_path):
     try:
         data = json.loads(index_path.read_text(encoding="utf-8"))
