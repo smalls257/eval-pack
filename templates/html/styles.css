@@ -958,6 +958,11 @@ details[open] .collapsible-trigger::before { content: '▾ '; }
   gap: 6px;
 }
 
+.lightbox-details .screenshot-badge {
+  position: static;
+  align-self: flex-start;
+}
+
 .lightbox-label {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.85);
