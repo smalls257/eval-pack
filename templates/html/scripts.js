@@ -446,6 +446,9 @@ const openLightbox = (() => {
     overlay.querySelector('.lightbox-counter').textContent =
       list.length ? `${imgIdx + 1} of ${list.length}` : '0 of 0';
     overlay.querySelector('.lightbox-round').value = String(roundIdx);
+    const empty = list.length === 0;
+    overlay.querySelector('.lightbox-prev').disabled = empty;
+    overlay.querySelector('.lightbox-next').disabled = empty;
   }
 
   function step(delta) {
@@ -466,8 +469,8 @@ const openLightbox = (() => {
 
   return function open(allRounds, rIdx, iIdx) {
     rounds = allRounds || [];
-    roundIdx = rIdx || 0;
-    imgIdx = iIdx || 0;
+    roundIdx = rIdx ?? 0;
+    imgIdx = iIdx ?? 0;
     if (!overlay) build();
     buildRoundOptions();
     overlay.style.display = 'flex';
