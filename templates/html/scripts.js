@@ -483,16 +483,16 @@ function makeScreenshotItem(s) {
   const path = s.path || '';
   const label = s.label || s.path || '';
   const badge = screenshotBadge(s.source);
-  return html`<div class="screenshot-item" data-src="${path}">
+  return html`<div class="screenshot-item">
     <span class="screenshot-badge ${badge.cls}">${badge.text}</span>
     <img src="${path}" alt="${label}" loading="lazy">
     <div class="screenshot-label">${label}</div>
   </div>`;
 }
 
-function attachScreenshotClicks(container, rounds, roundIdx) {
+function attachScreenshotClicks(container, allRounds, roundIdx) {
   container.querySelectorAll('.screenshot-item').forEach((item, i) => {
-    item.addEventListener('click', () => openLightbox(rounds, roundIdx, i));
+    item.addEventListener('click', () => openLightbox(allRounds, roundIdx, i));
   });
 }
 
