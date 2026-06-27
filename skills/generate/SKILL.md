@@ -39,6 +39,22 @@ CHANGED_FILES=$(git diff --name-only "$DIFF_BASE" 2>/dev/null \
 
 If git is unavailable, all variables default to empty/zero — scripts proceed with blank git stats.
 
+## Step 0.6: Assemble the Whole Conversation
+
+Phase-2 of whole-conversation eval: merge every session archived for this repo (the
+`.eval-packs/sessions/` store) with the current session, so all later steps evaluate the
+**entire** conversation rather than only the latest (possibly resumed) session.
+
+```bash
+mkdir -p "${PACK_DIR}"
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/build_conversation.py" "$(pwd)" "${TRANSCRIPT_PATH}" "${PACK_DIR}/merged.jsonl"
+```
+
+If `${PACK_DIR}/merged.jsonl` now exists (the command reports `1` or more sessions), set
+`TRANSCRIPT_PATH="${PACK_DIR}/merged.jsonl"` and use it for every remaining step (Steps 1, 2,
+2.5, the Step 4 analysis input, and Step 5 render). If the command reported `0 session(s)` (no
+archive and no live transcript), keep the original `TRANSCRIPT_PATH`.
+
 ## Step 1: Extract Metrics
 
 Run the extract-metrics script against the current session transcript:
