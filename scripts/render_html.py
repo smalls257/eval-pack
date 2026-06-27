@@ -190,17 +190,21 @@ def load_round_inputs(pack_dir, transcript_file, scripts_dir):
             p.write_text(default, encoding="utf-8")
 
 
-def load_prior_rounds(zip_path, session_id):
-    """Read prior round data from existing zip. Returns (prev_data, prev_screenshot_names)."""
+def load_prior_rounds(zip_path):
+    """Read prior round data from an existing branch zip.
+
+    Anchor: the zip is named by branch, so its rounds belong to this unit of
+    work regardless of which session id produced them — carry them forward
+    rather than restarting rounds at every resumed session.
+    Returns (prev_data, prev_screenshot_names).
+    """
     prev_data = {}
     if zip_path.is_file():
         try:
             with zipfile.ZipFile(zip_path, "r") as zf:
                 for name in zf.namelist():
                     if name.endswith("data.json"):
-                        candidate = json.loads(zf.read(name).decode("utf-8"))
-                        if candidate.get("sessionId") == session_id:
-                            prev_data = candidate
+                        prev_data = json.loads(zf.read(name).decode("utf-8"))
                         break
         except Exception:
             print(f"Warning: could not read prior zip {zip_path}; starting fresh", file=sys.stderr)
@@ -354,7 +358,7 @@ def main():
     git_branch = args.branch
     zip_name = slugify(git_branch) if git_branch else args.session_id
     zip_path = args.output_dir / f"{zip_name}.zip"
-    prev_data, prev_screenshot_names = load_prior_rounds(zip_path, args.session_id)
+    prev_data, prev_screenshot_names = load_prior_rounds(zip_path)
     screenshots = collect_new_screenshots(
         pack_dir / "screenshots", prev_screenshot_names, agent_screenshot_names
     )
