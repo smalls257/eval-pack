@@ -5,7 +5,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/archive_session.py\""
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/archive_session.py\"",
+            "timeout": 30
           }
         ]
       }
