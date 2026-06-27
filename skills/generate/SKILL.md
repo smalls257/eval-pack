@@ -41,19 +41,42 @@ If git is unavailable, all variables default to empty/zero — scripts proceed w
 
 ## Step 0.6: Assemble the Whole Conversation
 
-Phase-2 of whole-conversation eval: merge every session archived for this repo (the
-`.eval-packs/sessions/` store) with the current session, so all later steps evaluate the
-**entire** conversation rather than only the latest (possibly resumed) session.
+Whole-conversation eval: evaluate the **entire** unit of work, not just the latest (possibly
+resumed) session. Archived sessions for this repo are always included; additional sessions found
+in Claude Code's own transcript store can be folded in after you confirm them.
+
+First, discover repo sessions that are present in Claude Code's store but NOT yet archived:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/discover_sessions.py" "$(pwd)"
+```
+
+This prints a JSON array of candidates, each with `sessionId`, `transcriptPath`, `firstPrompt`,
+`branches`, `timeRange`, and `msgCount`.
+
+- **Interactive run (the default for `/eval-pack:generate` and `/eval-pack:review`):** if the array
+  is non-empty, show the candidates to the user as a short list (first prompt + branch + time
+  range + message count) and ask which belong to this unit of work. Pre-suggest those sharing the
+  current branch. Collect the `transcriptPath` of each confirmed candidate into repeated `--extra`
+  flags below. If the user declines all, pass no `--extra` flags.
+- **Non-interactive run (CI / headless, no user to ask):** do NOT prompt. Skip the `--extra` flags
+  (archived sessions are still included). Note in the run that coverage is archive-only.
+- **Honest coverage (Sensor):** if discovery prints `[]`, state "0 additional sessions found" —
+  do not imply the conversation is provably complete; a session opened outside this repo's
+  directories cannot be discovered and only the user knows it exists.
+
+Then assemble the merged transcript (archived ∪ confirmed-extra ∪ current):
 
 ```bash
 mkdir -p "${PACK_DIR}"
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/build_conversation.py" "$(pwd)" "${TRANSCRIPT_PATH}" "${PACK_DIR}/merged.jsonl"
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/build_conversation.py" "$(pwd)" "${TRANSCRIPT_PATH}" "${PACK_DIR}/merged.jsonl" \
+  --extra "<transcriptPath of each confirmed candidate>"   # repeat --extra per candidate; omit if none
 ```
 
-If `${PACK_DIR}/merged.jsonl` now exists (the command reports `1` or more sessions), set
-`TRANSCRIPT_PATH="${PACK_DIR}/merged.jsonl"` and use it for every remaining step (Steps 1, 2,
-2.5, the Step 4 analysis input, and Step 5 render). If the command reported `0 session(s)` (no
-archive and no live transcript), keep the original `TRANSCRIPT_PATH`.
+If `${PACK_DIR}/merged.jsonl` was written (`1` or more sessions), set
+`TRANSCRIPT_PATH="${PACK_DIR}/merged.jsonl"` and use it for every remaining step (Steps 1, 2, 2.5,
+the Step 4 analysis input, and Step 5 render). If `0 session(s)` were reported, keep the original
+`TRANSCRIPT_PATH`.
 
 ## Step 1: Extract Metrics
 
