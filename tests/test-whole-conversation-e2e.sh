@@ -32,7 +32,8 @@ JSONL
 
 # Assemble the whole conversation from inside the repo
 OUT="$TEST_DIR/merged.jsonl"
-( cd "$REPO" && python3 "$PLUGIN_ROOT/scripts/build_conversation.py" "$REPO" "$TR_B" "$OUT" )
+ARCH="$REPO/.eval-packs/sessions/sessA.jsonl"
+( cd "$REPO" && python3 "$PLUGIN_ROOT/scripts/build_conversation.py" "$TR_B" "sessB" "$OUT" --select "$ARCH" )
 
 # The merged transcript must contain all four uuids, time-ordered a1,a2,b1,b2
 UUIDS=$(python3 -c "import json,sys;print(','.join(json.loads(l)['uuid'] for l in open('$OUT') if l.strip()))")

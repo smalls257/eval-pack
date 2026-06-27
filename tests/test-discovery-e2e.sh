@@ -35,7 +35,7 @@ cat > "$TR_CUR" <<'JSONL'
 JSONL
 OUT="$TEST_DIR/merged.jsonl"
 PICK=$(echo "$CANDS" | python3 -c "import json,sys; print(json.load(sys.stdin)[0]['transcriptPath'])")
-( cd "$REPO" && python3 "$PLUGIN_ROOT/scripts/build_conversation.py" "$REPO" "$TR_CUR" "$OUT" --extra "$PICK" )
+( cd "$REPO" && python3 "$PLUGIN_ROOT/scripts/build_conversation.py" "$TR_CUR" "disccur" "$OUT" --select "$PICK" )
 
 UUIDS=$(python3 -c "import json;print(','.join(json.loads(l)['uuid'] for l in open('$OUT') if l.strip()))")
 if [[ "$UUIDS" != "d1,d2,c1" ]]; then
