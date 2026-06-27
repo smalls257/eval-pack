@@ -361,6 +361,18 @@ function renderTimeline(analysis) {
   ).join('');
 }
 
+function screenshotBadge(source) {
+  const src = source || 'unknown';
+  if (src === 'agent') return { text: 'Agent-captured', cls: 'badge-agent' };
+  if (src === 'test') return { text: 'Automated test', cls: 'badge-test' };
+  return { text: 'Unknown source', cls: 'badge-unknown' };
+}
+
+function wrapIndex(i, n) {
+  if (n <= 0) return 0;
+  return ((i % n) + n) % n;
+}
+
 function makeScreenshotItem(s) {
   const path = s.path || '';
   const label = s.label || s.path || '';
@@ -906,16 +918,22 @@ function init(data) {
 
 // ── bootstrap ─────────────────────────────────────────────────────────────────
 
-if (window.__EVAL_PACK_DATA__) {
-  init(window.__EVAL_PACK_DATA__);
-} else {
-  fetch('data.json')
-    .then(r => r.json())
-    .then(init)
-    .catch(err => {
-      document.body.innerHTML = html`<div style="padding:2rem;font-family:monospace;color:#e74c3c">
-        <h2>Failed to load eval pack data</h2>
-        <p>${String(err)}</p>
-      </div>`;
-    });
+if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
+  if (window.__EVAL_PACK_DATA__) {
+    init(window.__EVAL_PACK_DATA__);
+  } else {
+    fetch('data.json')
+      .then(r => r.json())
+      .then(init)
+      .catch(err => {
+        document.body.innerHTML = html`<div style="padding:2rem;font-family:monospace;color:#e74c3c">
+          <h2>Failed to load eval pack data</h2>
+          <p>${String(err)}</p>
+        </div>`;
+      });
+  }
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { screenshotBadge, wrapIndex };
 }
