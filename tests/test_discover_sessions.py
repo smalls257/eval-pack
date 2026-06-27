@@ -65,6 +65,20 @@ class DiscoverTests(unittest.TestCase):
             cfg = Path(d) / "cfg"
             self.assertEqual(discover_sessions.discover(str(repo), config_dir=cfg), [])
 
+    def test_first_prompt_skips_angle_bracket_content(self):
+        with tempfile.TemporaryDirectory() as d:
+            repo, cfg, proj = self._setup(d)
+            _write_session(proj, "sY", [
+                {"type": "user", "uuid": "u0",
+                 "timestamp": "2026-06-01T09:00:00Z",
+                 "message": {"content": [{"type": "text", "text": "<command-stuff>"}]}},
+                {"type": "user", "uuid": "u1",
+                 "timestamp": "2026-06-01T09:01:00Z",
+                 "message": {"content": [{"type": "text", "text": "real ask"}]}},
+            ])
+            got = discover_sessions.discover(str(repo), config_dir=cfg)
+            self.assertEqual(got[0]["firstPrompt"], "real ask")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -71,6 +71,8 @@ def _session_preview(path):
                     if not first_prompt and e.get("type") == "user":
                         first_prompt = _first_text(e["message"].get("content"))
     except OSError:
+        # Bounded on purpose: an unreadable transcript still surfaces as a
+        # candidate (empty preview), rather than vanishing from discovery.
         pass
     timestamps.sort()
     return {
@@ -83,10 +85,11 @@ def _session_preview(path):
 
 def _first_text(content):
     if isinstance(content, list):
-        for part in content:
-            if isinstance(part, dict) and part.get("type") == "text":
-                content = part.get("text")
-                break
+        content = next(
+            (p.get("text") for p in content
+             if isinstance(p, dict) and p.get("type") == "text"),
+            None,
+        )
     if isinstance(content, str) and content.strip() and not content.startswith("<"):
         return content.strip().replace("\n", " ")[:80]
     return ""
