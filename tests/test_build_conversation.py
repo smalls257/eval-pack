@@ -66,6 +66,17 @@ class BuildConversationTests(unittest.TestCase):
             self.assertEqual(res["sessions"], 0)
             self.assertFalse(out.exists())
 
+    def test_non_git_repo_cwd_uses_current_only(self):
+        with tempfile.TemporaryDirectory() as d:
+            plain = Path(d) / "plain"   # NOT a git repo
+            plain.mkdir()
+            current = Path(d) / "current.jsonl"
+            _write(current, [{"uuid": "u1", "timestamp": "t"}])
+            out = Path(d) / "merged.jsonl"
+            res = build_conversation.build(str(plain), str(current), out)
+            self.assertEqual(res["sessions"], 1)
+            self.assertEqual(res["entries"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
