@@ -325,6 +325,35 @@ def publish_openable(pack_dir, session_id, open_base):
     return open_dir
 
 
+def validate_pack(pack_dir):
+    """Return a list of gaps that must block producing the eval pack.
+
+    Sensor, not Silent Fallback: a missing required input must halt loudly and
+    produce NO output, rather than emitting a pack with empty placeholders.
+    Required: a real transcript (>=1 conversation turn) and metrics (extraction
+    actually ran). analysis.json is gated separately in load_round_inputs.
+    """
+    gaps = []
+
+    transcript = pack_dir / "transcript.jsonl"
+    if not transcript.is_file() or transcript.stat().st_size == 0:
+        gaps.append("transcript.jsonl is missing or empty")
+    else:
+        turns = sum(
+            1 for e in load_jsonl(transcript)
+            if e.get("type") in ("user", "human", "assistant")
+            and (e.get("message") or e.get("content"))
+        )
+        if turns == 0:
+            gaps.append("transcript.jsonl has no conversation turns")
+
+    metrics = read_json(pack_dir / "metrics.json")
+    if not metrics or not metrics.get("turnCount"):
+        gaps.append("metrics.json missing or has no turnCount (metric extraction did not run)")
+
+    return gaps
+
+
 def main():
     parser = argparse.ArgumentParser(description="Render eval pack HTML report")
     parser.add_argument("output_dir", type=Path)
@@ -352,6 +381,15 @@ def main():
 
     build_directory_structure(pack_dir, template_dir)
     load_round_inputs(pack_dir, args.transcript_file, scripts_dir)
+
+    gaps = validate_pack(pack_dir)
+    if gaps:
+        print("Refusing to produce eval pack — incomplete inputs:", file=sys.stderr)
+        for g in gaps:
+            print(f"  - {g}", file=sys.stderr)
+        print("Fix the gap(s) above and re-run; no partial pack was written.", file=sys.stderr)
+        shutil.rmtree(pack_dir, ignore_errors=True)
+        sys.exit(1)
 
     agent_screenshot_names = set()
     if args.transcript_file and args.transcript_file.is_file():
