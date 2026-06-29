@@ -80,5 +80,20 @@ class DiscoverTests(unittest.TestCase):
             self.assertEqual(got[0]["firstPrompt"], "real ask")
 
 
+class SlugEncodingTests(unittest.TestCase):
+    def test_matches_claude_code_rule_cross_platform(self):
+        enc = discover_sessions._encode_project_slug
+        # macOS/Linux simple
+        self.assertEqual(enc("/Users/x/Code/eval-pack"), "-Users-x-Code-eval-pack")
+        # dotted dir (macOS worktree): /. -> -- , matching real CC dir names
+        self.assertEqual(enc("/Users/x/p/.claude/wt"), "-Users-x-p--claude-wt")
+        # Windows backslash path: drive colon + separators -> -
+        self.assertEqual(enc("C:\\Users\\x\\Code\\eval-pack"),
+                         "C--Users-x-Code-eval-pack")
+        # Windows git-style forward slashes encode identically
+        self.assertEqual(enc("C:/Users/x/Code/eval-pack"),
+                         "C--Users-x-Code-eval-pack")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -10,6 +10,7 @@ only here. The interface returns preview metadata for a human to choose from.
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -24,8 +25,11 @@ def _default_config_dir():
 
 
 def _encode_project_slug(path):
-    """Encode an absolute cwd the way Claude Code names its project dir."""
-    return str(path).replace("/", "-")
+    """Encode an absolute cwd the way Claude Code names its project dir:
+    every non-alphanumeric character becomes '-'. This matches Claude Code on
+    macOS, Linux, and Windows — covering path separators ('/' and '\\'), the
+    Windows drive colon, and dots in directory names (e.g. .claude/worktrees)."""
+    return re.sub(r"[^a-zA-Z0-9]", "-", str(path))
 
 
 def _worktree_dirs(cwd):
