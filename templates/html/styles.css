@@ -928,6 +928,7 @@ details[open] .collapsible-trigger::before { content: '▾ '; }
   align-items: center;
   gap: 8px;
   min-height: 0;
+  overflow: hidden;   /* clip a zoomed image to the stage, not the whole screen */
 }
 
 .modal-overlay .lightbox-img {
@@ -935,6 +936,8 @@ details[open] .collapsible-trigger::before { content: '▾ '; }
   max-height: 72vh;
   border-radius: var(--radius);
   display: block;
+  transform-origin: center center;
+  will-change: transform;
 }
 
 .lightbox-nav {
@@ -948,8 +951,37 @@ details[open] .collapsible-trigger::before { content: '▾ '; }
   cursor: pointer;
   opacity: 0.55;
   transition: opacity 0.12s ease;
+  position: relative;
+  z-index: 2;         /* stay above a zoomed image */
 }
 .lightbox-nav:hover { opacity: 1; }
+
+/* ===== Lightbox zoom controls ===== */
+.lightbox-zoom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lightbox-zoombtn {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  line-height: 1;
+  padding: 4px 9px;
+  cursor: pointer;
+}
+.lightbox-zoombtn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.16); }
+.lightbox-zoombtn:disabled { opacity: 0.4; cursor: default; }
+
+.lightbox-zoomlevel {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  min-width: 38px;
+  text-align: center;
+}
 
 .lightbox-details {
   color: #fff;
