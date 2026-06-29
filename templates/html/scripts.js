@@ -713,8 +713,8 @@ function renderProof(analysis) {
       invEl.innerHTML = items.map(item =>
         html`<li class="artifact-item">
           <strong>${item.name || ''}</strong>${safe(
-            item.path && isSafePath(item.path)
-              ? html` — <a href="${item.path}">${item.path}</a>`
+            item.path && artifactLinkable(item.path)
+              ? html` — <a href="${artifactHref(item.path)}">${artifactHref(item.path)}</a>`
               : item.path ? html` — ${item.path}` : ''
           )}${safe(item.description ? `<div class="artifact-desc">${renderMarkdown(item.description)}</div>` : '')}
         </li>`
@@ -929,6 +929,16 @@ function isSafePath(path) {
   return /^https?:\/\//i.test(path) || /^\.{0,2}\//.test(path) || /^[^:]+$/.test(path);
 }
 
+// Raw .jsonl files are excluded from the pack/zip; the transcript ships as the
+// rendered transcript.html. Map the link target so the artifact is not a dead link.
+function artifactHref(p) {
+  return p === 'transcript.jsonl' ? 'transcript.html' : p;
+}
+// Linkable only if safe AND bundled — a .jsonl other than the transcript is not shipped.
+function artifactLinkable(p) {
+  return isSafePath(p) && (!p.endsWith('.jsonl') || p === 'transcript.jsonl');
+}
+
 function renderSessionArtifacts(analysis) {
   const list = document.getElementById('session-artifacts-list');
   if (!list) return;
@@ -938,8 +948,8 @@ function renderSessionArtifacts(analysis) {
     return;
   }
   list.innerHTML = items.map(item => {
-    if (item.path && isSafePath(item.path)) {
-      return html`<li><a href="${item.path}" target="_blank">${item.name || item.label || item.path}</a></li>`;
+    if (item.path && artifactLinkable(item.path)) {
+      return html`<li><a href="${artifactHref(item.path)}" target="_blank">${item.name || item.label || item.path}</a></li>`;
     }
     return html`<li>${item.name || item.label || item.path || String(item)}</li>`;
   }).join('');
@@ -1142,5 +1152,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, estimateCost, modelRates, estimateSubagentCost, sumReportedCost };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, estimateCost, modelRates, estimateSubagentCost, sumReportedCost, artifactHref, artifactLinkable };
 }

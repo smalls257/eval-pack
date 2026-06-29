@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 
 const require = createRequire(import.meta.url);
-const { screenshotBadge, wrapIndex, zoomAt } = require(
+const { screenshotBadge, wrapIndex, zoomAt, artifactHref, artifactLinkable } = require(
   path.join(import.meta.dirname, '..', 'templates', 'html', 'scripts.js')
 );
 
@@ -53,4 +53,19 @@ test('zoomAt clamps to 1 and resets pan', () => {
 
 test('zoomAt about centre (cursor 0,0) keeps pan zero', () => {
   assert.deepEqual(zoomAt(1, 0, 0, 0, 0, 2, 5), { scale: 2, panX: 0, panY: 0 });
+});
+
+// Raw .jsonl is excluded from the pack; transcript ships as transcript.html.
+test('artifactHref maps transcript.jsonl to the shipped transcript.html', () => {
+  assert.equal(artifactHref('transcript.jsonl'), 'transcript.html');
+  assert.equal(artifactHref('metrics.json'), 'metrics.json');
+  assert.equal(artifactHref('screenshots/a.png'), 'screenshots/a.png');
+});
+
+test('artifactLinkable: transcript ok, other .jsonl not, normal files ok', () => {
+  assert.equal(artifactLinkable('transcript.jsonl'), true);   // has transcript.html stand-in
+  assert.equal(artifactLinkable('merged.jsonl'), false);      // excluded, no stand-in -> no dead link
+  assert.equal(artifactLinkable('metrics.json'), true);
+  assert.equal(artifactLinkable('screenshots/x.png'), true);
+  assert.equal(artifactLinkable('//evil'), false);            // unsafe path
 });

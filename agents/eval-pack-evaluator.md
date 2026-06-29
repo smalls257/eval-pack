@@ -55,7 +55,7 @@ Schema for `analysis.json`:
   },
   "proof": {
     "artifactInventory": [
-      {"name": "Transcript", "path": "transcript.jsonl", "type": "transcript", "description": "Primary source for commands, failures, and outputs"}
+      {"name": "Transcript", "path": "transcript.html", "type": "transcript", "description": "Primary source for commands, failures, and outputs (the raw .jsonl is excluded from the pack; transcript.html is the bundled, viewable rendering)"}
     ],
     "evidenceTable": [
       {"point": "evidence point", "where": "transcript line / command / file", "whyItMatters": "why this evidence is significant"}
