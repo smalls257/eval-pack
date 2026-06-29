@@ -159,7 +159,11 @@ def build_directory_structure(pack_dir, template_dir):
 def load_round_inputs(pack_dir, transcript_file, scripts_dir):
     """Run extraction scripts, validate analysis.json, backfill defaults."""
     if transcript_file and transcript_file.is_file():
-        shutil.copy(transcript_file, pack_dir / "transcript.jsonl")
+        dest = pack_dir / "transcript.jsonl"
+        # The skill may already pass pack_dir/transcript.jsonl (the canonical
+        # merged transcript). Copying a file onto itself raises SameFileError.
+        if transcript_file.resolve() != dest.resolve():
+            shutil.copy(transcript_file, dest)
         ok = run_script(scripts_dir / "extract_tools.py", [transcript_file, pack_dir])
         if not ok:
             print("Warning: extract_tools.py failed; tool data will be empty", file=sys.stderr)

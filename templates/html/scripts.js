@@ -70,6 +70,23 @@ function estimateSubagentCost(model, totalTokens) {
   return (totalTokens * blended) / 1_000_000;
 }
 
+// Total cost = the sum of the per-model rows actually shown. Computing it as a
+// single lastModel-on-aggregate estimate diverges from the displayed rows when
+// models differ (e.g. a cheap lastModel makes Total < the sum above it).
+function sumReportedCost(tokensByModel, subagentTokensByModel, fallbackCtrl, fallbackAgent) {
+  let total = null;
+  const add = (v) => { if (v != null) total = (total || 0) + v; };
+  if (tokensByModel.length > 0) {
+    for (const r of tokensByModel) {
+      add(estimateCost(r.model, r.inputTokens, r.outputTokens, r.cacheReadTokens, r.cacheWriteTokens));
+    }
+  } else { add(fallbackCtrl); }
+  if (subagentTokensByModel.length > 0) {
+    for (const r of subagentTokensByModel) add(estimateSubagentCost(r.model, r.totalTokens));
+  } else { add(fallbackAgent); }
+  return total;
+}
+
 function formatCost(n) {
   if (n == null || n <= 0) return '—';
   return (n >= 0.01 ? '$' + n.toFixed(2) : '$' + n.toFixed(4)) + '*';
@@ -283,8 +300,6 @@ function renderStats(data) {
   if (!statsRow) return;
   const ctrlCost = estimateCost(m.lastModel, m.inputTokens, m.outputTokens, m.cacheReadTokens, m.cacheWriteTokens);
   const agentCost = estimateSubagentCost(m.lastModel, m.subagentTotalTokens);
-  const totalCost = (ctrlCost != null || agentCost != null)
-    ? (ctrlCost || 0) + (agentCost || 0) : null;
 
   const tokensByModel = Array.isArray(m.tokensByModel) ? m.tokensByModel : [];
   const tokenItems = tokensByModel.length > 0
@@ -313,6 +328,7 @@ function renderStats(data) {
         value: '~' + formatCost(estimateSubagentCost(r.model, r.totalTokens))
       }))
     : [{ label: 'Subagents', value: '~' + formatCost(agentCost) }];
+  const totalCost = sumReportedCost(tokensByModel, subagentTokensByModel, ctrlCost, agentCost);
   const costItems = [...ctrlCostItems, ...subagentCostItems, { label: 'Total *', value: formatCost(totalCost) }];
 
   const groups = [
@@ -1036,5 +1052,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, estimateCost, modelRates };
+  module.exports = { screenshotBadge, wrapIndex, estimateCost, modelRates, estimateSubagentCost, sumReportedCost };
 }
