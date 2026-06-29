@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  unit:
+    name: unit (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # Tests create throwaway git repos; CI runners need a default identity.
+      - name: Configure git identity
+        run: |
+          git config --global user.email ci@example.com
+          git config --global user.name CI
+      # Cross-platform: stdlib unittest. `python` is what setup-python exposes on
+      # all OSes (incl. Windows, where `python3` may be absent).
+      - name: Python unit tests
+        run: python -m unittest discover -s tests -p "test_*.py" -v
+      # Node expands the glob itself (Node 21+), so it works under pwsh/cmd too.
+      - name: Node tests
+        run: node --test "tests/**/*.test.mjs"
+
+  e2e:
+    name: shell e2e (bash)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Configure git identity
+        run: |
+          git config --global user.email ci@example.com
+          git config --global user.name CI
+      # Bash-only end-to-end drivers (hook stdin, merge, discovery, render).
+      - name: Shell e2e
+        run: |
+          set -e
+          for t in test-archive-hook test-whole-conversation-e2e test-discovery-e2e test-phase4-e2e test-e2e; do
+            echo "== $t =="
+            bash "tests/$t.sh"
+          done
