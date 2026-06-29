@@ -66,12 +66,14 @@ def extract_subagent_tokens(entries):
                 inner = block.get("content", "")
                 if isinstance(inner, list):
                     inner = " ".join(b.get("text", "") for b in inner if isinstance(b, dict))
-                m = re.search(r"total_tokens: (\d+)", str(inner))
+                # Agent results report usage as `subagent_tokens: N`; older/other
+                # formats may use `total_tokens: N`. Accept either.
+                m = re.search(r"(?:subagent_tokens|total_tokens):\s*(\d+)", str(inner))
                 if m:
                     model_tokens[model] += int(m.group(1))
                 else:
                     print(
-                        f"Warning: could not parse total_tokens from Agent tool_result "
+                        f"Warning: could not parse subagent_tokens from Agent tool_result "
                         f"(tool_use_id={tid!r}); subagent cost for this call will be 0",
                         file=sys.stderr,
                     )
@@ -114,10 +116,13 @@ def main():
     turn_count = sum(1 for e in entries if e.get("type") in turn_types)
     assistant_entries = [e for e in entries if e.get("type") == "assistant"]
 
+    # "<synthetic>" tags Claude Code placeholder turns (e.g. "No response
+    # requested." after a local command) — no real inference, zero usage.
+    # Exclude it from model attribution so it doesn't show as a $0 model row.
     model = "unknown"
     for e in reversed(assistant_entries):
         m = get_model(e)
-        if m:
+        if m and m != "<synthetic>":
             model = m
             break
 
@@ -131,12 +136,19 @@ def main():
     first_ts = timestamps[0] if timestamps else None
     last_ts = timestamps[-1] if timestamps else None
 
-    model_map = defaultdict(lambda: {"inputTokens": 0, "outputTokens": 0})
+    model_map = defaultdict(lambda: {
+        "inputTokens": 0, "outputTokens": 0,
+        "cacheReadTokens": 0, "cacheWriteTokens": 0,
+    })
     for e in assistant_entries:
         m = get_model(e) or "unknown"
+        if m == "<synthetic>":
+            continue
         u = get_usage(e)
         model_map[m]["inputTokens"] += u.get("input_tokens") or 0
         model_map[m]["outputTokens"] += u.get("output_tokens") or 0
+        model_map[m]["cacheReadTokens"] += u.get("cache_read_input_tokens") or 0
+        model_map[m]["cacheWriteTokens"] += u.get("cache_creation_input_tokens") or 0
     token_by_model = [{"model": k, **v} for k, v in sorted(model_map.items())]
 
     subagent_total_tokens, subagent_tokens_by_model = extract_subagent_tokens(entries)

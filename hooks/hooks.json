@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${user_config.pythonExecutable} \"${CLAUDE_PLUGIN_ROOT}/scripts/archive_session.py\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

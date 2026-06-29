@@ -7,13 +7,16 @@ tags: ["eval", "review", "metrics"]
 
 ## Prerequisites
 
-Verify Python 3 is available before running any scripts:
+Resolve the Python command from plugin config (the `pythonExecutable` userConfig, exposed as the
+env var `CLAUDE_PLUGIN_OPTION_pythonExecutable`; default `python3`), then verify it runs. Use this
+`$PYTHON` for every script invocation below — Windows users can set it to `python` or `py`.
 
 ```bash
-python3 --version
+PYTHON="${CLAUDE_PLUGIN_OPTION_pythonExecutable:-python3}"
+"$PYTHON" --version
 ```
 
-If this fails, stop and tell the user: `"Error: Python 3 is required by eval-pack. Install from python.org and ensure python3 is in your PATH."`
+If this fails, stop and tell the user: `"Error: Python 3 is required by eval-pack. Install from python.org, then either ensure 'python3' is on PATH or set the plugin's pythonExecutable config (e.g. 'python' or 'py' on Windows)."`
 
 You are generating an eval pack for the current session. Follow these steps in order.
 
@@ -33,18 +36,55 @@ INSERTIONS=$(echo "$DIFF_STAT" | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+'
 DELETIONS=$(echo "$DIFF_STAT" | grep -oE '[0-9]+ deletion' | grep -oE '[0-9]+' || echo "0")
 FILES_CHANGED=$(git diff --name-only "$DIFF_BASE" 2>/dev/null | wc -l | tr -d ' ' || echo "0")
 CHANGED_FILES=$(git diff --name-only "$DIFF_BASE" 2>/dev/null \
-  | python3 -c "import sys,json; lines=[l for l in sys.stdin.read().splitlines() if l.strip()]; print(json.dumps(lines))" \
+  | "$PYTHON" -c "import sys,json; lines=[l for l in sys.stdin.read().splitlines() if l.strip()]; print(json.dumps(lines))" \
   || echo "[]")
 ```
 
 If git is unavailable, all variables default to empty/zero — scripts proceed with blank git stats.
+
+## Step 0.6: Assemble the Whole Conversation
+
+Evaluate the **whole** unit of work. Only the current session is included automatically;
+every prior session is **opt-in and prompted** — branch only decides what is pre-suggested.
+
+List relevance-tagged candidates (archived + discovered, deduped, current excluded):
+
+```bash
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/list_candidates.py" "$(pwd)" "${SESSION_ID}" "${BRANCH}"
+```
+
+This prints a JSON array; each item has `sessionId`, `transcriptPath`, `source`
+(`archive`/`discovered`), `branches`, `firstPrompt`, `timeRange`, `msgCount`, and `relevant`
+(true when its branches include the current branch `${BRANCH}`).
+
+- **Interactive run (default for `/eval-pack:generate` and `/eval-pack:review`):** if the array is
+  non-empty, present the candidates as a checklist — **pre-check the `relevant: true`** ones (same
+  branch) and leave the rest unchecked. Show first prompt + branch + time range + message count per
+  item. Ask the user to confirm or edit. The user MAY pick none. Collect the `transcriptPath` of
+  each confirmed item into repeated `--select` flags below.
+- **Non-interactive run (CI / headless):** do NOT prompt and pass NO `--select` flags — evaluate the
+  current session only. State that coverage is current-session-only.
+- **Honest coverage (Sensor):** if the list is empty, say "no prior sessions found"; never imply the
+  conversation is provably complete (a session outside this repo's dirs cannot be discovered).
+
+Assemble the merged transcript (current + confirmed selections + their sub-agent transcripts):
+
+```bash
+mkdir -p "${PACK_DIR}"
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/build_conversation.py" "${TRANSCRIPT_PATH}" "${SESSION_ID}" "${PACK_DIR}/merged.jsonl" \
+  --select "<transcriptPath of each confirmed candidate>"   # repeat --select per candidate; omit if none
+```
+
+If `${PACK_DIR}/merged.jsonl` was written (`1` or more sessions), set
+`TRANSCRIPT_PATH="${PACK_DIR}/merged.jsonl"` and use it for every remaining step (Steps 1, 2, 2.5,
+the Step 4 analysis input, and Step 5 render). Otherwise keep the original `TRANSCRIPT_PATH`.
 
 ## Step 1: Extract Metrics
 
 Run the extract-metrics script against the current session transcript:
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/extract_metrics.py" "${TRANSCRIPT_PATH}" "${PACK_DIR}" \
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/extract_metrics.py" "${TRANSCRIPT_PATH}" "${PACK_DIR}" \
   --insertions "${INSERTIONS}" \
   --deletions "${DELETIONS}" \
   --files-changed "${FILES_CHANGED}" \
@@ -62,7 +102,7 @@ If the transcript path is not available, read the conversation history from cont
 Run the detect-patterns script:
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/detect_patterns.py" "${TRANSCRIPT_PATH}" "${PACK_DIR}"
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/detect_patterns.py" "${TRANSCRIPT_PATH}" "${PACK_DIR}"
 ```
 
 ## Step 2.5: Extract Tool Usage
@@ -70,7 +110,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/detect_patterns.py" "${TRANSCRIPT_PATH}" 
 Run the extract-tools script:
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/extract_tools.py" "${TRANSCRIPT_PATH}" "${PACK_DIR}"
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/extract_tools.py" "${TRANSCRIPT_PATH}" "${PACK_DIR}"
 ```
 
 If the transcript path is not available or the script fails, continue — `render_html.py` will fall back to `{}` automatically.
@@ -113,10 +153,12 @@ Identify and run appropriate tests for the changes made in this session:
            for name in z.namelist():
                if name.endswith("data.json"):
                    prev = json.loads(z.read(name))
-                   if prev.get("sessionId") == "${SESSION_ID}":
-                       for r in prev.get("rounds", []):
-                           for s in r.get("screenshots", []):
-                               already.add(pathlib.Path(s.get("path","")).name)
+                   # Branch-scoped: carry prior-round screenshots regardless of
+                   # session id (mirrors render_html.load_prior_rounds, which no
+                   # longer gates on sessionId across resumed sessions).
+                   for r in prev.get("rounds", []):
+                       for s in r.get("screenshots", []):
+                           already.add(pathlib.Path(s.get("path","")).name)
                    break
 
    candidates = []
@@ -184,7 +226,7 @@ Do not dispatch the evaluator. Write a minimal, honest stub so the dashboard sho
 clear "analysis disabled" banner rather than a fabricated score:
 
 ```bash
-python3 - "${PACK_DIR}" << 'PY'
+"$PYTHON" - "${PACK_DIR}" << 'PY'
 import json, sys, pathlib
 pack = pathlib.Path(sys.argv[1])
 pack.mkdir(parents=True, exist_ok=True)
@@ -200,7 +242,7 @@ PY
 Run the render script:
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/render_html.py" "${OUTPUT_DIR}" "${SESSION_ID}" "${CLAUDE_PLUGIN_ROOT}" "${TRANSCRIPT_PATH}" \
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/render_html.py" "${OUTPUT_DIR}" "${SESSION_ID}" "${CLAUDE_PLUGIN_ROOT}" "${TRANSCRIPT_PATH}" \
   --branch "${BRANCH}"
 ```
 
