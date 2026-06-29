@@ -4,6 +4,11 @@ on:
   push:
   pull_request:
 
+# Least privilege: tests need only to read the checkout. No secrets are used,
+# so even an (approved) fork-PR run cannot write to the repo or read secrets.
+permissions:
+  contents: read
+
 jobs:
   unit:
     name: unit (${{ matrix.os }})
