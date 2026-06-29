@@ -16,7 +16,7 @@ git -C "$REPO" config user.name t
 
 # A Claude Code transcript store with one session for this repo (never archived)
 CFG="$TEST_DIR/cfg"
-SLUG=$(python3 -c "print('$REPO'.replace('/', '-'))")
+SLUG=$(python3 -c "import re;print(re.sub(r'[^a-zA-Z0-9]','-','$REPO'))")
 PROJ="$CFG/projects/$SLUG"
 mkdir -p "$PROJ"
 cat > "$PROJ/disc1.jsonl" <<'JSONL'

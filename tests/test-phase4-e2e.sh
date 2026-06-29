@@ -12,7 +12,7 @@ REPO="$TEST_DIR/repo"; mkdir -p "$REPO"
 git -C "$REPO" init -q; git -C "$REPO" config user.email t@t.t; git -C "$REPO" config user.name t
 
 CFG="$TEST_DIR/cfg"
-SLUG=$(python3 -c "print('$REPO'.replace('/', '-'))")
+SLUG=$(python3 -c "import re;print(re.sub(r'[^a-zA-Z0-9]','-','$REPO'))")
 PROJ="$CFG/projects/$SLUG"; mkdir -p "$PROJ"
 
 # prior session on SAME branch (main), with a sub-agent
