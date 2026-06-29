@@ -14,6 +14,12 @@
   "agents": ["./agents/eval-pack-evaluator.md"],
   "hooks": "./hooks/hooks.json",
   "userConfig": {
+    "pythonExecutable": {
+      "type": "string",
+      "title": "Python executable",
+      "description": "Command used to run the bundled Python scripts. Default 'python3'; on Windows set to 'python' or 'py' if python3 is not on PATH.",
+      "default": "python3"
+    },
     "outputDir": {
       "type": "string",
       "title": "Output directory",
