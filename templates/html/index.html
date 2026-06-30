@@ -127,6 +127,7 @@
         <button class="tab-btn" data-panel="repo-improvements" role="tab" aria-selected="false">Repo Improvements</button>
         <button class="tab-btn" data-panel="user-improvements" role="tab" aria-selected="false">User Improvements</button>
         <button class="tab-btn" data-panel="tools" role="tab" aria-selected="false">Tools</button>
+        <button class="tab-btn" data-panel="lenses" role="tab" aria-selected="false">Lenses</button>
         <div class="tab-nav-actions">
           <button class="tab-action-btn" id="btn-show-all">Show all</button>
           <button class="tab-action-btn" id="btn-focus-current">Focus current section</button>
@@ -295,6 +296,11 @@
       <div id="tools-subagents"></div>
       <h3 class="section-subheading">Skills Leveraged</h3>
       <ul class="tools-skills-list" id="tools-skills-list"></ul>
+    </section>
+
+    <section class="tab-panel card" id="panel-lenses" role="tabpanel" style="display:none;">
+      <h2 class="card-title">Extension Lenses</h2>
+      <div class="lens-body"></div>
     </section>
 
     <!-- Session Artifacts (always visible, below all panels) -->

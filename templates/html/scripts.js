@@ -807,7 +807,9 @@ function renderReviewFindings(analysis) {
       <td><span class="review-severity review-severity-${sev}">${sev}</span></td>
       <td>${r.foundIn || '—'}</td>
       <td>${safe(renderMarkdown(r.resolution || '—'))}</td>
-      <td>${safe(r.commit ? html`<code class="review-commit">${r.commit}</code>` : '—')}</td>
+      <td>${safe(r.commit ? (EVAL_CONFIG.commitUrlTemplate
+        ? html`<a class="review-commit" href="${EVAL_CONFIG.commitUrlTemplate.replace('{sha}', r.commit)}">${r.commit}</a>`
+        : html`<code class="review-commit">${r.commit}</code>`) : '—')}</td>
     </tr>`;
   }).join('');
 }
@@ -1075,10 +1077,71 @@ function renderDisabledBanner(analysis) {
 
 // ── main render ───────────────────────────────────────────────────────────────
 
+// Resolved eval-pack config (branding, subjectNoun, link templates). Set in renderSession.
+let EVAL_CONFIG = {};
+
+function renderBranding(data) {
+  const cfg = data.evalConfig || {};
+  EVAL_CONFIG = cfg;
+
+  if (cfg.brandName) {
+    const logo = document.querySelector('.logo');
+    if (logo) logo.textContent = cfg.brandName;
+  }
+
+  const a = data.analysis || {};
+  document.title = cfg.reportTitle || a.title || cfg.brandName || 'Eval Pack';
+
+  const noun = cfg.subjectNoun;
+  if (noun && noun !== 'extension') {
+    document.querySelectorAll('.three-col-heading').forEach(h => {
+      h.textContent = h.textContent.replace(/\bextension\b/, noun);
+    });
+  }
+
+  if (cfg.footerText) {
+    const footer = document.querySelector('.footer');
+    if (footer) footer.textContent = cfg.footerText;
+  }
+}
+
+function renderLenses(data) {
+  const lenses = data.lenses;
+  const tabBtn = document.querySelector('.tab-btn[data-panel="lenses"]');
+  const panel = document.getElementById('panel-lenses');
+  const body = panel ? panel.querySelector('.lens-body') : null;
+  const has = lenses && ((lenses.contributors || []).length || (lenses.scorers || []).length ||
+                         (lenses.failures || []).length);
+  if (!has) {
+    if (tabBtn) tabBtn.style.display = 'none';
+    return;
+  }
+  const parts = [];
+  if (lenses.finalScore != null) {
+    parts.push(`<p class="lens-agg">Verdict aggregation — core <strong>${safe(lenses.coreScore)}</strong> `
+      + `<code>${safe(lenses.rule)}</code> lenses → final <strong>${safe(lenses.finalScore)}</strong></p>`);
+  }
+  (lenses.scorers || []).forEach(s => {
+    parts.push(`<div class="lens-card"><div class="lens-meta">scorer · ${safe(s.skill)}</div>`
+      + `<p>score <strong>${safe(s.score)}</strong> — ${safe(s.rationale)}</p></div>`);
+  });
+  (lenses.contributors || []).forEach(c => {
+    const findings = (c.findings || []).map(f => `<li>${safe(f)}</li>`).join('');
+    parts.push(`<div class="lens-card"><div class="lens-meta">contributor · ${safe(c.skill)}</div>`
+      + `<h4>${safe(c.title)}</h4><ul>${findings}</ul></div>`);
+  });
+  (lenses.failures || []).forEach(f => {
+    parts.push(`<div class="lens-card lens-fail"><div class="lens-meta">failed · ${safe(f.skill)}</div>`
+      + `<p>${safe(f.error)}</p></div>`);
+  });
+  if (body) body.innerHTML = parts.join('');
+}
+
 function renderSession(data) {
   const analysis = data.analysis || {};
   renderDisabledBanner(analysis);
 
+  renderBranding(data);
   renderPageHeader(data);
   renderHighlights(analysis);
   renderVerdict(data);
@@ -1097,6 +1160,7 @@ function renderSession(data) {
   renderSessionArtifacts(analysis);
   renderVerdictStatement(analysis);
   renderTimeline(analysis);
+  renderLenses(data);
 }
 
 function init(data) {
@@ -1118,7 +1182,15 @@ function init(data) {
   // Theme toggle — persist selection in localStorage
   const themeToggle = document.getElementById('theme-toggle');
   const savedTheme = localStorage.getItem('eval-pack-theme');
-  if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+  const cfgTheme = (data.evalConfig || {}).defaultTheme;
+  if (savedTheme) {
+    document.documentElement.dataset.theme = savedTheme;
+  } else if (cfgTheme === 'system') {
+    const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+    document.documentElement.dataset.theme = prefersLight ? 'light' : 'dark';
+  } else if (cfgTheme === 'light' || cfgTheme === 'dark') {
+    document.documentElement.dataset.theme = cfgTheme;
+  }
 
   if (themeToggle) {
     themeToggle.addEventListener('click', () => {

@@ -433,7 +433,15 @@ def main():
         )
 
     git_branch = args.branch
-    zip_name = slugify(git_branch) if git_branch else args.session_id
+    zip_template = cfg.get("zipNameTemplate", "")
+    if zip_template:
+        zip_name = slugify(
+            zip_template.replace("{branch}", git_branch or "")
+            .replace("{session}", args.session_id)
+            .replace("{date}", datetime.now(timezone.utc).strftime("%Y%m%d"))
+        )
+    else:
+        zip_name = slugify(git_branch) if git_branch else args.session_id
     zip_path = args.output_dir / f"{zip_name}.zip"
     prev_data, prev_screenshot_names = load_prior_rounds(zip_path)
     screenshots = collect_new_screenshots(
