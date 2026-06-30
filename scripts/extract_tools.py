@@ -4,7 +4,7 @@ import json
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))  # noqa: E402
-from constants import SKILL_ARGS_MAX_LEN  # noqa: E402
+from config import read_config  # noqa: E402
 
 
 def load_jsonl(path):
@@ -41,7 +41,9 @@ def main():
     parser = argparse.ArgumentParser(description="Extract tool uses from transcript")
     parser.add_argument("transcript", help="Path to transcript.jsonl")
     parser.add_argument("output_dir", help="Directory to write tool output")
+    parser.add_argument("--config", default=None, help="Path to resolved eval-config.json")
     args = parser.parse_args()
+    cfg = read_config(args.config)
 
     transcript_file = Path(args.transcript)
     output_dir = Path(args.output_dir)
@@ -86,7 +88,7 @@ def main():
         args = inp.get("args", "") or ""
         if not isinstance(args, str):
             args = json.dumps(args)
-        skills.append({"name": name, "args": args[:SKILL_ARGS_MAX_LEN]})
+        skills.append({"name": name, "args": args[:cfg["skillArgsMaxLen"]]})
 
     result = {
         "toolCalls": tool_calls,
