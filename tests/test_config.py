@@ -123,5 +123,31 @@ class TestReadConfig(unittest.TestCase):
             self.assertEqual(config.read_config(str(p))["scopeDriftFileThreshold"], 42)
 
 
+class TestRedactionKeys(unittest.TestCase):
+    def test_new_defaults(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = config.load_config(d, env={})
+            self.assertEqual(cfg["redaction"], [])
+            self.assertEqual(cfg["publishOpenable"], True)
+            self.assertEqual(cfg["openableDir"], "")
+
+    def test_bool_env_coercion_false(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = config.load_config(d, env={"CLAUDE_PLUGIN_OPTION_publishOpenable": "false"})
+            self.assertIs(cfg["publishOpenable"], False)
+
+    def test_bool_env_coercion_true(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = config.load_config(d, env={"CLAUDE_PLUGIN_OPTION_publishOpenable": "1"})
+            self.assertIs(cfg["publishOpenable"], True)
+
+    def test_redaction_list_validates(self):
+        self.assertEqual(config.validate({"redaction": ["sk-[0-9]+"]}), [])
+
+    def test_publishopenable_must_be_bool(self):
+        errs = config.validate({"publishOpenable": "yes"})
+        self.assertTrue(any("publishOpenable" in e for e in errs))
+
+
 if __name__ == "__main__":
     unittest.main()

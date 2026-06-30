@@ -42,6 +42,22 @@
       "type": "string",
       "default": "[A-Z][A-Z0-9]+-[0-9]+",
       "description": "Regex matching a ticket key for PR-body linking."
+    },
+    "redaction": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "Regex patterns whose matches are masked in published transcripts."
+    },
+    "publishOpenable": {
+      "type": "boolean",
+      "default": true,
+      "description": "Write an openable (unzipped) copy of the pack to a temp dir."
+    },
+    "openableDir": {
+      "type": "string",
+      "default": "",
+      "description": "Directory for the openable copy; empty means system temp."
     }
   }
 }

@@ -27,6 +27,12 @@ DEFAULTS = {
     "testCommands": [],
     # Ticket-key regex for PR-body linking (consumed by a later layer).
     "ticketPattern": r"[A-Z][A-Z0-9]+-[0-9]+",
+    # Regex patterns whose matches are masked in published transcripts (security).
+    "redaction": [],
+    # Whether to write an openable (unzipped) copy of the pack to a temp dir.
+    "publishOpenable": True,
+    # Directory for the openable copy; empty means the system temp dir.
+    "openableDir": "",
 }
 
 # Known keys and their expected JSON/Python types. A key absent here is "unknown"
@@ -38,6 +44,9 @@ _TYPES = {
     "frictionCategories": list,
     "testCommands": list,
     "ticketPattern": str,
+    "redaction": list,
+    "publishOpenable": bool,
+    "openableDir": str,
 }
 
 # Keys consumed during merge or by editors only — never part of the resolved config.
@@ -81,6 +90,8 @@ def _fresh_defaults():
 
 
 def _coerce(raw, typ, key):
+    if typ is bool:
+        return raw.strip().lower() in ("1", "true", "yes", "on")
     if typ is int:
         try:
             return int(raw)
