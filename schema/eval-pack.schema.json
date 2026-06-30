@@ -58,6 +58,27 @@
       "type": "string",
       "default": "",
       "description": "Directory for the openable copy; empty means system temp."
+    },
+    "analysisStance": {
+      "type": "string",
+      "default": "skeptical-reviewer",
+      "description": "Named evaluator persona preset."
+    },
+    "rubric": {
+      "type": "object",
+      "default": {},
+      "description": "Structured scoring rubric (band -> criteria); empty uses the built-in anchor."
+    },
+    "retrospectiveQuestions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "Retrospective questions for the evaluator; empty uses the built-in set."
+    },
+    "evaluatorPromptFile": {
+      "type": "string",
+      "default": "",
+      "description": "Path to an override evaluator prompt; empty uses the bundled default."
     }
   }
 }

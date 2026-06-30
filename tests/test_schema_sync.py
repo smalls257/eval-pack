@@ -28,7 +28,7 @@ class TestSchemaSync(unittest.TestCase):
         # agree with the runtime _TYPES and DEFAULTS for every known key.
         schema = json.loads((ROOT / "schema" / "eval-pack.schema.json").read_text())
         props = schema["properties"]
-        json_to_py = {"integer": int, "array": list, "string": str, "boolean": bool}
+        json_to_py = {"integer": int, "array": list, "string": str, "boolean": bool, "object": dict}
         for key, typ in config._TYPES.items():
             with self.subTest(key=key):
                 self.assertEqual(json_to_py[props[key]["type"]], typ)

@@ -149,5 +149,29 @@ class TestRedactionKeys(unittest.TestCase):
         self.assertTrue(any("publishOpenable" in e for e in errs))
 
 
+class TestPromptRubricKeys(unittest.TestCase):
+    def test_new_defaults(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = config.load_config(d, env={})
+            self.assertEqual(cfg["analysisStance"], "skeptical-reviewer")
+            self.assertEqual(cfg["rubric"], {})
+            self.assertEqual(cfg["retrospectiveQuestions"], [])
+            self.assertEqual(cfg["evaluatorPromptFile"], "")
+
+    def test_rubric_dict_validates(self):
+        self.assertEqual(config.validate({"rubric": {"high": "no bugs"}}), [])
+
+    def test_rubric_must_be_object(self):
+        errs = config.validate({"rubric": ["not", "a", "dict"]})
+        self.assertTrue(any("rubric" in e for e in errs))
+
+    def test_stance_override(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / ".eval-pack.json").write_text(
+                json.dumps({"analysisStance": "collaborative-coach"}), encoding="utf-8")
+            cfg = config.load_config(d, env={})
+            self.assertEqual(cfg["analysisStance"], "collaborative-coach")
+
+
 if __name__ == "__main__":
     unittest.main()

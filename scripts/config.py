@@ -34,6 +34,14 @@ DEFAULTS = {
     "publishOpenable": True,
     # Directory for the openable copy; empty means the system temp dir.
     "openableDir": "",
+    # Named evaluator persona preset (file under presets/stances/<name>.md).
+    "analysisStance": "skeptical-reviewer",
+    # Structured scoring rubric (band -> criteria); empty uses the built-in anchor.
+    "rubric": {},
+    # Retrospective questions for the evaluator; empty uses the built-in set.
+    "retrospectiveQuestions": [],
+    # Path to an override evaluator prompt; empty uses the bundled default.
+    "evaluatorPromptFile": "",
 }
 
 # Known keys and their expected JSON/Python types. A key absent here is "unknown"
@@ -48,6 +56,10 @@ _TYPES = {
     "redaction": list,
     "publishOpenable": bool,
     "openableDir": str,
+    "analysisStance": str,
+    "rubric": dict,
+    "retrospectiveQuestions": list,
+    "evaluatorPromptFile": str,
 }
 
 # Keys consumed during merge or by editors only — never part of the resolved config.
@@ -85,9 +97,17 @@ def _overlay(base, layer):
     return base
 
 
+def _copy_default(v):
+    # Copy mutable containers so a returned config can never mutate DEFAULTS.
+    if isinstance(v, list):
+        return list(v)
+    if isinstance(v, dict):
+        return dict(v)
+    return v
+
+
 def _fresh_defaults():
-    # Copy list values so a returned config can never mutate DEFAULTS.
-    return {k: (list(v) if isinstance(v, list) else v) for k, v in DEFAULTS.items()}
+    return {k: _copy_default(v) for k, v in DEFAULTS.items()}
 
 
 def _coerce(raw, typ, key):
