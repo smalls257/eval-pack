@@ -7,6 +7,7 @@ Pure: reads files and env only. No network, no clock — unit-testable in isolat
 """
 import json
 import os
+import re
 from pathlib import Path
 
 
@@ -147,6 +148,13 @@ def validate(cfg):
             errors.append("{}: expected int, got bool".format(k))
         elif not isinstance(v, typ):
             errors.append("{}: expected {}, got {}".format(k, typ.__name__, type(v).__name__))
+    rules = cfg.get("redaction")
+    if isinstance(rules, list):
+        for pat in rules:
+            try:
+                re.compile(pat)
+            except re.error as exc:
+                errors.append("redaction: invalid regex {!r} ({})".format(pat, exc))
     return errors
 
 

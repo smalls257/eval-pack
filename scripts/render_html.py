@@ -12,6 +12,10 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))  # noqa: E402
+import redact  # noqa: E402
+from config import read_config  # noqa: E402
+
 
 def run_script(script_path, args):
     result = subprocess.run(
@@ -49,7 +53,7 @@ def load_jsonl(path):
     return entries
 
 
-def render_transcript_html(transcript_path, pack_dir, screenshots_dir):
+def render_transcript_html(transcript_path, pack_dir, screenshots_dir, rules=()):
     """Render transcript HTML and collect browser screenshots in a single pass."""
     rows = []
     copied = 0
@@ -77,7 +81,16 @@ def render_transcript_html(transcript_path, pack_dir, screenshots_dir):
                         f"<pre>{htmllib.escape(text)}</pre></div>"
                     )
             elif role == "assistant":
-                if isinstance(content, list):
+                if isinstance(content, str):
+                    text = content.strip()
+                    if text:
+                        model = (msg.get("model") or "").upper()
+                        rows.append(
+                            f'<div class="turn assistant"><div class="meta">'
+                            f'{htmllib.escape(model or "ASSISTANT")} {htmllib.escape(ts)}</div>'
+                            f"<pre>{htmllib.escape(text)}</pre></div>"
+                        )
+                elif isinstance(content, list):
                     for block in content:
                         if not isinstance(block, dict):
                             continue
@@ -143,8 +156,17 @@ def render_transcript_html(transcript_path, pack_dir, screenshots_dir):
         + "".join(rows)
         + "</body></html>"
     )
+    page = redact.redact(page, rules)
     (pack_dir / "transcript.html").write_text(page, encoding="utf-8")
     return agent_screenshot_names
+
+
+def redact_transcript_file(pack_dir, rules):
+    """Mask the raw transcript.jsonl in place so secrets never ship in the zip or openable copy."""
+    path = pack_dir / "transcript.jsonl"
+    if not rules or not path.is_file():
+        return
+    path.write_text(redact.redact(path.read_text(encoding="utf-8"), rules), encoding="utf-8")
 
 
 def build_directory_structure(pack_dir, template_dir):
@@ -386,6 +408,9 @@ def main():
         sys.exit(1)
 
     pack_dir = args.output_dir / args.session_id
+    cfg_path = pack_dir / "eval-config.json"
+    cfg = read_config(cfg_path if cfg_path.is_file() else None)
+    redaction_rules = cfg["redaction"]
     template_dir = args.plugin_root / "templates" / "html"
     scripts_dir = args.plugin_root / "scripts"
 
@@ -404,7 +429,7 @@ def main():
     agent_screenshot_names = set()
     if args.transcript_file and args.transcript_file.is_file():
         agent_screenshot_names = render_transcript_html(
-            args.transcript_file, pack_dir, pack_dir / "screenshots"
+            args.transcript_file, pack_dir, pack_dir / "screenshots", redaction_rules
         )
 
     git_branch = args.branch
@@ -436,18 +461,23 @@ def main():
 
     inject_into_template(pack_dir, data)
 
+    redact_transcript_file(pack_dir, redaction_rules)
+
     include_transcript = _include_transcript()
     write_zip(pack_dir, zip_path, args.session_id, include_transcript)
     print(f"Eval pack rendered to {zip_path}")
 
-    open_base = Path(args.open_base) if args.open_base else Path(tempfile.gettempdir())
-    try:
-        open_dir = publish_openable(pack_dir, args.session_id, open_base, include_transcript)
-        print(f"Open: file://{open_dir}/index.html")
-    except Exception as ex:
-        # Buffer: the zip is the durable artifact; the openable copy is a
-        # convenience. Degrade loudly, never silently.
-        print(f"Warning: could not write openable copy: {ex}", file=sys.stderr)
+    if cfg["publishOpenable"]:
+        open_base = (
+            Path(cfg["openableDir"]) if cfg["openableDir"]
+            else (Path(args.open_base) if args.open_base else Path(tempfile.gettempdir()))
+        )
+        try:
+            open_dir = publish_openable(pack_dir, args.session_id, open_base, include_transcript)
+            print(f"Open: file://{open_dir}/index.html")
+        except Exception as ex:
+            # Buffer: the zip is the durable artifact; the openable copy is a convenience.
+            print(f"Warning: could not write openable copy: {ex}", file=sys.stderr)
 
     shutil.rmtree(pack_dir)
 
