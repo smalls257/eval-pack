@@ -253,6 +253,54 @@ pack.mkdir(parents=True, exist_ok=True)
 PY
 ```
 
+## Step 4.7: Extension Lenses (optional)
+
+Read `analysisLenses` from `${PACK_DIR}/eval-config.json`. If it is empty, SKIP this entire
+step — the core eval never depends on a lens being present (the Airplane Test). The
+configuration was validated at resolve time, so every lens already has a `skill` and a valid
+`role`.
+
+For each lens `{skill, role}`, dispatch the named skill as a SEPARATE subagent over the
+read-only artifacts (`transcript.jsonl`, `metrics.json`, `patterns.json`, `test-results.json`,
+and the git diff). Pass only artifact locations — never your own reasoning.
+
+- A `contributor` lens returns a section `{title, findings: [...]}`. It MUST NOT influence the
+  verdict — it only adds an attributed section.
+- A `scorer` lens returns `{score, rationale}` (score 0–100). Its score reaches the verdict
+  ONLY through the declared `verdictAggregation` rule below.
+
+Record every result with attribution (`skill`, `role`). If a lens errors or returns malformed
+output, record `{skill, role, error}` and CONTINUE — a failing lens degrades to a noted failure;
+it never crashes the eval and never silently vanishes.
+
+Compute the final verdict score from the core analysis confidence and the scorer scores, using
+the tested aggregation module (the math is not done by hand — that keeps the verdict auditable):
+
+```bash
+# CORE = highlights.confidencePercent from analysis.json; SCORES = JSON list of scorer scores;
+# RULE = verdictAggregation from eval-config.json.
+"$PYTHON" -c "import sys, json; sys.path.insert(0, '${CLAUDE_PLUGIN_ROOT}/scripts'); import aggregate; print(aggregate.aggregate(${CORE}, ${SCORES}, '${RULE}'))"
+```
+
+Write `${PACK_DIR}/lenses.json` capturing the full, transparent picture (Guard G2 — every move
+is attributed and the math is shown):
+
+```json
+{
+  "rule": "min",
+  "coreScore": 82,
+  "finalScore": 61,
+  "contributors": [{"skill": "acme-sec:review", "title": "Security lens", "findings": ["..."]}],
+  "scorers": [{"skill": "team:perf-budget", "score": 61, "rationale": "..."}],
+  "failures": [{"skill": "x:lens", "role": "scorer", "error": "..."}]
+}
+```
+
+Guards: rules come from config set before the run sees results (G1, pre-committed); attribution
+and the aggregation math are written above (G2, transparent); the aggregation rule was bounded
+to a known, can-still-fail rule at resolve time (G3); lenses are config-listed only, failures
+degrade, and the core ran without them (G4, isolated).
+
 ## Step 5: Render HTML
 
 Run the render script:

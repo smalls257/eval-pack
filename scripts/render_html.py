@@ -455,6 +455,7 @@ def main():
         "patterns": read_json(pack_dir / "patterns.json"),
         "testResults": read_json(pack_dir / "test-results.json"),
         "tools": read_json(pack_dir / "tools.json"),
+        "lenses": read_json(pack_dir / "lenses.json"),
         "rounds": list(prev_data.get("rounds") or []) + [new_round],
         "transcript": load_jsonl(transcript_jsonl) if transcript_jsonl.is_file() else [],
     }
