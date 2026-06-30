@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "eval-pack",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Generate eval packs — polished HTML reports capturing how code was produced, with metrics, heuristics, and AI-driven analysis",
   "author": {
     "name": "Jason Smith",

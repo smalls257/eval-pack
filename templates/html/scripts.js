@@ -70,6 +70,23 @@ function estimateSubagentCost(model, totalTokens) {
   return (totalTokens * blended) / 1_000_000;
 }
 
+// Total cost = the sum of the per-model rows actually shown. Computing it as a
+// single lastModel-on-aggregate estimate diverges from the displayed rows when
+// models differ (e.g. a cheap lastModel makes Total < the sum above it).
+function sumReportedCost(tokensByModel, subagentTokensByModel, fallbackCtrl, fallbackAgent) {
+  let total = null;
+  const add = (v) => { if (v != null) total = (total || 0) + v; };
+  if (tokensByModel.length > 0) {
+    for (const r of tokensByModel) {
+      add(estimateCost(r.model, r.inputTokens, r.outputTokens, r.cacheReadTokens, r.cacheWriteTokens));
+    }
+  } else { add(fallbackCtrl); }
+  if (subagentTokensByModel.length > 0) {
+    for (const r of subagentTokensByModel) add(estimateSubagentCost(r.model, r.totalTokens));
+  } else { add(fallbackAgent); }
+  return total;
+}
+
 function formatCost(n) {
   if (n == null || n <= 0) return '—';
   return (n >= 0.01 ? '$' + n.toFixed(2) : '$' + n.toFixed(4)) + '*';
@@ -283,8 +300,6 @@ function renderStats(data) {
   if (!statsRow) return;
   const ctrlCost = estimateCost(m.lastModel, m.inputTokens, m.outputTokens, m.cacheReadTokens, m.cacheWriteTokens);
   const agentCost = estimateSubagentCost(m.lastModel, m.subagentTotalTokens);
-  const totalCost = (ctrlCost != null || agentCost != null)
-    ? (ctrlCost || 0) + (agentCost || 0) : null;
 
   const tokensByModel = Array.isArray(m.tokensByModel) ? m.tokensByModel : [];
   const tokenItems = tokensByModel.length > 0
@@ -313,6 +328,7 @@ function renderStats(data) {
         value: '~' + formatCost(estimateSubagentCost(r.model, r.totalTokens))
       }))
     : [{ label: 'Subagents', value: '~' + formatCost(agentCost) }];
+  const totalCost = sumReportedCost(tokensByModel, subagentTokensByModel, ctrlCost, agentCost);
   const costItems = [...ctrlCostItems, ...subagentCostItems, { label: 'Total *', value: formatCost(totalCost) }];
 
   const groups = [
@@ -378,12 +394,33 @@ function wrapIndex(i, n) {
   return ((i % n) + n) % n;
 }
 
+// Pure zoom math. Given current scale + pan and a cursor offset from the image's
+// (untransformed) centre, return the new scale (clamped to [1, maxScale]) and the
+// pan that keeps the point under the cursor fixed. cursor (0,0) zooms about the
+// centre (used by the +/- buttons). At scale 1 the pan is reset to 0.
+function zoomAt(scale, panX, panY, cursorX, cursorY, factor, maxScale) {
+  let next = scale * factor;
+  if (next < 1) next = 1;
+  if (next > maxScale) next = maxScale;
+  if (next === 1) return { scale: 1, panX: 0, panY: 0 };
+  const k = next / scale;
+  return {
+    scale: next,
+    panX: cursorX - k * (cursorX - panX),
+    panY: cursorY - k * (cursorY - panY),
+  };
+}
+
 // One reusable enlarged-image viewer. Public surface: openLightbox(rounds, roundIdx, imgIdx).
 const openLightbox = (() => {
+  const MAX_SCALE = 5;
   let overlay = null;
   let rounds = [];
   let roundIdx = 0;
   let imgIdx = 0;
+  let scale = 1, panX = 0, panY = 0;
+  let dragging = false, dragMoved = false;
+  let dragX = 0, dragY = 0, panStartX = 0, panStartY = 0;
 
   function shots() {
     return (rounds[roundIdx] && rounds[roundIdx].screenshots) || [];
@@ -396,11 +433,17 @@ const openLightbox = (() => {
       <div class="lightbox-panel" role="dialog" aria-modal="true">
         <div class="lightbox-bar">
           <select class="lightbox-round" aria-label="Round"></select>
+          <div class="lightbox-zoom">
+            <button class="lightbox-zoombtn lightbox-zoomout" type="button" aria-label="Zoom out">−</button>
+            <span class="lightbox-zoomlevel">100%</span>
+            <button class="lightbox-zoombtn lightbox-zoomin" type="button" aria-label="Zoom in">+</button>
+            <button class="lightbox-zoombtn lightbox-zoomreset" type="button" aria-label="Reset zoom">reset</button>
+          </div>
           <button class="lightbox-close" type="button" aria-label="Close">✕</button>
         </div>
         <div class="lightbox-stage">
           <button class="lightbox-nav lightbox-prev" type="button" aria-label="Previous">‹</button>
-          <img class="lightbox-img" alt="">
+          <img class="lightbox-img" alt="" draggable="false">
           <button class="lightbox-nav lightbox-next" type="button" aria-label="Next">›</button>
         </div>
         <div class="lightbox-details">
@@ -409,13 +452,74 @@ const openLightbox = (() => {
           <div class="lightbox-counter"></div>
         </div>
       </div>`;
-    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    overlay.addEventListener('click', e => {
+      if (dragMoved) { dragMoved = false; return; }  // a pan-drag is not a backdrop click
+      if (e.target === overlay) close();
+    });
     overlay.querySelector('.lightbox-close').addEventListener('click', close);
     overlay.querySelector('.lightbox-prev').addEventListener('click', () => step(-1));
     overlay.querySelector('.lightbox-next').addEventListener('click', () => step(1));
     overlay.querySelector('.lightbox-round')
       .addEventListener('change', e => selectRound(parseInt(e.target.value, 10)));
+    overlay.querySelector('.lightbox-zoomin').addEventListener('click', () => zoomBy(1.25));
+    overlay.querySelector('.lightbox-zoomout').addEventListener('click', () => zoomBy(1 / 1.25));
+    overlay.querySelector('.lightbox-zoomreset').addEventListener('click', resetZoom);
+    const img = overlay.querySelector('.lightbox-img');
+    img.addEventListener('dblclick', resetZoom);
+    img.addEventListener('wheel', onWheel, { passive: false });
+    img.addEventListener('mousedown', onDragStart);
+    document.addEventListener('mousemove', onDragMove);
+    document.addEventListener('mouseup', onDragEnd);
     document.body.appendChild(overlay);
+  }
+
+  function applyZoom() {
+    const img = overlay.querySelector('.lightbox-img');
+    img.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+    img.style.cursor = scale > 1 ? (dragging ? 'grabbing' : 'grab') : '';
+    overlay.querySelector('.lightbox-zoomlevel').textContent = Math.round(scale * 100) + '%';
+    overlay.querySelector('.lightbox-zoomout').disabled = scale <= 1;
+    overlay.querySelector('.lightbox-zoomreset').disabled = scale <= 1;
+  }
+
+  function resetZoom() {
+    scale = 1; panX = 0; panY = 0;
+    if (overlay) applyZoom();
+  }
+
+  function zoomBy(factor) {
+    ({ scale, panX, panY } = zoomAt(scale, panX, panY, 0, 0, factor, MAX_SCALE));
+    applyZoom();
+  }
+
+  function onWheel(e) {
+    e.preventDefault();
+    const rect = overlay.querySelector('.lightbox-img').getBoundingClientRect();
+    const cx = rect.left + rect.width / 2 - panX;   // untransformed centre
+    const cy = rect.top + rect.height / 2 - panY;
+    const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+    ({ scale, panX, panY } = zoomAt(scale, panX, panY, e.clientX - cx, e.clientY - cy, factor, MAX_SCALE));
+    applyZoom();
+  }
+
+  function onDragStart(e) {
+    if (scale <= 1) return;
+    e.preventDefault();
+    dragging = true; dragMoved = false;
+    dragX = e.clientX; dragY = e.clientY; panStartX = panX; panStartY = panY;
+    applyZoom();
+  }
+
+  function onDragMove(e) {
+    if (!dragging) return;
+    panX = panStartX + (e.clientX - dragX);
+    panY = panStartY + (e.clientY - dragY);
+    if (Math.abs(e.clientX - dragX) > 2 || Math.abs(e.clientY - dragY) > 2) dragMoved = true;
+    applyZoom();
+  }
+
+  function onDragEnd() {
+    if (dragging) { dragging = false; applyZoom(); }
   }
 
   function onKey(e) {
@@ -438,6 +542,7 @@ const openLightbox = (() => {
   }
 
   function render() {
+    resetZoom();  // each image opens at fit; nav/round-change start un-zoomed
     const list = shots();
     const s = list[imgIdx] || {};
     const badge = screenshotBadge(s.source);
@@ -470,6 +575,7 @@ const openLightbox = (() => {
   function close() {
     // Hide, don't destroy: the overlay is built once and reused across opens,
     // so listeners bound in build() are never re-attached (no duplicate keydowns).
+    resetZoom();
     if (overlay) overlay.style.display = 'none';
     document.removeEventListener('keydown', onKey);
   }
@@ -607,8 +713,8 @@ function renderProof(analysis) {
       invEl.innerHTML = items.map(item =>
         html`<li class="artifact-item">
           <strong>${item.name || ''}</strong>${safe(
-            item.path && isSafePath(item.path)
-              ? html` — <a href="${item.path}">${item.path}</a>`
+            item.path && artifactLinkable(item.path)
+              ? html` — <a href="${artifactHref(item.path)}">${artifactHref(item.path)}</a>`
               : item.path ? html` — ${item.path}` : ''
           )}${safe(item.description ? `<div class="artifact-desc">${renderMarkdown(item.description)}</div>` : '')}
         </li>`
@@ -823,6 +929,16 @@ function isSafePath(path) {
   return /^https?:\/\//i.test(path) || /^\.{0,2}\//.test(path) || /^[^:]+$/.test(path);
 }
 
+// Raw .jsonl files are excluded from the pack/zip; the transcript ships as the
+// rendered transcript.html. Map the link target so the artifact is not a dead link.
+function artifactHref(p) {
+  return p === 'transcript.jsonl' ? 'transcript.html' : p;
+}
+// Linkable only if safe AND bundled — a .jsonl other than the transcript is not shipped.
+function artifactLinkable(p) {
+  return isSafePath(p) && (!p.endsWith('.jsonl') || p === 'transcript.jsonl');
+}
+
 function renderSessionArtifacts(analysis) {
   const list = document.getElementById('session-artifacts-list');
   if (!list) return;
@@ -832,8 +948,8 @@ function renderSessionArtifacts(analysis) {
     return;
   }
   list.innerHTML = items.map(item => {
-    if (item.path && isSafePath(item.path)) {
-      return html`<li><a href="${item.path}" target="_blank">${item.name || item.label || item.path}</a></li>`;
+    if (item.path && artifactLinkable(item.path)) {
+      return html`<li><a href="${artifactHref(item.path)}" target="_blank">${item.name || item.label || item.path}</a></li>`;
     }
     return html`<li>${item.name || item.label || item.path || String(item)}</li>`;
   }).join('');
@@ -1036,5 +1152,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, estimateCost, modelRates };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, estimateCost, modelRates, estimateSubagentCost, sumReportedCost, artifactHref, artifactLinkable };
 }

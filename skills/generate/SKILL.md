@@ -69,15 +69,19 @@ This prints a JSON array; each item has `sessionId`, `transcriptPath`, `source`
 
 Assemble the merged transcript (current + confirmed selections + their sub-agent transcripts):
 
+Write it to `${PACK_DIR}/transcript.jsonl` — the canonical name every later step reads (extraction,
+the Step 4 evaluator, and Step 5 render):
+
 ```bash
 mkdir -p "${PACK_DIR}"
-"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/build_conversation.py" "${TRANSCRIPT_PATH}" "${SESSION_ID}" "${PACK_DIR}/merged.jsonl" \
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/build_conversation.py" "${TRANSCRIPT_PATH}" "${SESSION_ID}" "${PACK_DIR}/transcript.jsonl" \
   --select "<transcriptPath of each confirmed candidate>"   # repeat --select per candidate; omit if none
 ```
 
-If `${PACK_DIR}/merged.jsonl` was written (`1` or more sessions), set
-`TRANSCRIPT_PATH="${PACK_DIR}/merged.jsonl"` and use it for every remaining step (Steps 1, 2, 2.5,
-the Step 4 analysis input, and Step 5 render). Otherwise keep the original `TRANSCRIPT_PATH`.
+If `${PACK_DIR}/transcript.jsonl` was written (`1` or more sessions), set
+`TRANSCRIPT_PATH="${PACK_DIR}/transcript.jsonl"` and use it for every remaining step (Steps 1, 2,
+2.5, the Step 4 analysis input, and Step 5 render) — this guarantees the evaluator has a transcript
+to read. Otherwise keep the original `TRANSCRIPT_PATH`.
 
 ## Step 1: Extract Metrics
 

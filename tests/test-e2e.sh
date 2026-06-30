@@ -267,8 +267,10 @@ echo "  PASS"
 # Step 6: Test regeneration (round 2)
 echo ""
 echo "--- Step 6: Test regeneration (round 2) ---"
-# Recreate analysis.json — pack_dir was cleaned up after Step 5 zip
+# Regeneration re-runs the full pipeline — pack_dir was cleaned up after Step 5.
+# Recreate metrics (validation gate requires it) and analysis before rendering.
 mkdir -p "$TEST_DIR/$SESSION_ID"
+python3 "$PLUGIN_ROOT/scripts/extract_metrics.py" "$TEST_DIR/transcript.jsonl" "$TEST_DIR/$SESSION_ID"
 cp "$TEST_DIR/analysis_backup.json" "$TEST_DIR/$SESSION_ID/analysis.json"
 python3 "$PLUGIN_ROOT/scripts/render_html.py" "$TEST_DIR" "$SESSION_ID" "$PLUGIN_ROOT" "$TEST_DIR/transcript.jsonl" \
   --branch "test-branch" --open-base "$TEST_DIR/open"
@@ -294,6 +296,7 @@ echo "--- Step 7: Disabled analysis ---"
 # The browser-side banner/verdict toggle is JS and is not exercised headlessly here.
 rm -rf "$TEST_DIR/$SESSION_ID"
 mkdir -p "$TEST_DIR/$SESSION_ID"
+python3 "$PLUGIN_ROOT/scripts/extract_metrics.py" "$TEST_DIR/transcript.jsonl" "$TEST_DIR/$SESSION_ID"
 echo '{"title":"Disabled run","disabled":true}' > "$TEST_DIR/$SESSION_ID/analysis.json"
 python3 "$PLUGIN_ROOT/scripts/render_html.py" "$TEST_DIR" "$SESSION_ID" "$PLUGIN_ROOT" "$TEST_DIR/transcript.jsonl" \
   --branch "test-branch" --open-base "$TEST_DIR/open"
@@ -347,8 +350,10 @@ echo '{"title":"Screenshot provenance test"}' > "$SS_PACK/analysis.json"
 : > "$SS_PACK/screenshots/mystery-shot.png"
 echo '{"test-shot.png":"test"}' > "$SS_PACK/screenshots/sources.json"
 cat > "$TEST_DIR/ss-transcript.jsonl" << 'JSONL'
+{"type":"user","timestamp":"2026-05-10T09:59:00Z","message":{"content":"take a screenshot"}}
 {"type":"assistant","timestamp":"2026-05-10T10:00:00Z","message":{"model":"x","content":[{"type":"tool_use","name":"mcp__playwright__browser_take_screenshot","id":"s1","input":{"filename":"agent-shot.png"}}]}}
 JSONL
+python3 "$PLUGIN_ROOT/scripts/extract_metrics.py" "$TEST_DIR/ss-transcript.jsonl" "$SS_PACK"
 python3 "$PLUGIN_ROOT/scripts/render_html.py" "$TEST_DIR" "$SS_SESSION" "$PLUGIN_ROOT" "$TEST_DIR/ss-transcript.jsonl" \
   --branch "ss" --open-base "$TEST_DIR/open"
 python3 - "$TEST_DIR/open/eval-pack-$SS_SESSION/data.json" << 'PY'
