@@ -861,7 +861,7 @@ function renderDiff(analysis) {
       filesEl.innerHTML = files.map(f => {
         const path = typeof f === 'string' ? f : (f.file || '');
         const desc = typeof f === 'object' ? (f.description || '') : '';
-        return html`<li><code>${path}</code>${safe(desc ? ` — ${renderMarkdown(desc)}` : '')}</li>`;
+        return html`<li>${safe(pathLink(path))}${safe(desc ? ` — ${renderMarkdown(desc)}` : '')}</li>`;
       }).join('');
     }
   }
@@ -1080,6 +1080,35 @@ function renderDisabledBanner(analysis) {
 // Resolved eval-pack config (branding, subjectNoun, link templates). Set in renderSession.
 let EVAL_CONFIG = {};
 
+// Linkify a repo-relative file path against repoBaseUrl, or render it as plain code.
+function pathLink(path) {
+  const base = EVAL_CONFIG.repoBaseUrl;
+  if (base) {
+    const url = base.replace(/\/$/, '') + '/' + path;
+    return html`<a href="${url}"><code>${path}</code></a>`;
+  }
+  return html`<code>${path}</code>`;
+}
+
+// Honor configured section toggle/order: hide unlisted tabs, reorder to match, activate first.
+function applySections(data) {
+  const order = (data.evalConfig || {}).sections || [];
+  if (!order.length) return;  // empty = default set/order
+  const nav = document.getElementById('tab-nav');
+  if (!nav) return;
+  const btns = Array.from(nav.querySelectorAll('.tab-btn'));
+  const actions = nav.querySelector('.tab-nav-actions');
+  btns.forEach(b => {
+    if (!order.includes(b.dataset.panel)) b.style.display = 'none';
+  });
+  order.forEach(panel => {
+    const btn = btns.find(b => b.dataset.panel === panel);
+    if (btn) nav.insertBefore(btn, actions || null);
+  });
+  const first = order.find(panel => btns.some(b => b.dataset.panel === panel));
+  if (first) activatePanel(first);
+}
+
 function renderBranding(data) {
   const cfg = data.evalConfig || {};
   EVAL_CONFIG = cfg;
@@ -1203,6 +1232,9 @@ function init(data) {
 
   // Activate default panel
   activatePanel('summary');
+
+  // Apply configured section toggle/order (overrides the default activation above)
+  applySections(data);
 }
 
 // ── bootstrap ─────────────────────────────────────────────────────────────────
