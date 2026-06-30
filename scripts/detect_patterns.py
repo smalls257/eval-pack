@@ -5,7 +5,7 @@ import re
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))  # noqa: E402
-from constants import SCOPE_DRIFT_FILE_THRESHOLD, RETRY_AMBER_THRESHOLD  # noqa: E402
+from config import read_config  # noqa: E402
 
 
 def load_jsonl(path):
@@ -125,7 +125,7 @@ def read_test_verdict(output_dir):
     return data.get("verdict")
 
 
-def check_scope_drift(output_dir):
+def check_scope_drift(output_dir, threshold):
     metrics_path = Path(output_dir) / "metrics.json"
     if not metrics_path.is_file():
         print(
@@ -135,7 +135,7 @@ def check_scope_drift(output_dir):
         return False
     try:
         data = json.loads(metrics_path.read_text(encoding="utf-8"))
-        return (data.get("filesChanged") or 0) > SCOPE_DRIFT_FILE_THRESHOLD
+        return (data.get("filesChanged") or 0) > threshold
     except json.JSONDecodeError as exc:
         print(f"Warning: could not parse metrics.json — scope drift unknown: {exc}", file=sys.stderr)
         return False
@@ -148,7 +148,9 @@ def main():
     parser = argparse.ArgumentParser(description="Detect heuristic patterns in transcript")
     parser.add_argument("transcript", help="Path to transcript.jsonl")
     parser.add_argument("output_dir", help="Directory to write pattern output")
+    parser.add_argument("--config", default=None, help="Path to resolved eval-config.json")
     args = parser.parse_args()
+    cfg = read_config(args.config)
 
     transcript_file = Path(args.transcript)
     output_dir = Path(args.output_dir)
@@ -162,7 +164,7 @@ def main():
 
     false_completions = detect_false_completions(entries)
     retry_count = detect_retries(entries)
-    scope_drift = check_scope_drift(output_dir)
+    scope_drift = check_scope_drift(output_dir, cfg["scopeDriftFileThreshold"])
     partial_session = detect_partial_session(entries)
 
     test_verdict = read_test_verdict(output_dir)
@@ -174,7 +176,7 @@ def main():
         flags.append({"level": "green", "label": "Tests passing at completion"})
     if false_completions:
         flags.append({"level": "amber", "label": "False completions", "count": len(false_completions)})
-    if retry_count >= RETRY_AMBER_THRESHOLD:
+    if retry_count >= cfg["retryAmberThreshold"]:
         flags.append({"level": "amber", "label": "High retry count", "count": retry_count})
     if scope_drift:
         flags.append({"level": "amber", "label": "Scope drift — many files changed"})
