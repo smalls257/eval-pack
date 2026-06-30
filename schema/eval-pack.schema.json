@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/smalls257/eval-pack/schema/eval-pack.schema.json",
+  "title": "eval-pack configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "extends": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Preset config files to inherit, lowest-priority first."
+    },
+    "scopeDriftFileThreshold": {
+      "type": "integer",
+      "default": 10,
+      "description": "Files changed beyond this count flags scope drift."
+    },
+    "retryAmberThreshold": {
+      "type": "integer",
+      "default": 4,
+      "description": "Retry count at or above this flags amber."
+    },
+    "skillArgsMaxLen": {
+      "type": "integer",
+      "default": 200,
+      "description": "Max characters of skill args retained in tools.json."
+    },
+    "frictionCategories": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": ["tooling", "structure", "naming", "docs", "other"],
+      "description": "Categories the evaluator classifies friction into."
+    },
+    "testCommands": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "Commands the generate skill runs to determine the test verdict."
+    },
+    "ticketPattern": {
+      "type": "string",
+      "default": "[A-Z][A-Z0-9]+-[0-9]+",
+      "description": "Regex matching a ticket key for PR-body linking."
+    }
+  }
+}
