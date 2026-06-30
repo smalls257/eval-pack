@@ -98,6 +98,16 @@
       "enum": ["core", "min", "mean"],
       "default": "core",
       "description": "How scorer-lens scores combine with the core verdict."
-    }
+    },
+    "brandName": { "type": "string", "default": "Eval Pack", "description": "Report brand name." },
+    "reportTitle": { "type": "string", "default": "", "description": "Report title override; empty uses the analysis title." },
+    "footerText": { "type": "string", "default": "", "description": "Custom footer text." },
+    "subjectNoun": { "type": "string", "default": "extension", "description": "Noun for the thing under review (e.g. service, feature)." },
+    "defaultTheme": { "type": "string", "enum": ["dark", "light", "system"], "default": "dark", "description": "Default report theme." },
+    "sections": { "type": "array", "items": { "type": "string" }, "default": [], "description": "Section toggle/order; empty uses the default set." },
+    "zipNameTemplate": { "type": "string", "default": "", "description": "Template for the zip filename." },
+    "commitUrlTemplate": { "type": "string", "default": "", "description": "Template turning a commit SHA into a link." },
+    "repoBaseUrl": { "type": "string", "default": "", "description": "Base URL for repo links." },
+    "messages": { "type": "object", "default": {}, "description": "Overridable UI strings (i18n)." }
   }
 }

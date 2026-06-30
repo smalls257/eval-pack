@@ -202,5 +202,35 @@ class TestLensKeys(unittest.TestCase):
         self.assertTrue(any("analysisLenses" in e for e in no_skill))
 
 
+class TestCosmeticKeys(unittest.TestCase):
+    def test_new_defaults(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = config.load_config(d, env={})
+            self.assertEqual(cfg["brandName"], "Eval Pack")
+            self.assertEqual(cfg["reportTitle"], "")
+            self.assertEqual(cfg["footerText"], "")
+            self.assertEqual(cfg["subjectNoun"], "extension")
+            self.assertEqual(cfg["defaultTheme"], "dark")
+            self.assertEqual(cfg["sections"], [])
+            self.assertEqual(cfg["zipNameTemplate"], "")
+            self.assertEqual(cfg["commitUrlTemplate"], "")
+            self.assertEqual(cfg["repoBaseUrl"], "")
+            self.assertEqual(cfg["messages"], {})
+
+    def test_theme_must_be_known(self):
+        errs = config.validate({"defaultTheme": "neon"})
+        self.assertTrue(any("defaultTheme" in e for e in errs))
+
+    def test_theme_known_accepted(self):
+        self.assertEqual(config.validate({"defaultTheme": "light"}), [])
+
+    def test_brand_override(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / ".eval-pack.json").write_text(
+                json.dumps({"brandName": "Acme Reports"}), encoding="utf-8")
+            cfg = config.load_config(d, env={})
+            self.assertEqual(cfg["brandName"], "Acme Reports")
+
+
 if __name__ == "__main__":
     unittest.main()

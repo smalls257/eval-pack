@@ -458,6 +458,14 @@ def main():
         "lenses": read_json(pack_dir / "lenses.json"),
         "rounds": list(prev_data.get("rounds") or []) + [new_round],
         "transcript": load_jsonl(transcript_jsonl) if transcript_jsonl.is_file() else [],
+        "evalConfig": {
+            "brandName": cfg["brandName"],
+            "reportTitle": cfg["reportTitle"],
+            "footerText": cfg["footerText"],
+            "subjectNoun": cfg["subjectNoun"],
+            "defaultTheme": cfg["defaultTheme"],
+            "messages": cfg["messages"],
+        },
     }
 
     inject_into_template(pack_dir, data)

@@ -46,6 +46,17 @@ DEFAULTS = {
     "analysisLenses": [],
     # How scorer-lens scores combine with the core verdict (see AGGREGATION_RULES).
     "verdictAggregation": "core",
+    # Presentation. Defaults preserve today's look (brand "Eval Pack", dark theme, "extension").
+    "brandName": "Eval Pack",
+    "reportTitle": "",
+    "footerText": "",
+    "subjectNoun": "extension",
+    "defaultTheme": "dark",
+    "sections": [],
+    "zipNameTemplate": "",
+    "commitUrlTemplate": "",
+    "repoBaseUrl": "",
+    "messages": {},
 }
 
 # Known keys and their expected JSON/Python types. A key absent here is "unknown"
@@ -66,6 +77,16 @@ _TYPES = {
     "evaluatorPromptFile": str,
     "analysisLenses": list,
     "verdictAggregation": str,
+    "brandName": str,
+    "reportTitle": str,
+    "footerText": str,
+    "subjectNoun": str,
+    "defaultTheme": str,
+    "sections": list,
+    "zipNameTemplate": str,
+    "commitUrlTemplate": str,
+    "repoBaseUrl": str,
+    "messages": dict,
 }
 
 # Keys consumed during merge or by editors only — never part of the resolved config.
@@ -73,6 +94,9 @@ _META_KEYS = {"extends", "$schema"}
 
 # Allowed verdict aggregation rules (shared with scripts/aggregate.py).
 AGGREGATION_RULES = ("core", "min", "mean")
+
+# Allowed report themes.
+THEMES = ("dark", "light", "system")
 
 
 def _read_json(path):
@@ -198,6 +222,9 @@ def validate(cfg):
                 errors.append(
                     "analysisLenses[{}]: role must be 'contributor' or 'scorer'".format(i)
                 )
+    theme = cfg.get("defaultTheme")
+    if theme is not None and theme not in THEMES:
+        errors.append("defaultTheme: {!r} is not one of {}".format(theme, list(THEMES)))
     return errors
 
 
