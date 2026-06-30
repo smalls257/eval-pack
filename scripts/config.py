@@ -102,7 +102,13 @@ def _apply_env(cfg, env):
 
 
 def load_config(project_root, env=None):
-    """Return the merged, resolved config dict. Does NOT validate (call validate())."""
+    """Return the merged, resolved config dict. Does NOT validate (call validate()).
+
+    List merge differs by layer: file layers (presets, .eval-pack.json,
+    .eval-pack.local.json) concat-then-dedupe onto the base, but a
+    CLAUDE_PLUGIN_OPTION_* env override REPLACES the list outright. Raises
+    ConfigError on malformed JSON or an uncoercible env value.
+    """
     env = os.environ if env is None else env
     root = Path(project_root)
     project_cfg = _read_json(root / ".eval-pack.json")

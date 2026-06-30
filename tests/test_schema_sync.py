@@ -23,6 +23,17 @@ class TestSchemaSync(unittest.TestCase):
         schema = json.loads((ROOT / "schema" / "eval-pack.schema.json").read_text())
         self.assertFalse(schema["additionalProperties"])
 
+    def test_schema_types_and_defaults_match(self):
+        # Guard against type/default drift, not just key drift: the schema must
+        # agree with the runtime _TYPES and DEFAULTS for every known key.
+        schema = json.loads((ROOT / "schema" / "eval-pack.schema.json").read_text())
+        props = schema["properties"]
+        json_to_py = {"integer": int, "array": list, "string": str}
+        for key, typ in config._TYPES.items():
+            with self.subTest(key=key):
+                self.assertEqual(json_to_py[props[key]["type"]], typ)
+                self.assertEqual(props[key]["default"], config.DEFAULTS[key])
+
 
 if __name__ == "__main__":
     unittest.main()
