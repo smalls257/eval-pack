@@ -172,6 +172,12 @@ class TestPromptRubricKeys(unittest.TestCase):
             cfg = config.load_config(d, env={})
             self.assertEqual(cfg["analysisStance"], "collaborative-coach")
 
+    def test_returned_dicts_do_not_alias_defaults(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = config.load_config(d, env={})
+            cfg["rubric"]["mutated"] = True
+            self.assertNotIn("mutated", config.DEFAULTS["rubric"])
+
 
 if __name__ == "__main__":
     unittest.main()
