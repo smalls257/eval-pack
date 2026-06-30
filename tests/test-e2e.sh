@@ -254,8 +254,15 @@ if ! grep -q "__EVAL_PACK_DATA__" "$OPEN_DIR/index.html"; then
   echo "FAIL: openable index.html missing embedded data" >&2
   exit 1
 fi
-if [[ -f "$OPEN_DIR/transcript.jsonl" ]]; then
-  echo "FAIL: transcript.jsonl should be excluded from openable copy" >&2
+# includeTranscript defaults to true -> the raw transcript.jsonl is bundled
+if [[ ! -f "$OPEN_DIR/transcript.jsonl" ]]; then
+  echo "FAIL: transcript.jsonl should be included in openable copy (includeTranscript default true)" >&2
+  exit 1
+fi
+# Capture first (avoid SIGPIPE: grep -q closing the pipe early would fail unzip under pipefail)
+ZIP_LIST=$(unzip -Z1 "$ZIP_PATH")
+if ! printf '%s\n' "$ZIP_LIST" | grep -q "transcript.jsonl"; then
+  echo "FAIL: transcript.jsonl should be bundled in the zip (includeTranscript default true)" >&2
   exit 1
 fi
 if [[ ! -f "$ZIP_PATH" ]]; then
