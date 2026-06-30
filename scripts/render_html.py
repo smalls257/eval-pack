@@ -2,6 +2,7 @@
 import argparse
 import html as htmllib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -303,26 +304,35 @@ def inject_into_template(pack_dir, data):
     )
 
 
-def write_zip(pack_dir, zip_path, session_id):
-    """Write zip from pack_dir contents (excluding .jsonl)."""
+def write_zip(pack_dir, zip_path, session_id, include_transcript=True):
+    """Write zip from pack_dir contents. The raw transcript.jsonl is bundled
+    only when include_transcript (the `includeTranscript` userConfig)."""
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for f in pack_dir.rglob("*"):
-            if f.is_file() and f.suffix != ".jsonl":
+            if f.is_file() and (include_transcript or f.suffix != ".jsonl"):
                 zf.write(f, f"{session_id}/{f.relative_to(pack_dir)}")
 
 
-def publish_openable(pack_dir, session_id, open_base):
+def publish_openable(pack_dir, session_id, open_base, include_transcript=True):
     """Copy rendered pack to an openable dir outside the repo; return that dir.
 
     Sensor: the dashboard must be readable without a decompress step. The copy
     lives outside the repo (system temp by default) so it is never pushed.
+    The raw .jsonl is included only when include_transcript.
     """
     open_base.mkdir(parents=True, exist_ok=True)
     open_dir = open_base / f"eval-pack-{session_id}"
     if open_dir.exists():
         shutil.rmtree(open_dir)
-    shutil.copytree(pack_dir, open_dir, ignore=shutil.ignore_patterns("*.jsonl"))
+    ignore = None if include_transcript else shutil.ignore_patterns("*.jsonl")
+    shutil.copytree(pack_dir, open_dir, ignore=ignore)
     return open_dir
+
+
+def _include_transcript():
+    """Read the includeTranscript userConfig (env). Default true."""
+    val = os.environ.get("CLAUDE_PLUGIN_OPTION_includeTranscript", "true")
+    return str(val).strip().lower() not in ("false", "0", "no")
 
 
 def validate_pack(pack_dir):
@@ -426,12 +436,13 @@ def main():
 
     inject_into_template(pack_dir, data)
 
-    write_zip(pack_dir, zip_path, args.session_id)
+    include_transcript = _include_transcript()
+    write_zip(pack_dir, zip_path, args.session_id, include_transcript)
     print(f"Eval pack rendered to {zip_path}")
 
     open_base = Path(args.open_base) if args.open_base else Path(tempfile.gettempdir())
     try:
-        open_dir = publish_openable(pack_dir, args.session_id, open_base)
+        open_dir = publish_openable(pack_dir, args.session_id, open_base, include_transcript)
         print(f"Open: file://{open_dir}/index.html")
     except Exception as ex:
         # Buffer: the zip is the durable artifact; the openable copy is a

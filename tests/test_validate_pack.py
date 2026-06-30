@@ -55,5 +55,40 @@ class ValidatePackTests(unittest.TestCase):
             self.assertTrue(any("metrics" in g for g in render_html.validate_pack(Path(d))))
 
 
+
+class WriteZipTranscriptTests(unittest.TestCase):
+    def _pack(self, d):
+        p = Path(d) / "pk"; p.mkdir()
+        (p / "index.html").write_text("x", encoding="utf-8")
+        (p / "transcript.jsonl").write_text('{"uuid":"u1"}\n', encoding="utf-8")
+        return p
+
+    def _names(self, zpath):
+        import zipfile
+        return zipfile.ZipFile(zpath).namelist()
+
+    def test_includes_transcript_when_true(self):
+        with tempfile.TemporaryDirectory() as d:
+            z = Path(d) / "o.zip"
+            render_html.write_zip(self._pack(d), z, "sid", True)
+            self.assertTrue(any(n.endswith("transcript.jsonl") for n in self._names(z)))
+
+    def test_excludes_transcript_when_false(self):
+        with tempfile.TemporaryDirectory() as d:
+            z = Path(d) / "o.zip"
+            render_html.write_zip(self._pack(d), z, "sid", False)
+            names = self._names(z)
+            self.assertFalse(any(n.endswith("transcript.jsonl") for n in names))
+            self.assertTrue(any(n.endswith("index.html") for n in names))
+
+    def test_include_transcript_env(self):
+        import os
+        os.environ.pop("CLAUDE_PLUGIN_OPTION_includeTranscript", None)
+        self.assertTrue(render_html._include_transcript())       # default true
+        os.environ["CLAUDE_PLUGIN_OPTION_includeTranscript"] = "false"
+        self.assertFalse(render_html._include_transcript())
+        os.environ.pop("CLAUDE_PLUGIN_OPTION_includeTranscript", None)
+
+
 if __name__ == "__main__":
     unittest.main()
