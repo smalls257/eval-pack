@@ -226,7 +226,8 @@ eval-pack-evaluator`. Pass it only the artifact location — not your own reason
 
 > Write the eval-pack analysis. PACK_DIR is `${ABS_PACK_DIR}` (absolute). REPO_ROOT is
 > `${REPO_ROOT}`. DIFF_BASE is `${DIFF_BASE}`.
-> Read transcript.jsonl, metrics.json, patterns.json, and test-results.json from PACK_DIR,
+> Read eval-config.json (your configuration), transcript.jsonl, metrics.json, patterns.json,
+> and test-results.json from PACK_DIR,
 > run git from REPO_ROOT to inspect the diff against DIFF_BASE, and write
 > `${ABS_PACK_DIR}/analysis.json` per your schema.
 

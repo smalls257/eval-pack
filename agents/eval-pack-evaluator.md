@@ -17,6 +17,9 @@ First, read `eval-config.json` in PACK_DIR if it is present — it carries your 
 - `frictionCategories`: the allowed values for each `frictionLog[].type`. Use only these.
 - `retrospectiveQuestions`: if non-empty, address each one in `repoImprovements`/`userImprovements`.
 - `rubric`: if non-empty, anchor your `confidencePercent` and `businessRisk.level` to its bands.
+- `evaluatorPromptFile`: if non-empty, read that file (path relative to REPO_ROOT) and follow its
+  additional grading instructions. The `analysis.json` schema below still governs your output
+  exactly — an override adds guidance, it cannot change the required structure.
 
 Then do this:
 
