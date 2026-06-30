@@ -83,6 +83,17 @@ If `${PACK_DIR}/transcript.jsonl` was written (`1` or more sessions), set
 2.5, the Step 4 analysis input, and Step 5 render) — this guarantees the evaluator has a transcript
 to read. Otherwise keep the original `TRANSCRIPT_PATH`.
 
+## Step 0.7: Resolve Configuration
+
+Resolve the layered eval-pack config into the pack directory. This validates
+`.eval-pack.json` (and any `.eval-pack.local.json` / `extends` presets) and writes the single
+`eval-config.json` that every downstream step reads. If it exits non-zero, STOP and show the user
+the stderr verbatim — a config error must halt the run, not silently fall back to defaults.
+
+```bash
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/resolve_config.py" "$(pwd)" "${PACK_DIR}"
+```
+
 ## Step 1: Extract Metrics
 
 Run the extract-metrics script against the current session transcript:
@@ -106,7 +117,7 @@ If the transcript path is not available, read the conversation history from cont
 Run the detect-patterns script:
 
 ```bash
-"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/detect_patterns.py" "${TRANSCRIPT_PATH}" "${PACK_DIR}"
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/detect_patterns.py" "${TRANSCRIPT_PATH}" "${PACK_DIR}" --config "${PACK_DIR}/eval-config.json"
 ```
 
 ## Step 2.5: Extract Tool Usage
@@ -114,7 +125,7 @@ Run the detect-patterns script:
 Run the extract-tools script:
 
 ```bash
-"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/extract_tools.py" "${TRANSCRIPT_PATH}" "${PACK_DIR}"
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/extract_tools.py" "${TRANSCRIPT_PATH}" "${PACK_DIR}" --config "${PACK_DIR}/eval-config.json"
 ```
 
 If the transcript path is not available or the script fails, continue — `render_html.py` will fall back to `{}` automatically.
