@@ -79,6 +79,25 @@
       "type": "string",
       "default": "",
       "description": "Path to an override evaluator prompt; empty uses the bundled default."
+    },
+    "analysisLenses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "skill": { "type": "string" },
+          "role": { "type": "string", "enum": ["contributor", "scorer"] }
+        },
+        "required": ["skill", "role"]
+      },
+      "default": [],
+      "description": "Extension lenses that contribute analysis or feed the verdict."
+    },
+    "verdictAggregation": {
+      "type": "string",
+      "enum": ["core", "min", "mean"],
+      "default": "core",
+      "description": "How scorer-lens scores combine with the core verdict."
     }
   }
 }

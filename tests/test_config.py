@@ -179,5 +179,28 @@ class TestPromptRubricKeys(unittest.TestCase):
             self.assertNotIn("mutated", config.DEFAULTS["rubric"])
 
 
+class TestLensKeys(unittest.TestCase):
+    def test_new_defaults(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = config.load_config(d, env={})
+            self.assertEqual(cfg["analysisLenses"], [])
+            self.assertEqual(cfg["verdictAggregation"], "core")
+
+    def test_unknown_aggregation_rejected(self):
+        errs = config.validate({"verdictAggregation": "sneaky"})
+        self.assertTrue(any("verdictAggregation" in e for e in errs))
+
+    def test_known_aggregation_accepted(self):
+        self.assertEqual(config.validate({"verdictAggregation": "min"}), [])
+
+    def test_lens_must_have_skill_and_valid_role(self):
+        errs = config.validate({"analysisLenses": [{"skill": "x", "role": "contributor"}]})
+        self.assertEqual(errs, [])
+        bad_role = config.validate({"analysisLenses": [{"skill": "x", "role": "boss"}]})
+        self.assertTrue(any("analysisLenses" in e for e in bad_role))
+        no_skill = config.validate({"analysisLenses": [{"role": "scorer"}]})
+        self.assertTrue(any("analysisLenses" in e for e in no_skill))
+
+
 if __name__ == "__main__":
     unittest.main()

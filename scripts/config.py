@@ -42,6 +42,10 @@ DEFAULTS = {
     "retrospectiveQuestions": [],
     # Path to an override evaluator prompt; empty uses the bundled default.
     "evaluatorPromptFile": "",
+    # Extension lenses: list of {"skill": str, "role": "contributor"|"scorer"}.
+    "analysisLenses": [],
+    # How scorer-lens scores combine with the core verdict (see AGGREGATION_RULES).
+    "verdictAggregation": "core",
 }
 
 # Known keys and their expected JSON/Python types. A key absent here is "unknown"
@@ -60,10 +64,15 @@ _TYPES = {
     "rubric": dict,
     "retrospectiveQuestions": list,
     "evaluatorPromptFile": str,
+    "analysisLenses": list,
+    "verdictAggregation": str,
 }
 
 # Keys consumed during merge or by editors only — never part of the resolved config.
 _META_KEYS = {"extends", "$schema"}
+
+# Allowed verdict aggregation rules (shared with scripts/aggregate.py).
+AGGREGATION_RULES = ("core", "min", "mean")
 
 
 def _read_json(path):
@@ -175,6 +184,20 @@ def validate(cfg):
                 re.compile(pat)
             except re.error as exc:
                 errors.append("redaction: invalid regex {!r} ({})".format(pat, exc))
+    rule = cfg.get("verdictAggregation")
+    if rule is not None and rule not in AGGREGATION_RULES:
+        errors.append(
+            "verdictAggregation: {!r} is not one of {}".format(rule, list(AGGREGATION_RULES))
+        )
+    lenses = cfg.get("analysisLenses")
+    if isinstance(lenses, list):
+        for i, lens in enumerate(lenses):
+            if not isinstance(lens, dict) or "skill" not in lens:
+                errors.append("analysisLenses[{}]: must be an object with a 'skill'".format(i))
+            elif lens.get("role") not in ("contributor", "scorer"):
+                errors.append(
+                    "analysisLenses[{}]: role must be 'contributor' or 'scorer'".format(i)
+                )
     return errors
 
 
