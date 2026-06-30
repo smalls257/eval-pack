@@ -83,5 +83,45 @@ class TestValidate(unittest.TestCase):
         self.assertTrue(any("retryAmberThreshold" in e and "bool" in e for e in errs))
 
 
+class TestMalformedInput(unittest.TestCase):
+    def test_bad_int_env_raises_configerror_naming_key(self):
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(config.ConfigError) as ctx:
+                config.load_config(d, env={"CLAUDE_PLUGIN_OPTION_scopeDriftFileThreshold": "true"})
+            self.assertIn("scopeDriftFileThreshold", str(ctx.exception))
+
+    def test_malformed_json_raises_configerror_naming_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / ".eval-pack.json").write_text("{not json", encoding="utf-8")
+            with self.assertRaises(config.ConfigError) as ctx:
+                config.load_config(d, env={})
+            self.assertIn(".eval-pack.json", str(ctx.exception))
+
+    def test_env_list_override_replaces(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = config.load_config(d, env={"CLAUDE_PLUGIN_OPTION_frictionCategories": "a,b,c"})
+            self.assertEqual(cfg["frictionCategories"], ["a", "b", "c"])
+
+
+class TestResolveRoundTrip(unittest.TestCase):
+    def test_resolved_config_strips_meta_and_validates(self):
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, "base.json", {"retryAmberThreshold": 2})
+            _write(d, ".eval-pack.json",
+                   {"extends": ["base.json"], "$schema": "x", "scopeDriftFileThreshold": 9})
+            cfg = config.load_config(d, env={})
+            self.assertNotIn("extends", cfg)
+            self.assertNotIn("$schema", cfg)
+            self.assertEqual(config.validate(cfg), [])
+
+
+class TestReadConfig(unittest.TestCase):
+    def test_read_config_from_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "eval-config.json"
+            p.write_text(json.dumps({"scopeDriftFileThreshold": 42}), encoding="utf-8")
+            self.assertEqual(config.read_config(str(p))["scopeDriftFileThreshold"], 42)
+
+
 if __name__ == "__main__":
     unittest.main()

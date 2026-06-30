@@ -9,6 +9,10 @@ import json
 import os
 from pathlib import Path
 
+
+class ConfigError(Exception):
+    """Raised when config input is malformed: bad JSON or an uncoercible env value."""
+
 # Defaults preserve today's hardcoded behavior. Override nothing -> identical output.
 DEFAULTS = {
     # Scope drift: monorepo PRs typically touch <10 files; beyond this suggests task bleed.
@@ -44,7 +48,10 @@ def _read_json(path):
     p = Path(path)
     if not p.is_file():
         return {}
-    return json.loads(p.read_text(encoding="utf-8"))
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ConfigError("{}: invalid JSON ({})".format(p.name, exc)) from exc
 
 
 def _dedupe(seq):
@@ -73,9 +80,14 @@ def _fresh_defaults():
     return {k: (list(v) if isinstance(v, list) else v) for k, v in DEFAULTS.items()}
 
 
-def _coerce(raw, typ):
+def _coerce(raw, typ, key):
     if typ is int:
-        return int(raw)
+        try:
+            return int(raw)
+        except ValueError as exc:
+            raise ConfigError(
+                "CLAUDE_PLUGIN_OPTION_{}: expected int, got {!r}".format(key, raw)
+            ) from exc
     if typ is list:
         return [s for s in raw.split(",") if s]
     return raw
@@ -85,7 +97,7 @@ def _apply_env(cfg, env):
     for key, typ in _TYPES.items():
         raw = env.get("CLAUDE_PLUGIN_OPTION_" + key)
         if raw not in (None, ""):
-            cfg[key] = _coerce(raw, typ)
+            cfg[key] = _coerce(raw, typ, key)
     return cfg
 
 
@@ -97,6 +109,7 @@ def load_config(project_root, env=None):
     local_cfg = _read_json(root / ".eval-pack.local.json")
 
     merged = _fresh_defaults()
+    # extends is single-level and project-only: presets cannot themselves extend.
     for preset_id in project_cfg.get("extends", []):
         _overlay(merged, _strip_meta(_read_json(root / preset_id)))
     _overlay(merged, _strip_meta(project_cfg))
