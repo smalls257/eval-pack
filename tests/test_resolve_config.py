@@ -51,5 +51,24 @@ class TestResolveConfig(unittest.TestCase):
             self.assertFalse((Path(pack) / "eval-config.json").exists())
 
 
+class TestStanceEmbedding(unittest.TestCase):
+    def test_default_stance_text_embedded(self):
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as pack:
+            r = _run([root, pack])
+            self.assertEqual(r.returncode, 0, r.stderr)
+            cfg = json.loads((Path(pack) / "eval-config.json").read_text())
+            self.assertIn("analysisStanceText", cfg)
+            self.assertIn("Skeptical Reviewer", cfg["analysisStanceText"])
+
+    def test_unknown_stance_halts(self):
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as pack:
+            (Path(root) / ".eval-pack.json").write_text(
+                json.dumps({"analysisStance": "bogus-stance"}), encoding="utf-8")
+            r = _run([root, pack])
+            self.assertEqual(r.returncode, 1)
+            self.assertIn("analysisStance", r.stderr)
+            self.assertFalse((Path(pack) / "eval-config.json").exists())
+
+
 if __name__ == "__main__":
     unittest.main()

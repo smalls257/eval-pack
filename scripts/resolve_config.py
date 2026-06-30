@@ -34,6 +34,17 @@ def main(argv=None):
             print("ERROR: " + e, file=sys.stderr)
         return 1
 
+    plugin_root = Path(__file__).resolve().parent.parent
+    stance = cfg.get("analysisStance", "")
+    preset = plugin_root / "presets" / "stances" / (stance + ".md")
+    if not preset.is_file():
+        print(
+            "ERROR: unknown analysisStance {!r} — no preset at presets/stances/{}.md".format(stance, stance),
+            file=sys.stderr,
+        )
+        return 1
+    cfg["analysisStanceText"] = preset.read_text(encoding="utf-8")
+
     if args.check:
         print("config valid")
         return 0
