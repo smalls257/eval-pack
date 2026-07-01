@@ -53,7 +53,7 @@ def load_jsonl(path):
     return entries
 
 
-def render_transcript_html(transcript_path, pack_dir, screenshots_dir):
+def render_transcript_html(transcript_path, pack_dir, screenshots_dir, rules=()):
     """Render transcript HTML and collect browser screenshots in a single pass."""
     rows = []
     copied = 0
@@ -78,7 +78,7 @@ def render_transcript_html(transcript_path, pack_dir, screenshots_dir):
                 if text.strip():
                     rows.append(
                         f'<div class="turn user"><div class="meta">USER {htmllib.escape(ts)}</div>'
-                        f"<pre>{htmllib.escape(text)}</pre></div>"
+                        f"<pre>{htmllib.escape(redact.redact(text, rules))}</pre></div>"
                     )
             elif role == "assistant":
                 if isinstance(content, str):
@@ -88,7 +88,7 @@ def render_transcript_html(transcript_path, pack_dir, screenshots_dir):
                         rows.append(
                             f'<div class="turn assistant"><div class="meta">'
                             f'{htmllib.escape(model or "ASSISTANT")} {htmllib.escape(ts)}</div>'
-                            f"<pre>{htmllib.escape(text)}</pre></div>"
+                            f"<pre>{htmllib.escape(redact.redact(text, rules))}</pre></div>"
                         )
                 elif isinstance(content, list):
                     for block in content:
@@ -101,7 +101,7 @@ def render_transcript_html(transcript_path, pack_dir, screenshots_dir):
                                 rows.append(
                                     f'<div class="turn assistant"><div class="meta">'
                                     f'{htmllib.escape(model or "ASSISTANT")} {htmllib.escape(ts)}</div>'
-                                    f"<pre>{htmllib.escape(text)}</pre></div>"
+                                    f"<pre>{htmllib.escape(redact.redact(text, rules))}</pre></div>"
                                 )
                         elif block.get("type") == "tool_use" and block.get("name") == "Agent":
                             desc = (block.get("input") or {}).get("description", "")
@@ -110,7 +110,7 @@ def render_transcript_html(transcript_path, pack_dir, screenshots_dir):
                                 label = f"[{model_tag}] {desc}" if model_tag else desc
                                 rows.append(
                                     f'<div class="turn subagent"><div class="meta">→ SUBAGENT {htmllib.escape(ts)}</div>'
-                                    f"<pre>{htmllib.escape(label)}</pre></div>"
+                                    f"<pre>{htmllib.escape(redact.redact(label, rules))}</pre></div>"
                                 )
 
             # Collect browser screenshots from ALL tool_use blocks (any role)
@@ -161,16 +161,37 @@ def render_transcript_html(transcript_path, pack_dir, screenshots_dir):
 
 
 def redact_pack(pack_dir, rules):
-    """The single redaction choke point: mask secrets across EVERY emitted text artifact
-    (transcript.html, index.html, all *.json, the raw *.jsonl) right before the pack is zipped
-    or copied out. Covers derived artifacts too — analysis.json (evaluator quotes), tools.json
-    (skill args / agent descriptions), data.json, lenses.json — so a secret can't leak through a
-    file other than the transcript. Runs after all artifacts are written."""
+    """Mask secrets in the on-disk JSON artifacts at the string-VALUE level, so masking
+    happens BEFORE JSON re-escaping — a plaintext rule can't be defeated by escaping (e.g. a
+    secret containing a quote surviving as `\\"`). Covers analysis.json (evaluator quotes),
+    tools.json (skill args / agent descriptions), metrics/patterns/test-results/lenses/data.json,
+    and the raw transcript.jsonl. transcript.html is redacted at its render source; index.html and
+    data.json are clean because the `data` dict is redacted before injection. Runs after all
+    artifacts are written, before zip/publish."""
     if not rules:
         return
     for path in Path(pack_dir).rglob("*"):
-        if path.is_file() and path.suffix in (".html", ".json", ".jsonl"):
-            path.write_text(redact.redact(path.read_text(encoding="utf-8"), rules), encoding="utf-8")
+        if not path.is_file():
+            continue
+        if path.suffix == ".json":
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                continue
+            path.write_text(
+                json.dumps(redact.redact_value(data, rules), indent=2), encoding="utf-8"
+            )
+        elif path.suffix == ".jsonl":
+            out = []
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    out.append(line)
+                    continue
+                try:
+                    out.append(json.dumps(redact.redact_value(json.loads(line), rules)))
+                except json.JSONDecodeError:
+                    out.append(redact.redact(line, rules))  # fallback: plaintext line
+            path.write_text("\n".join(out) + "\n", encoding="utf-8")
 
 
 def _is_within(child, parent):
@@ -453,7 +474,7 @@ def main():
     agent_screenshot_names = set()
     if args.transcript_file and args.transcript_file.is_file():
         agent_screenshot_names = render_transcript_html(
-            args.transcript_file, pack_dir, pack_dir / "screenshots"
+            args.transcript_file, pack_dir, pack_dir / "screenshots", redaction_rules
         )
 
     git_branch = args.branch
@@ -493,9 +514,13 @@ def main():
         "evalConfig": report_config(cfg),
     }
 
+    # Redact the data dict at the value level BEFORE it is serialized into index.html /
+    # data.json, so escaping happens after masking (no escape-defeats-rule leak).
+    data = redact.redact_value(data, redaction_rules)
     inject_into_template(pack_dir, data)
 
-    # Single redaction choke point: every artifact now exists; mask before zip/publish.
+    # Value-level pass over the standalone on-disk JSON/JSONL artifacts (analysis.json,
+    # tools.json, transcript.jsonl, …) before zip/publish. transcript.html was masked at source.
     redact_pack(pack_dir, redaction_rules)
 
     include_transcript = _include_transcript()

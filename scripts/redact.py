@@ -17,3 +17,21 @@ def redact(text, rules):
     for pattern in rules:
         text = re.sub(pattern, REDACTION_MARK, text)
     return text
+
+
+def redact_value(obj, rules):
+    """Recursively redact string values in a JSON-like structure (dict/list/str).
+
+    Redacting the plaintext VALUES before they are JSON- or HTML-serialized is what
+    makes redaction escape-proof: a rule written for the raw secret still matches,
+    because masking happens before any escaping. Dict keys are left intact (structural).
+    """
+    if not rules:
+        return obj
+    if isinstance(obj, str):
+        return redact(obj, rules)
+    if isinstance(obj, list):
+        return [redact_value(x, rules) for x in obj]
+    if isinstance(obj, dict):
+        return {k: redact_value(v, rules) for k, v in obj.items()}
+    return obj
