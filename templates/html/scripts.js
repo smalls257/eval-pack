@@ -1145,23 +1145,22 @@ function renderLenses(data) {
     if (tabBtn) tabBtn.style.display = 'none';
     return;
   }
+  // Use the html`` tag (not safe() in plain literals — that stringifies to
+  // "[object Object]"). html`` escapes each interpolation, which is what we want for
+  // untrusted lens output (skill names, rationales, findings, error text).
   const parts = [];
   if (lenses.finalScore != null) {
-    parts.push(`<p class="lens-agg">Verdict aggregation — core <strong>${safe(lenses.coreScore)}</strong> `
-      + `<code>${safe(lenses.rule)}</code> lenses → final <strong>${safe(lenses.finalScore)}</strong></p>`);
+    parts.push(html`<p class="lens-agg">Verdict aggregation — core <strong>${lenses.coreScore}</strong> <code>${lenses.rule}</code> lenses → final <strong>${lenses.finalScore}</strong></p>`);
   }
   (lenses.scorers || []).forEach(s => {
-    parts.push(`<div class="lens-card"><div class="lens-meta">scorer · ${safe(s.skill)}</div>`
-      + `<p>score <strong>${safe(s.score)}</strong> — ${safe(s.rationale)}</p></div>`);
+    parts.push(html`<div class="lens-card"><div class="lens-meta">scorer · ${s.skill}</div><p>score <strong>${s.score}</strong> — ${s.rationale}</p></div>`);
   });
   (lenses.contributors || []).forEach(c => {
-    const findings = (c.findings || []).map(f => `<li>${safe(f)}</li>`).join('');
-    parts.push(`<div class="lens-card"><div class="lens-meta">contributor · ${safe(c.skill)}</div>`
-      + `<h4>${safe(c.title)}</h4><ul>${findings}</ul></div>`);
+    const findings = (c.findings || []).map(f => html`<li>${f}</li>`).join('');
+    parts.push(html`<div class="lens-card"><div class="lens-meta">contributor · ${c.skill}</div><h4>${c.title}</h4><ul>${safe(findings)}</ul></div>`);
   });
   (lenses.failures || []).forEach(f => {
-    parts.push(`<div class="lens-card lens-fail"><div class="lens-meta">failed · ${safe(f.skill)}</div>`
-      + `<p>${safe(f.error)}</p></div>`);
+    parts.push(html`<div class="lens-card lens-fail"><div class="lens-meta">failed · ${f.skill}</div><p>${f.error}</p></div>`);
   });
   if (body) body.innerHTML = parts.join('');
 }
