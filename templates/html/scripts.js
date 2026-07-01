@@ -1132,19 +1132,22 @@ function renderBranding(data) {
     const footer = document.querySelector('.footer');
     if (footer) footer.textContent = cfg.footerText;
   }
+}
 
-  // messages: override any labeled UI string by element id, e.g. {"page-title":"…"} (i18n hook).
-  const messages = cfg.messages || {};
+// messages: override any labeled UI string by element id, e.g. {"page-title":"…"} (i18n hook).
+// Applied LAST, after every renderer, so a specific string (e.g. page-title) isn't clobbered.
+function applyMessages(data) {
+  const messages = (data.evalConfig || {}).messages || {};
   Object.keys(messages).forEach(id => {
     const el = document.getElementById(id);
     if (el) el.textContent = messages[id];
   });
 }
 
-// Display a lens score defensively: a finite number, else an em dash (never garbage/NaN).
+// Display a lens score defensively: a finite number clamped to [0,100], else an em dash.
 function lensScore(x) {
   const n = Number(x);
-  return Number.isFinite(n) ? n : '—';
+  return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : '—';
 }
 
 function renderLenses(data) {
@@ -1247,6 +1250,9 @@ function init(data) {
 
   // Apply configured section toggle/order (overrides the default activation above)
   applySections(data);
+
+  // Apply message overrides LAST so they win over every renderer's default text.
+  applyMessages(data);
 }
 
 // ── bootstrap ─────────────────────────────────────────────────────────────────
