@@ -145,7 +145,14 @@ def _fresh_defaults():
 
 def _coerce(raw, typ, key):
     if typ is bool:
-        return raw.strip().lower() in ("1", "true", "yes", "on")
+        low = raw.strip().lower()
+        if low in ("1", "true", "yes", "on"):
+            return True
+        if low in ("0", "false", "no", "off"):
+            return False
+        raise ConfigError(
+            "CLAUDE_PLUGIN_OPTION_{}: expected a boolean, got {!r}".format(key, raw)
+        )
     if typ is int:
         try:
             return int(raw)
@@ -182,7 +189,11 @@ def load_config(project_root, env=None):
     merged = _fresh_defaults()
     # extends is single-level and project-only: presets cannot themselves extend.
     for preset_id in project_cfg.get("extends", []):
-        _overlay(merged, _strip_meta(_read_json(root / preset_id)))
+        preset_path = root / preset_id
+        if not preset_path.is_file():
+            # Fail loud: a typo'd/renamed preset must not silently resolve to defaults.
+            raise ConfigError("extends: preset not found: {}".format(preset_id))
+        _overlay(merged, _strip_meta(_read_json(preset_path)))
     _overlay(merged, _strip_meta(project_cfg))
     _overlay(merged, _strip_meta(local_cfg))
     _apply_env(merged, env)

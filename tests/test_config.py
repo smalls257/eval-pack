@@ -232,5 +232,26 @@ class TestCosmeticKeys(unittest.TestCase):
             self.assertEqual(cfg["brandName"], "Acme Reports")
 
 
+class TestFailLoudRegressions(unittest.TestCase):
+    def test_missing_extends_preset_raises(self):
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, ".eval-pack.json", {"extends": ["nope.json"]})
+            with self.assertRaises(config.ConfigError) as ctx:
+                config.load_config(d, env={})
+            self.assertIn("nope.json", str(ctx.exception))
+
+    def test_garbage_bool_env_raises(self):
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(config.ConfigError) as ctx:
+                config.load_config(d, env={"CLAUDE_PLUGIN_OPTION_publishOpenable": "banana"})
+            self.assertIn("publishOpenable", str(ctx.exception))
+
+    def test_explicit_false_bool_env(self):
+        with tempfile.TemporaryDirectory() as d:
+            for token in ("false", "FALSE", "0", "no", "off"):
+                cfg = config.load_config(d, env={"CLAUDE_PLUGIN_OPTION_publishOpenable": token})
+                self.assertIs(cfg["publishOpenable"], False, token)
+
+
 if __name__ == "__main__":
     unittest.main()
