@@ -179,6 +179,20 @@ def _is_within(child, parent):
     return child == parent or parent in child.parents
 
 
+# Config keys the report template (templates/html/scripts.js) reads off data.evalConfig.
+# A key the template consumes but this omits is a silent dead knob — keep in sync with the
+# EVAL_CONFIG / pathLink / applySections reads in scripts.js.
+_REPORT_CONFIG_KEYS = (
+    "brandName", "reportTitle", "footerText", "subjectNoun", "defaultTheme", "messages",
+    "commitUrlTemplate", "repoBaseUrl", "sections",
+)
+
+
+def report_config(cfg):
+    """The subset of resolved config surfaced to the report template."""
+    return {k: cfg[k] for k in _REPORT_CONFIG_KEYS}
+
+
 def build_directory_structure(pack_dir, template_dir):
     """Create pack directory layout and copy static templates."""
     pack_dir.mkdir(parents=True, exist_ok=True)
@@ -476,14 +490,7 @@ def main():
         "lenses": read_json(pack_dir / "lenses.json"),
         "rounds": list(prev_data.get("rounds") or []) + [new_round],
         "transcript": load_jsonl(transcript_jsonl) if transcript_jsonl.is_file() else [],
-        "evalConfig": {
-            "brandName": cfg["brandName"],
-            "reportTitle": cfg["reportTitle"],
-            "footerText": cfg["footerText"],
-            "subjectNoun": cfg["subjectNoun"],
-            "defaultTheme": cfg["defaultTheme"],
-            "messages": cfg["messages"],
-        },
+        "evalConfig": report_config(cfg),
     }
 
     inject_into_template(pack_dir, data)
