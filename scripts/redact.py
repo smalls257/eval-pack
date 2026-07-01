@@ -20,11 +20,13 @@ def redact(text, rules):
 
 
 def redact_value(obj, rules):
-    """Recursively redact string values in a JSON-like structure (dict/list/str).
+    """Recursively redact strings in a JSON-like structure (dict/list/str), including
+    dict KEYS.
 
-    Redacting the plaintext VALUES before they are JSON- or HTML-serialized is what
-    makes redaction escape-proof: a rule written for the raw secret still matches,
-    because masking happens before any escaping. Dict keys are left intact (structural).
+    Redacting the plaintext before JSON/HTML serialization is what makes redaction
+    escape-proof (a rule for the raw secret still matches, because masking happens before
+    escaping). Keys are redacted too: real transcripts put secrets in object keys — e.g.
+    `trackedFileBackups` keyed by absolute file paths — which a values-only pass would leak.
     """
     if not rules:
         return obj
@@ -33,5 +35,6 @@ def redact_value(obj, rules):
     if isinstance(obj, list):
         return [redact_value(x, rules) for x in obj]
     if isinstance(obj, dict):
-        return {k: redact_value(v, rules) for k, v in obj.items()}
+        return {redact(k, rules) if isinstance(k, str) else k: redact_value(v, rules)
+                for k, v in obj.items()}
     return obj

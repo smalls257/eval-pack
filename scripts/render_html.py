@@ -173,6 +173,8 @@ def redact_pack(pack_dir, rules):
     for path in Path(pack_dir).rglob("*"):
         if not path.is_file():
             continue
+        # eval-config.json IS redacted too: a redaction rule can itself be the sensitive value
+        # (e.g. a home-path prefix), so the bundled config shows "[REDACTED]" rather than leak it.
         if path.suffix == ".json":
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))

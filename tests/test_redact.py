@@ -33,3 +33,12 @@ class TestRedact(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRedactKeys(unittest.TestCase):
+    def test_dict_keys_redacted(self):
+        # real transcripts key trackedFileBackups by absolute path -> keys must be masked
+        obj = {"trackedFileBackups": {"/Users/x/secret.md": {"t": 1}}}
+        out = redact.redact_value(obj, [r"/Users/\w+"])
+        self.assertNotIn("/Users/x", str(out))
+        self.assertIn("[REDACTED]", str(out))

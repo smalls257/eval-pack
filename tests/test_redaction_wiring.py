@@ -96,5 +96,26 @@ class TestInvalidRedactionRegex(unittest.TestCase):
         self.assertTrue(any("redaction" in e for e in errs))
 
 
+class TestKeyLeakAndConfigSkip(unittest.TestCase):
+    def test_path_key_masked_in_jsonl(self):
+        with tempfile.TemporaryDirectory() as d:
+            pack = Path(d)
+            line = {"trackedFileBackups": {"/Users/jasonsmith/x.md": {"backupTime": "t"}}}
+            (pack / "transcript.jsonl").write_text(json.dumps(line) + "\n", encoding="utf-8")
+            render_html.redact_pack(pack, [r"/Users/jasonsmith"])
+            txt = (pack / "transcript.jsonl").read_text(encoding="utf-8")
+            self.assertNotIn("/Users/jasonsmith", txt)
+            self.assertIn("[REDACTED]", txt)
+
+    def test_eval_config_rule_is_masked_not_leaked(self):
+        # a rule can itself be sensitive (a home path) — the bundled config must not leak it
+        with tempfile.TemporaryDirectory() as d:
+            pack = Path(d)
+            (pack / "eval-config.json").write_text(json.dumps({"redaction": ["/Users/jasonsmith"]}), encoding="utf-8")
+            render_html.redact_pack(pack, [r"/Users/jasonsmith"])
+            txt = (pack / "eval-config.json").read_text(encoding="utf-8")
+            self.assertNotIn("/Users/jasonsmith", txt)
+
+
 if __name__ == "__main__":
     unittest.main()
