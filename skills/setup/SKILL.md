@@ -117,3 +117,15 @@ Tell the user:
   `/plugin marketplace add smalls257/eval-pack` then `/plugin install eval-pack@eval-pack`.
 - They can now use `/eval-pack:generate` and `/eval-pack:review`; re-run `/eval-pack:setup` any
   time to adjust the configuration.
+
+## Extending in your own space (no plugin-source edits)
+
+Everything a team adds lives in **their** repo, not the plugin:
+- **Custom stance** — drop `.eval-pack/stances/<name>.md` in the repo and set
+  `"analysisStance": "<name>"`. It wins over the bundled presets (project-first).
+- **Custom evaluator guidance** — point `"evaluatorPromptFile"` at a file in the repo.
+- **Custom lenses** — add `{"skill": "<your-skill>", "role": "contributor|scorer"}` to
+  `analysisLenses` and provide `<your-skill>` as your own skill/agent (in `.claude/agents/` or
+  your own plugin). eval-pack dispatches it and collects its `lenses/<skill>.json`; no eval-pack
+  source change is needed. `requirement-drift` and `verification-rigor` are bundled examples.
+- **Rubric, redaction, thresholds, friction categories, branding** — all plain `.eval-pack.json`.

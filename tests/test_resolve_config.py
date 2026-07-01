@@ -72,3 +72,30 @@ class TestStanceEmbedding(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestUserSpaceStance(unittest.TestCase):
+    def test_custom_stance_from_project_no_plugin_edit(self):
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as pack:
+            sd = Path(root) / ".eval-pack" / "stances"
+            sd.mkdir(parents=True)
+            (sd / "acme-auditor.md").write_text("# Acme Auditor\nBe ruthless.", encoding="utf-8")
+            (Path(root) / ".eval-pack.json").write_text(
+                json.dumps({"analysisStance": "acme-auditor"}), encoding="utf-8")
+            r = _run([root, pack])
+            self.assertEqual(r.returncode, 0, r.stderr)
+            cfg = json.loads((Path(pack) / "eval-config.json").read_text())
+            self.assertIn("Acme Auditor", cfg["analysisStanceText"])
+
+    def test_project_stance_overrides_bundled_name(self):
+        # a project file named like a bundled preset wins (project-first)
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as pack:
+            sd = Path(root) / ".eval-pack" / "stances"
+            sd.mkdir(parents=True)
+            (sd / "skeptical-reviewer.md").write_text("PROJECT OVERRIDE STANCE", encoding="utf-8")
+            (Path(root) / ".eval-pack.json").write_text(
+                json.dumps({"analysisStance": "skeptical-reviewer"}), encoding="utf-8")
+            r = _run([root, pack])
+            self.assertEqual(r.returncode, 0, r.stderr)
+            cfg = json.loads((Path(pack) / "eval-config.json").read_text())
+            self.assertIn("PROJECT OVERRIDE STANCE", cfg["analysisStanceText"])

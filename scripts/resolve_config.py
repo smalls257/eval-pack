@@ -36,10 +36,17 @@ def main(argv=None):
 
     plugin_root = Path(__file__).resolve().parent.parent
     stance = cfg.get("analysisStance", "")
-    preset = plugin_root / "presets" / "stances" / (stance + ".md")
-    if not preset.is_file():
+    # Project-first: a custom stance lives in the user's own repo (.eval-pack/stances/<name>.md),
+    # with the bundled presets as fallback — so a custom stance needs NO plugin-source edit.
+    candidates = [
+        Path(args.project_root) / ".eval-pack" / "stances" / (stance + ".md"),
+        plugin_root / "presets" / "stances" / (stance + ".md"),
+    ]
+    preset = next((p for p in candidates if p.is_file()), None)
+    if preset is None:
         print(
-            "ERROR: unknown analysisStance {!r} — no preset at presets/stances/{}.md".format(stance, stance),
+            "ERROR: unknown analysisStance {!r} — no preset at .eval-pack/stances/{}.md "
+            "(your repo) or the bundled presets/stances/".format(stance, stance),
             file=sys.stderr,
         )
         return 1
