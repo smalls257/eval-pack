@@ -260,46 +260,42 @@ step — the core eval never depends on a lens being present (the Airplane Test)
 configuration was validated at resolve time, so every lens already has a `skill` and a valid
 `role`.
 
-For each lens `{skill, role}`, dispatch the named skill as a SEPARATE subagent over the
-read-only artifacts (`transcript.jsonl`, `metrics.json`, `patterns.json`, `test-results.json`,
-and the git diff). Pass only artifact locations — never your own reasoning.
+Create the lens output dir: `mkdir -p "${PACK_DIR}/lenses"`. Then for each lens `{skill, role}`,
+dispatch it as a SEPARATE subagent over the read-only artifacts. Each lens WRITES its result to
+`${PACK_DIR}/lenses/<id>.json` (the assembler collects these). Pass only artifact locations —
+never your own reasoning.
 
-- A `contributor` lens returns a section `{title, findings: [...]}`. It MUST NOT influence the
-  verdict — it only adds an attributed section.
-- A `scorer` lens returns `{score, rationale}` (score 0–100). Its score reaches the verdict
-  ONLY through the declared `verdictAggregation` rule below.
+**First-party lenses** ship with eval-pack; dispatch each with the `Agent` tool using the matching
+`subagent_type`, passing `PACK_DIR` (absolute), `REPO_ROOT`, and `DIFF_BASE`:
 
-Record every result with attribution (`skill`, `role`). If a lens errors or returns malformed
-output, record `{skill, role, error}` and CONTINUE — a failing lens degrades to a noted failure;
-it never crashes the eval and never silently vanishes.
+- `requirement-drift` (scorer) — did the delivered work match what the user originally asked?
+- `verification-rigor` (scorer) — were success claims backed by observed evidence?
 
-Compute the final verdict score from the core analysis confidence and the scorer scores, using
-the tested aggregation module (the math is not done by hand — that keeps the verdict auditable):
+> Run the `<skill>` lens. PACK_DIR is `${ABS_PACK_DIR}`. REPO_ROOT is `${REPO_ROOT}`. DIFF_BASE is
+> `${DIFF_BASE}`. Read the artifacts, then write your result to
+> `${ABS_PACK_DIR}/lenses/<skill>.json` per your schema.
+
+A **third-party** lens is dispatched as its named skill/agent; instruct it to write the same
+`{skill, role, score|title, rationale|findings}` shape to `lenses/<skill>.json`. A `contributor`
+adds an attributed section and MUST NOT touch the verdict; a `scorer` returns a 0–100 `score` that
+reaches the verdict only through the declared `verdictAggregation` rule. If a lens errors or writes
+malformed output, leave a note in `lenses/<skill>.json` — the assembler quarantines it as a
+failure and the eval continues (never crashes, never silently vanishes).
+
+Then assemble the results and compute the aggregated verdict with the tested script (the math is
+not done by hand — that keeps the verdict auditable):
 
 ```bash
-# CORE = highlights.confidencePercent from analysis.json; SCORES = JSON list of scorer scores;
-# RULE = verdictAggregation from eval-config.json.
-"$PYTHON" -c "import sys, json; sys.path.insert(0, '${CLAUDE_PLUGIN_ROOT}/scripts'); import aggregate; print(aggregate.aggregate(${CORE}, ${SCORES}, '${RULE}'))"
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/assemble_lenses.py" "${PACK_DIR}"
 ```
 
-Write `${PACK_DIR}/lenses.json` capturing the full, transparent picture (Guard G2 — every move
-is attributed and the math is shown):
+This writes `${PACK_DIR}/lenses.json` — contributors, scorers, failures, `coreScore`, and the
+aggregated `finalScore` — which the report's Lenses tab renders.
 
-```json
-{
-  "rule": "min",
-  "coreScore": 82,
-  "finalScore": 61,
-  "contributors": [{"skill": "acme-sec:review", "title": "Security lens", "findings": ["..."]}],
-  "scorers": [{"skill": "team:perf-budget", "score": 61, "rationale": "..."}],
-  "failures": [{"skill": "x:lens", "role": "scorer", "error": "..."}]
-}
-```
-
-Guards: rules come from config set before the run sees results (G1, pre-committed); attribution
-and the aggregation math are written above (G2, transparent); the aggregation rule was bounded
-to a known, can-still-fail rule at resolve time (G3); lenses are config-listed only, failures
-degrade, and the core ran without them (G4, isolated).
+Guards: rules come from config set before the run sees results (G1, pre-committed); every result is
+attributed and the aggregation math is written to lenses.json (G2, transparent); the rule was
+bounded to a known, can-still-fail rule at resolve time (G3); lenses are config-listed only,
+failures degrade to quarantined notes, and the core ran without them (G4, isolated).
 
 ## Step 5: Render HTML
 

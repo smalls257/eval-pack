@@ -11,7 +11,11 @@
   "license": "MIT",
   "keywords": ["eval", "review", "metrics", "reporting"],
   "skills": "./skills/",
-  "agents": ["./agents/eval-pack-evaluator.md"],
+  "agents": [
+    "./agents/eval-pack-evaluator.md",
+    "./agents/lenses/requirement-drift.md",
+    "./agents/lenses/verification-rigor.md"
+  ],
   "userConfig": {
     "pythonExecutable": {
       "type": "string",
