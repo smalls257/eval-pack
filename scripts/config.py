@@ -188,9 +188,14 @@ def load_config(project_root, env=None):
     local_cfg = _read_json(root / ".eval-pack.local.json")
 
     merged = _fresh_defaults()
+    root_resolved = root.resolve()
     # extends is single-level and project-only: presets cannot themselves extend.
     for preset_id in project_cfg.get("extends", []):
         preset_path = root / preset_id
+        # Confine presets to the repo: reject ../ escapes and absolute paths outside root.
+        resolved = preset_path.resolve()
+        if not (resolved == root_resolved or root_resolved in resolved.parents):
+            raise ConfigError("extends: preset {!r} resolves outside the repo".format(preset_id))
         if not preset_path.is_file():
             # Fail loud: a typo'd/renamed preset must not silently resolve to defaults.
             raise ConfigError("extends: preset not found: {}".format(preset_id))

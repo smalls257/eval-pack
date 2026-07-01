@@ -29,6 +29,11 @@ Inspect the repo BEFORE asking anything. Asking what is already on disk is frict
 
 ## Step 2: Propose — a draft where every key carries its why
 
+**Re-running setup (idempotency):** if `.eval-pack.json` already exists, READ it first and treat
+the user's existing values as authoritative — propose changes as a diff on top, and never silently
+overwrite a hand-edited key. Confirm before changing any value the user already set.
+
+
 Render a proposed `.eval-pack.json` as a diff and tag each key by origin: `detected`, `chosen`,
 or `default`. Reference the JSON Schema so editors validate it:
 

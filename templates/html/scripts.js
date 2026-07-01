@@ -807,8 +807,8 @@ function renderReviewFindings(analysis) {
       <td><span class="review-severity review-severity-${sev}">${sev}</span></td>
       <td>${r.foundIn || '—'}</td>
       <td>${safe(renderMarkdown(r.resolution || '—'))}</td>
-      <td>${safe(r.commit ? (EVAL_CONFIG.commitUrlTemplate
-        ? html`<a class="review-commit" href="${EVAL_CONFIG.commitUrlTemplate.replace('{sha}', r.commit)}">${r.commit}</a>`
+      <td>${safe(r.commit ? (safeUrl(EVAL_CONFIG.commitUrlTemplate ? EVAL_CONFIG.commitUrlTemplate.replace('{sha}', r.commit) : '')
+        ? html`<a class="review-commit" href="${safeUrl(EVAL_CONFIG.commitUrlTemplate.replace('{sha}', r.commit))}">${r.commit}</a>`
         : html`<code class="review-commit">${r.commit}</code>`) : '—')}</td>
     </tr>`;
   }).join('');
@@ -1080,13 +1080,18 @@ function renderDisabledBanner(analysis) {
 // Resolved eval-pack config (branding, subjectNoun, link templates). Set in renderSession.
 let EVAL_CONFIG = {};
 
+// Reject dangerous URL schemes from config-supplied link templates; allow http(s)/relative.
+function safeUrl(u) {
+  if (typeof u !== 'string' || !u) return '';
+  if (/^\s*(javascript|data|vbscript):/i.test(u)) return '';
+  return u;
+}
+
 // Linkify a repo-relative file path against repoBaseUrl, or render it as plain code.
 function pathLink(path) {
   const base = EVAL_CONFIG.repoBaseUrl;
-  if (base) {
-    const url = base.replace(/\/$/, '') + '/' + path;
-    return html`<a href="${url}"><code>${path}</code></a>`;
-  }
+  const url = base ? safeUrl(base.replace(/\/$/, '') + '/' + path) : '';
+  if (url) return html`<a href="${url}"><code>${path}</code></a>`;
   return html`<code>${path}</code>`;
 }
 
@@ -1098,15 +1103,17 @@ function applySections(data) {
   if (!nav) return;
   const btns = Array.from(nav.querySelectorAll('.tab-btn'));
   const actions = nav.querySelector('.tab-nav-actions');
+  const known = order.filter(panel => btns.some(b => b.dataset.panel === panel));
+  // All-unknown list: leave the default nav intact rather than hiding every tab.
+  if (!known.length) return;
   btns.forEach(b => {
     if (!order.includes(b.dataset.panel)) b.style.display = 'none';
   });
-  order.forEach(panel => {
+  known.forEach(panel => {
     const btn = btns.find(b => b.dataset.panel === panel);
     if (btn) nav.insertBefore(btn, actions || null);
   });
-  const first = order.find(panel => btns.some(b => b.dataset.panel === panel));
-  if (first) activatePanel(first);
+  activatePanel(known[0]);
 }
 
 function renderBranding(data) {

@@ -267,3 +267,21 @@ class TestSkillArgsMaxLenBound(unittest.TestCase):
         with _t.TemporaryDirectory() as d:
             cfg = config.load_config(d, env={"CLAUDE_PLUGIN_OPTION_frictionCategories": "a,,b,a"})
             self.assertEqual(cfg["frictionCategories"], ["a", "b"])
+
+
+class TestExtendsConfinement(unittest.TestCase):
+    def test_parent_escape_rejected(self):
+        with tempfile.TemporaryDirectory() as outer:
+            (Path(outer) / "evil.json").write_text('{"retryAmberThreshold": 7}', encoding="utf-8")
+            repo = Path(outer) / "repo"
+            repo.mkdir()
+            _write(str(repo), ".eval-pack.json", {"extends": ["../evil.json"]})
+            with self.assertRaises(config.ConfigError) as ctx:
+                config.load_config(str(repo), env={})
+            self.assertIn("outside the repo", str(ctx.exception))
+
+    def test_in_repo_preset_ok(self):
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, "base.json", {"retryAmberThreshold": 2})
+            _write(d, ".eval-pack.json", {"extends": ["base.json"]})
+            self.assertEqual(config.load_config(d, env={})["retryAmberThreshold"], 2)
