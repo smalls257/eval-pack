@@ -53,7 +53,7 @@ def load_jsonl(path):
     return entries
 
 
-def render_transcript_html(transcript_path, pack_dir, screenshots_dir, rules=()):
+def render_transcript_html(transcript_path, pack_dir, screenshots_dir):
     """Render transcript HTML and collect browser screenshots in a single pass."""
     rows = []
     copied = 0
@@ -156,17 +156,27 @@ def render_transcript_html(transcript_path, pack_dir, screenshots_dir, rules=())
         + "".join(rows)
         + "</body></html>"
     )
-    page = redact.redact(page, rules)
     (pack_dir / "transcript.html").write_text(page, encoding="utf-8")
     return agent_screenshot_names
 
 
-def redact_transcript_file(pack_dir, rules):
-    """Mask the raw transcript.jsonl in place so secrets never ship in the zip or openable copy."""
-    path = pack_dir / "transcript.jsonl"
-    if not rules or not path.is_file():
+def redact_pack(pack_dir, rules):
+    """The single redaction choke point: mask secrets across EVERY emitted text artifact
+    (transcript.html, index.html, all *.json, the raw *.jsonl) right before the pack is zipped
+    or copied out. Covers derived artifacts too — analysis.json (evaluator quotes), tools.json
+    (skill args / agent descriptions), data.json, lenses.json — so a secret can't leak through a
+    file other than the transcript. Runs after all artifacts are written."""
+    if not rules:
         return
-    path.write_text(redact.redact(path.read_text(encoding="utf-8"), rules), encoding="utf-8")
+    for path in Path(pack_dir).rglob("*"):
+        if path.is_file() and path.suffix in (".html", ".json", ".jsonl"):
+            path.write_text(redact.redact(path.read_text(encoding="utf-8"), rules), encoding="utf-8")
+
+
+def _is_within(child, parent):
+    """True if child resolves to parent or a path inside it."""
+    child, parent = Path(child).resolve(), Path(parent).resolve()
+    return child == parent or parent in child.parents
 
 
 def build_directory_structure(pack_dir, template_dir):
@@ -429,7 +439,7 @@ def main():
     agent_screenshot_names = set()
     if args.transcript_file and args.transcript_file.is_file():
         agent_screenshot_names = render_transcript_html(
-            args.transcript_file, pack_dir, pack_dir / "screenshots", redaction_rules
+            args.transcript_file, pack_dir, pack_dir / "screenshots"
         )
 
     git_branch = args.branch
@@ -478,7 +488,8 @@ def main():
 
     inject_into_template(pack_dir, data)
 
-    redact_transcript_file(pack_dir, redaction_rules)
+    # Single redaction choke point: every artifact now exists; mask before zip/publish.
+    redact_pack(pack_dir, redaction_rules)
 
     include_transcript = _include_transcript()
     write_zip(pack_dir, zip_path, args.session_id, include_transcript)
@@ -489,12 +500,20 @@ def main():
             Path(cfg["openableDir"]) if cfg["openableDir"]
             else (Path(args.open_base) if args.open_base else Path(tempfile.gettempdir()))
         )
-        try:
-            open_dir = publish_openable(pack_dir, args.session_id, open_base, include_transcript)
-            print(f"Open: file://{open_dir}/index.html")
-        except Exception as ex:
-            # Buffer: the zip is the durable artifact; the openable copy is a convenience.
-            print(f"Warning: could not write openable copy: {ex}", file=sys.stderr)
+        if cfg["openableDir"] and _is_within(open_base, Path.cwd()):
+            # Refuse to drop the openable copy inside the repo — it could be committed/pushed.
+            print(
+                f"Warning: openableDir {open_base} is inside the repo — skipping the openable "
+                f"copy so pack artifacts can't be committed. Choose a dir outside the repo.",
+                file=sys.stderr,
+            )
+        else:
+            try:
+                open_dir = publish_openable(pack_dir, args.session_id, open_base, include_transcript)
+                print(f"Open: file://{open_dir}/index.html")
+            except Exception as ex:
+                # Buffer: the zip is the durable artifact; the openable copy is a convenience.
+                print(f"Warning: could not write openable copy: {ex}", file=sys.stderr)
 
     shutil.rmtree(pack_dir)
 
