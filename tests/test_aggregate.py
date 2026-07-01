@@ -28,3 +28,17 @@ class TestAggregate(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestAggregateSanitizesScores(unittest.TestCase):
+    def test_clamps_out_of_range_scores(self):
+        self.assertEqual(aggregate.aggregate(82, [9999], "min"), 82)   # 9999 -> 100
+        self.assertEqual(aggregate.aggregate(82, [-5], "min"), 0)      # -5 -> 0
+
+    def test_drops_non_numeric_scores(self):
+        self.assertEqual(aggregate.aggregate(80, ["high"], "min"), 80)
+        self.assertEqual(aggregate.aggregate(80, [None], "mean"), 80)
+
+    def test_bad_core_raises(self):
+        with self.assertRaises(ValueError):
+            aggregate.aggregate("nope", [50], "min")

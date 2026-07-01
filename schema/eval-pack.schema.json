@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/smalls257/eval-pack/schema/eval-pack.schema.json",
+  "$id": "https://raw.githubusercontent.com/smalls257/eval-pack/main/schema/eval-pack.schema.json",
   "title": "eval-pack configuration",
   "type": "object",
   "additionalProperties": false,

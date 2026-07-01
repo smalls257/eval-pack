@@ -255,3 +255,15 @@ class TestFailLoudRegressions(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSkillArgsMaxLenBound(unittest.TestCase):
+    def test_negative_rejected(self):
+        errs = config.validate({"skillArgsMaxLen": -1})
+        self.assertTrue(any("skillArgsMaxLen" in e for e in errs))
+
+    def test_env_list_deduped(self):
+        import tempfile as _t
+        with _t.TemporaryDirectory() as d:
+            cfg = config.load_config(d, env={"CLAUDE_PLUGIN_OPTION_frictionCategories": "a,,b,a"})
+            self.assertEqual(cfg["frictionCategories"], ["a", "b"])

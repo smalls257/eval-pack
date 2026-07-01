@@ -161,7 +161,8 @@ def _coerce(raw, typ, key):
                 "CLAUDE_PLUGIN_OPTION_{}: expected int, got {!r}".format(key, raw)
             ) from exc
     if typ is list:
-        return [s for s in raw.split(",") if s]
+        # Dedupe to match the file-layer list-merge semantics (consistency).
+        return _dedupe([s for s in raw.split(",") if s])
     return raw
 
 
@@ -236,6 +237,10 @@ def validate(cfg):
     theme = cfg.get("defaultTheme")
     if theme is not None and theme not in THEMES:
         errors.append("defaultTheme: {!r} is not one of {}".format(theme, list(THEMES)))
+    # Non-negative bound: a negative truncation length is a garbage (negative-index) slice.
+    n = cfg.get("skillArgsMaxLen")
+    if isinstance(n, int) and not isinstance(n, bool) and n < 0:
+        errors.append("skillArgsMaxLen: must be >= 0, got {}".format(n))
     return errors
 
 

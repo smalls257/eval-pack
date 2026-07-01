@@ -34,7 +34,7 @@ or `default`. Reference the JSON Schema so editors validate it:
 
 ```json
 {
-  "$schema": "https://github.com/smalls257/eval-pack/schema/eval-pack.schema.json",
+  "$schema": "https://raw.githubusercontent.com/smalls257/eval-pack/main/schema/eval-pack.schema.json",
   "testCommands": ["npm test"],
   "ticketPattern": "ABC-\\d+",
   "subjectNoun": "plugin"

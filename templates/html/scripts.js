@@ -1132,6 +1132,19 @@ function renderBranding(data) {
     const footer = document.querySelector('.footer');
     if (footer) footer.textContent = cfg.footerText;
   }
+
+  // messages: override any labeled UI string by element id, e.g. {"page-title":"…"} (i18n hook).
+  const messages = cfg.messages || {};
+  Object.keys(messages).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = messages[id];
+  });
+}
+
+// Display a lens score defensively: a finite number, else an em dash (never garbage/NaN).
+function lensScore(x) {
+  const n = Number(x);
+  return Number.isFinite(n) ? n : '—';
 }
 
 function renderLenses(data) {
@@ -1150,10 +1163,10 @@ function renderLenses(data) {
   // untrusted lens output (skill names, rationales, findings, error text).
   const parts = [];
   if (lenses.finalScore != null) {
-    parts.push(html`<p class="lens-agg">Verdict aggregation — core <strong>${lenses.coreScore}</strong> <code>${lenses.rule}</code> lenses → final <strong>${lenses.finalScore}</strong></p>`);
+    parts.push(html`<p class="lens-agg">Verdict aggregation — core <strong>${lensScore(lenses.coreScore)}</strong> <code>${lenses.rule}</code> lenses → final <strong>${lensScore(lenses.finalScore)}</strong></p>`);
   }
   (lenses.scorers || []).forEach(s => {
-    parts.push(html`<div class="lens-card"><div class="lens-meta">scorer · ${s.skill}</div><p>score <strong>${s.score}</strong> — ${s.rationale}</p></div>`);
+    parts.push(html`<div class="lens-card"><div class="lens-meta">scorer · ${s.skill}</div><p>score <strong>${lensScore(s.score)}</strong> — ${s.rationale}</p></div>`);
   });
   (lenses.contributors || []).forEach(c => {
     const findings = (c.findings || []).map(f => html`<li>${f}</li>`).join('');
