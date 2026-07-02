@@ -155,6 +155,13 @@ def read_test_verdict(output_dir):
     return data.get("verdict")
 
 
+def read_json_safe(path):
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
 def check_scope_drift(output_dir, threshold):
     metrics_path = Path(output_dir) / "metrics.json"
     if not metrics_path.is_file():
@@ -202,24 +209,39 @@ def main():
 
     test_verdict = read_test_verdict(output_dir)
 
+    # Built-in flags carry a stable id so users can retune severity per-flag.
+    sev = cfg.get("flagSeverities") or {}
+
+    def add_flag(fid, default_level, label, **extra):
+        level = sev.get(fid, default_level)
+        if level == "off":
+            return
+        flags.append(dict({"id": fid, "level": level, "label": label}, **extra))
+
     flags = []
     if test_verdict == "fail":
-        flags.append({"level": "red", "label": "Tests failing at completion"})
+        add_flag("testsFailing", "red", "Tests failing at completion")
     elif test_verdict == "pass":
-        flags.append({"level": "green", "label": "Tests passing at completion"})
+        add_flag("testsPassing", "green", "Tests passing at completion")
+    elif test_verdict not in ("", None, "none"):
+        # An unrecognized verdict must be visible, not silently identical to a clean run.
+        add_flag("unknownVerdict", "amber", f"Unknown test verdict: {test_verdict!r}")
     if false_completions:
-        flags.append({"level": "amber", "label": "False completions", "count": len(false_completions)})
+        add_flag("falseCompletions", "amber", "False completions", count=len(false_completions))
     if retry_count >= cfg["retryAmberThreshold"]:
-        flags.append({"level": "amber", "label": "High retry count", "count": retry_count})
+        add_flag("highRetry", "amber", "High retry count", count=retry_count)
     if scope_drift:
-        flags.append({"level": "amber", "label": "Scope drift — many files changed"})
+        add_flag("scopeDrift", "amber", "Scope drift — many files changed")
     if partial_session:
-        flags.append({
-            "level": "amber",
-            "label": "Partial session — earlier turns may be missing",
-        })
+        add_flag("partialSession", "amber", "Partial session — earlier turns may be missing")
+    budget = cfg.get("costBudgetTokens") or 0
+    if budget > 0:
+        metrics = read_json_safe(output_dir / "metrics.json")
+        total = (metrics or {}).get("totalTokens") or 0
+        if total > budget:
+            add_flag("overBudget", "amber", f"Over token budget ({total} > {budget})")
     if not flags:
-        flags.append({"level": "green", "label": "Clean first-pass implementation"})
+        flags.append({"id": "cleanPass", "level": "green", "label": "Clean first-pass implementation"})
 
     result = {
         "falseCompletions": false_completions,

@@ -99,3 +99,16 @@ class TestUserSpaceStance(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stderr)
             cfg = json.loads((Path(pack) / "eval-config.json").read_text())
             self.assertIn("PROJECT OVERRIDE STANCE", cfg["analysisStanceText"])
+
+
+class TestCanNeverFailWarning(unittest.TestCase):
+    def test_all_flags_disabled_warns(self):
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as pack:
+            (Path(root) / ".eval-pack.json").write_text(json.dumps({
+                "flagSeverities": {k: "off" for k in
+                    ["testsFailing", "testsPassing", "falseCompletions", "highRetry",
+                     "scopeDrift", "partialSession", "unknownVerdict", "overBudget"]}
+            }), encoding="utf-8")
+            r = _run([root, pack])
+            self.assertEqual(r.returncode, 0)          # warn, don't block
+            self.assertIn("can never fail", r.stderr)   # but say so loudly

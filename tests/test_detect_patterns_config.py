@@ -51,5 +51,42 @@ class TestConfigurableDetection(unittest.TestCase):
         self.assertEqual(len(found[0]["agentClaim"]), 10)
 
 
+class TestFlagSeverities(unittest.TestCase):
+    def _run(self, cfg_extra, metrics=None, verdict=None):
+        import subprocess
+        with tempfile.TemporaryDirectory() as d:
+            pack = Path(d)
+            (pack / "transcript.jsonl").write_text(
+                json.dumps({"type": "assistant", "message": {"content": [{"type": "text", "text": "hi"}]}}) + "\n",
+                encoding="utf-8")
+            base = dict(json.loads(json.dumps(__import__("config").DEFAULTS)))
+            base.update(cfg_extra)
+            (pack / "eval-config.json").write_text(json.dumps(base), encoding="utf-8")
+            if metrics:
+                (pack / "metrics.json").write_text(json.dumps(metrics), encoding="utf-8")
+            if verdict:
+                (pack / "test-results.json").write_text(json.dumps({"verdict": verdict}), encoding="utf-8")
+            subprocess.run(
+                [sys.executable, str(SCRIPTS / "detect_patterns.py"),
+                 str(pack / "transcript.jsonl"), str(pack), "--config", str(pack / "eval-config.json")],
+                check=True, capture_output=True, text=True)
+            return json.loads((pack / "patterns.json").read_text(encoding="utf-8"))
+
+    def test_severity_override_and_off(self):
+        out = self._run({"flagSeverities": {"testsFailing": "amber"}}, verdict="fail")
+        flag = next(f for f in out["flags"] if f["id"] == "testsFailing")
+        self.assertEqual(flag["level"], "amber")
+        out2 = self._run({"flagSeverities": {"testsFailing": "off"}}, verdict="fail")
+        self.assertFalse(any(f["id"] == "testsFailing" for f in out2["flags"]))
+
+    def test_unknown_verdict_surfaces(self):
+        out = self._run({}, verdict="banana")
+        self.assertTrue(any(f["id"] == "unknownVerdict" and f["level"] == "amber" for f in out["flags"]))
+
+    def test_cost_budget_flag(self):
+        out = self._run({"costBudgetTokens": 100}, metrics={"totalTokens": 500, "filesChanged": 0})
+        self.assertTrue(any(f["id"] == "overBudget" for f in out["flags"]))
+
+
 if __name__ == "__main__":
     unittest.main()

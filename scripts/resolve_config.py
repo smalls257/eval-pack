@@ -52,6 +52,15 @@ def main(argv=None):
         return 1
     cfg["analysisStanceText"] = preset.read_text(encoding="utf-8")
 
+    # Sensor: a verdict config where every flag is disabled can never fail — warn, don't block.
+    sev = cfg.get("flagSeverities") or {}
+    if sev and all(level == "off" for level in sev.values()) and len(sev) >= 8:
+        print(
+            "WARNING: flagSeverities disables every built-in flag — this verdict config "
+            "can never fail. Intended?",
+            file=sys.stderr,
+        )
+
     if args.check:
         print("config valid")
         return 0
