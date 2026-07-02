@@ -216,14 +216,16 @@ def report_config(cfg):
     return {k: cfg[k] for k in _REPORT_CONFIG_KEYS}
 
 
-def build_directory_structure(pack_dir, template_dir):
-    """Create pack directory layout and copy static templates."""
+def build_directory_structure(pack_dir, template_dir, user_template_dir=None):
+    """Create pack layout; copy templates project-first (user file wins, bundled fills gaps)."""
     pack_dir.mkdir(parents=True, exist_ok=True)
     (pack_dir / "screenshots").mkdir(exist_ok=True)
     (pack_dir / "logs").mkdir(exist_ok=True)
-    shutil.copy(template_dir / "index.html", pack_dir / "index.html")
-    shutil.copy(template_dir / "styles.css", pack_dir / "styles.css")
-    shutil.copy(template_dir / "scripts.js", pack_dir / "scripts.js")
+    for name in ("index.html", "styles.css", "scripts.js"):
+        src = template_dir / name
+        if user_template_dir is not None and (Path(user_template_dir) / name).is_file():
+            src = Path(user_template_dir) / name
+        shutil.copy(src, pack_dir / name)
 
 
 def load_round_inputs(pack_dir, transcript_file, scripts_dir):
@@ -462,10 +464,17 @@ def main():
     cfg_path = pack_dir / "eval-config.json"
     cfg = read_config(cfg_path if cfg_path.is_file() else None)
     redaction_rules = cfg["redaction"]
+    user_template_dir = None
+    if cfg["templateDir"]:
+        user_template_dir = Path.cwd() / cfg["templateDir"]
+        if not user_template_dir.is_dir():
+            # Fail loud: a configured override that doesn't exist must not silently use bundled.
+            print(f"Error: templateDir {user_template_dir} does not exist", file=sys.stderr)
+            sys.exit(1)
     template_dir = args.plugin_root / "templates" / "html"
     scripts_dir = args.plugin_root / "scripts"
 
-    build_directory_structure(pack_dir, template_dir)
+    build_directory_structure(pack_dir, template_dir, user_template_dir)
     load_round_inputs(pack_dir, args.transcript_file, scripts_dir)
 
     gaps = validate_pack(pack_dir)
