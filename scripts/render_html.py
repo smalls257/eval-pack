@@ -234,7 +234,11 @@ def load_round_inputs(pack_dir, transcript_file, scripts_dir):
         # merged transcript). Copying a file onto itself raises SameFileError.
         if transcript_file.resolve() != dest.resolve():
             shutil.copy(transcript_file, dest)
-        ok = run_script(scripts_dir / "extract_tools.py", [transcript_file, pack_dir])
+        tools_args = [transcript_file, pack_dir]
+        cfg_file = Path(pack_dir) / "eval-config.json"
+        if cfg_file.is_file():
+            tools_args += ["--config", cfg_file]
+        ok = run_script(scripts_dir / "extract_tools.py", tools_args)
         if not ok:
             print("Warning: extract_tools.py failed; tool data will be empty", file=sys.stderr)
 
