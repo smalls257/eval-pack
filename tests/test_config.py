@@ -285,3 +285,33 @@ class TestExtendsConfinement(unittest.TestCase):
             _write(d, "base.json", {"retryAmberThreshold": 2})
             _write(d, ".eval-pack.json", {"extends": ["base.json"]})
             self.assertEqual(config.load_config(d, env={})["retryAmberThreshold"], 2)
+
+
+class TestDetectionCostKeys(unittest.TestCase):
+    def test_new_defaults(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = config.load_config(d, env={})
+            self.assertEqual(cfg["templateDir"], "")
+            self.assertEqual(cfg["falseCompletionWindow"], 1)
+            self.assertEqual(cfg["claimTruncLen"], 120)
+            self.assertEqual(cfg["flagSeverities"], {})
+            self.assertEqual(cfg["tokenFieldNames"], ["subagent_tokens", "total_tokens"])
+            self.assertEqual(cfg["tokenWeights"], {})
+            self.assertEqual(cfg["costBudgetTokens"], 0)
+            self.assertIn("done", cfg["detectionPatterns"])
+            self.assertIn("correction", cfg["detectionPatterns"])
+            self.assertIn("retry", cfg["detectionPatterns"])
+
+    def test_detection_pattern_bad_regex_rejected(self):
+        errs = config.validate({"detectionPatterns": {"done": ["("]}})
+        self.assertTrue(any("detectionPatterns" in e for e in errs))
+
+    def test_flag_severity_enum(self):
+        self.assertEqual(config.validate({"flagSeverities": {"highRetry": "red"}}), [])
+        errs = config.validate({"flagSeverities": {"highRetry": "purple"}})
+        self.assertTrue(any("flagSeverities" in e for e in errs))
+
+    def test_token_weights_numeric(self):
+        self.assertEqual(config.validate({"tokenWeights": {"input": 2}}), [])
+        errs = config.validate({"tokenWeights": {"input": "two"}})
+        self.assertTrue(any("tokenWeights" in e for e in errs))

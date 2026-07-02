@@ -108,6 +108,22 @@
     "zipNameTemplate": { "type": "string", "default": "", "description": "Template for the zip filename." },
     "commitUrlTemplate": { "type": "string", "default": "", "description": "Template turning a commit SHA into a link." },
     "repoBaseUrl": { "type": "string", "default": "", "description": "Base URL for repo links." },
-    "messages": { "type": "object", "default": {}, "description": "Overridable UI strings (i18n)." }
+    "messages": { "type": "object", "default": {}, "description": "Overridable UI strings (i18n)." },
+    "templateDir": { "type": "string", "default": "", "description": "Project-relative dir with report template overrides; empty uses bundled." },
+    "detectionPatterns": {
+      "type": "object",
+      "default": {
+        "done": ["(?i)(done|complete|finished|all set|that should|looks good now)"],
+        "correction": ["(?i)(no|not|wrong|still|actually|but|fix|fail|error|broken|issue)"],
+        "retry": ["(?i)(try again|retry|let me try|another approach|different approach)"]
+      },
+      "description": "Heuristic detection regexes (lists OR-combined)."
+    },
+    "falseCompletionWindow": { "type": "integer", "default": 1, "description": "Entries scanned for a user correction after a completion claim." },
+    "claimTruncLen": { "type": "integer", "default": 120, "description": "Truncation length for quoted claims in patterns.json." },
+    "flagSeverities": { "type": "object", "default": {}, "description": "Per-flag severity overrides: {flagId: red|amber|green|off}." },
+    "tokenFieldNames": { "type": "array", "items": { "type": "string" }, "default": ["subagent_tokens", "total_tokens"], "description": "Accepted subagent token field names." },
+    "tokenWeights": { "type": "object", "default": {}, "description": "Optional weights for the total-token sum; empty = plain sum." },
+    "costBudgetTokens": { "type": "integer", "default": 0, "description": "Amber-flag when totalTokens exceeds this; 0 disables." }
   }
 }

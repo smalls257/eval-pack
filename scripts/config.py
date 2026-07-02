@@ -57,6 +57,28 @@ DEFAULTS = {
     "commitUrlTemplate": "",
     "repoBaseUrl": "",
     "messages": {},
+    # Project-relative dir holding report template overrides (index.html/styles.css/scripts.js);
+    # empty means the bundled templates.
+    "templateDir": "",
+    # Heuristic detection regexes (lists are OR-combined). Defaults are today's English patterns.
+    "detectionPatterns": {
+        "done": [r"(?i)(done|complete|finished|all set|that should|looks good now)"],
+        "correction": [r"(?i)(no|not|wrong|still|actually|but|fix|fail|error|broken|issue)"],
+        "retry": [r"(?i)(try again|retry|let me try|another approach|different approach)"],
+    },
+    # How many following entries to scan for a user correction after a completion claim.
+    "falseCompletionWindow": 1,
+    # Truncation length for quoted claim/response text in patterns.json.
+    "claimTruncLen": 120,
+    # Per-flag severity overrides: {flagId: "red"|"amber"|"green"|"off"}. Empty = built-in levels.
+    "flagSeverities": {},
+    # Field names accepted when parsing subagent token usage from Agent tool results.
+    "tokenFieldNames": ["subagent_tokens", "total_tokens"],
+    # Optional weights for the total-token sum: {"input","output","cacheRead","cacheWrite"}.
+    # Empty = plain unweighted sum (today's behavior).
+    "tokenWeights": {},
+    # Amber-flag the session when totalTokens exceeds this budget; 0 disables.
+    "costBudgetTokens": 0,
 }
 
 # Known keys and their expected JSON/Python types. A key absent here is "unknown"
@@ -87,6 +109,14 @@ _TYPES = {
     "commitUrlTemplate": str,
     "repoBaseUrl": str,
     "messages": dict,
+    "templateDir": str,
+    "detectionPatterns": dict,
+    "falseCompletionWindow": int,
+    "claimTruncLen": int,
+    "flagSeverities": dict,
+    "tokenFieldNames": list,
+    "tokenWeights": dict,
+    "costBudgetTokens": int,
 }
 
 # Keys consumed during merge or by editors only — never part of the resolved config.
@@ -97,6 +127,9 @@ AGGREGATION_RULES = ("core", "min", "mean")
 
 # Allowed report themes.
 THEMES = ("dark", "light", "system")
+
+# Allowed per-flag severity overrides.
+FLAG_LEVELS = ("red", "amber", "green", "off")
 
 
 def _read_json(path):
@@ -246,6 +279,27 @@ def validate(cfg):
     n = cfg.get("skillArgsMaxLen")
     if isinstance(n, int) and not isinstance(n, bool) and n < 0:
         errors.append("skillArgsMaxLen: must be >= 0, got {}".format(n))
+    dp = cfg.get("detectionPatterns")
+    if isinstance(dp, dict):
+        for group, pats in dp.items():
+            if not isinstance(pats, list):
+                errors.append("detectionPatterns.{}: expected list of regexes".format(group))
+                continue
+            for pat in pats:
+                try:
+                    re.compile(pat)
+                except re.error as exc:
+                    errors.append("detectionPatterns.{}: invalid regex {!r} ({})".format(group, pat, exc))
+    sevs = cfg.get("flagSeverities")
+    if isinstance(sevs, dict):
+        for fid, level in sevs.items():
+            if level not in FLAG_LEVELS:
+                errors.append("flagSeverities.{}: {!r} is not one of {}".format(fid, level, list(FLAG_LEVELS)))
+    weights = cfg.get("tokenWeights")
+    if isinstance(weights, dict):
+        for k, v in weights.items():
+            if isinstance(v, bool) or not isinstance(v, (int, float)):
+                errors.append("tokenWeights.{}: expected a number, got {}".format(k, type(v).__name__))
     return errors
 
 
