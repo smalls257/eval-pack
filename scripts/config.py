@@ -24,9 +24,9 @@ DEFAULTS = {
     "skillArgsMaxLen": 200,
     # Friction taxonomy the evaluator must classify into (consumed by a later layer).
     "frictionCategories": ["tooling", "structure", "naming", "docs", "other"],
-    # Commands the generate skill runs to determine the test verdict (consumed by a later layer).
+    # Commands the generate skill runs verbatim to determine the test verdict; empty = detect.
     "testCommands": [],
-    # Ticket-key regex for PR-body linking (consumed by a later layer).
+    # Ticket-key regex the review skill matches for PR-body linking.
     "ticketPattern": r"[A-Z][A-Z0-9]+-[0-9]+",
     # Regex patterns whose matches are masked in published transcripts (security).
     "redaction": [],
@@ -130,6 +130,13 @@ THEMES = ("dark", "light", "system")
 
 # Allowed per-flag severity overrides.
 FLAG_LEVELS = ("red", "amber", "green", "off")
+
+# Flag ids that can signal failure (used by the can-never-fail guard). Green-only ids
+# (testsPassing, cleanPass) are excluded — keep in sync with detect_patterns.main.
+FAILURE_FLAG_IDS = (
+    "testsFailing", "unknownVerdict", "falseCompletions",
+    "highRetry", "scopeDrift", "partialSession", "overBudget",
+)
 
 
 def _read_json(path):

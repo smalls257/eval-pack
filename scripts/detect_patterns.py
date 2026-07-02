@@ -211,10 +211,12 @@ def main():
 
     # Built-in flags carry a stable id so users can retune severity per-flag.
     sev = cfg.get("flagSeverities") or {}
+    suppressed = []
 
     def add_flag(fid, default_level, label, **extra):
         level = sev.get(fid, default_level)
         if level == "off":
+            suppressed.append(fid)
             return
         flags.append(dict({"id": fid, "level": level, "label": label}, **extra))
 
@@ -237,11 +239,25 @@ def main():
     budget = cfg.get("costBudgetTokens") or 0
     if budget > 0:
         metrics = read_json_safe(output_dir / "metrics.json")
+        if not metrics:
+            # Sensor: a configured budget must not silently no-op on missing metrics.
+            print(
+                "Warning: metrics.json missing or unreadable — token budget check skipped",
+                file=sys.stderr,
+            )
         total = (metrics or {}).get("totalTokens") or 0
         if total > budget:
             add_flag("overBudget", "amber", f"Over token budget ({total} > {budget})")
     if not flags:
-        flags.append({"id": "cleanPass", "level": "green", "label": "Clean first-pass implementation"})
+        if suppressed:
+            # Suppression must not masquerade as a clean pass — say what was hidden.
+            flags.append({
+                "id": "flagsSuppressed", "level": "amber",
+                "label": f"No flags shown — {len(suppressed)} suppressed by flagSeverities",
+                "count": len(suppressed),
+            })
+        else:
+            flags.append({"id": "cleanPass", "level": "green", "label": "Clean first-pass implementation"})
 
     result = {
         "falseCompletions": false_completions,
@@ -249,6 +265,7 @@ def main():
         "scopeDrift": scope_drift,
         "partialSession": partial_session or False,
         "flags": flags,
+        "suppressedFlags": suppressed,
     }
 
     out_path = output_dir / "patterns.json"

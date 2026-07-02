@@ -90,3 +90,13 @@ class TestFlagSeverities(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSuppressionHonesty(unittest.TestCase):
+    def test_suppressed_failure_does_not_claim_clean_pass(self):
+        # N2: testsFailing off + verdict fail must NOT render "Clean first-pass"
+        helper = TestFlagSeverities()
+        out = helper._run({"flagSeverities": {"testsFailing": "off"}}, verdict="fail")
+        self.assertFalse(any(f["id"] == "cleanPass" for f in out["flags"]))
+        self.assertTrue(any(f["id"] == "flagsSuppressed" and f["level"] == "amber" for f in out["flags"]))
+        self.assertEqual(out["suppressedFlags"], ["testsFailing"])

@@ -52,12 +52,13 @@ def main(argv=None):
         return 1
     cfg["analysisStanceText"] = preset.read_text(encoding="utf-8")
 
-    # Sensor: a verdict config where every flag is disabled can never fail — warn, don't block.
+    # Sensor: a verdict config where every failure-capable flag is disabled can never fail —
+    # warn, don't block. Derived from FAILURE_FLAG_IDS so it can't rot when flags are added.
     sev = cfg.get("flagSeverities") or {}
-    if sev and all(level == "off" for level in sev.values()) and len(sev) >= 8:
+    if sev and all(sev.get(fid) == "off" for fid in config.FAILURE_FLAG_IDS):
         print(
-            "WARNING: flagSeverities disables every built-in flag — this verdict config "
-            "can never fail. Intended?",
+            "WARNING: flagSeverities disables every failure-capable flag — this verdict "
+            "config can never fail. Intended?",
             file=sys.stderr,
         )
 
