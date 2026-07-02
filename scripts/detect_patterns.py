@@ -247,14 +247,16 @@ def main():
             )
         total = (metrics or {}).get("totalTokens") or 0
         if total > budget:
-            add_flag("overBudget", "amber", f"Over token budget ({total} > {budget})")
+            # "incl. cache" disambiguates from the report header's cache-exclusive token stat.
+            add_flag("overBudget", "amber",
+                     f"Over token budget ({total:,} incl. cache > {budget:,})")
     if not flags:
         if suppressed:
             # Suppression must not masquerade as a clean pass — say what was hidden.
+            # No `count` field: the renderer appends " (count)" and the label already says it.
             flags.append({
                 "id": "flagsSuppressed", "level": "amber",
                 "label": f"No flags shown — {len(suppressed)} suppressed by flagSeverities",
-                "count": len(suppressed),
             })
         else:
             flags.append({"id": "cleanPass", "level": "green", "label": "Clean first-pass implementation"})
