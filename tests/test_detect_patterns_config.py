@@ -23,5 +23,33 @@ class TestScopeDriftThreshold(unittest.TestCase):
             self.assertFalse(detect_patterns.check_scope_drift(d, threshold=10))
 
 
+def _entry(etype, text):
+    return {"type": etype, "message": {"content": [{"type": "text", "text": text}]}}
+
+
+class TestConfigurableDetection(unittest.TestCase):
+    def test_custom_done_pattern(self):
+        entries = [_entry("assistant", "task fertig jetzt"), _entry("user", "nein, broken")]
+        rx = detect_patterns.compile_patterns({"done": [r"(?i)fertig"],
+                                               "correction": [r"(?i)(nein|broken)"],
+                                               "retry": [r"(?i)nochmal"]})
+        found = detect_patterns.detect_false_completions(entries, rx, window=1, trunc=120)
+        self.assertEqual(len(found), 1)
+
+    def test_window_extends_reach(self):
+        entries = [_entry("assistant", "all done"),
+                   _entry("assistant", "wrapping up"),
+                   _entry("user", "no, still broken")]
+        rx = detect_patterns.compile_patterns(detect_patterns.DEFAULT_PATTERNS)
+        self.assertEqual(len(detect_patterns.detect_false_completions(entries, rx, window=1, trunc=120)), 0)
+        self.assertEqual(len(detect_patterns.detect_false_completions(entries, rx, window=2, trunc=120)), 1)
+
+    def test_trunc_len_applied(self):
+        entries = [_entry("assistant", "done " + "x" * 300), _entry("user", "no, wrong")]
+        rx = detect_patterns.compile_patterns(detect_patterns.DEFAULT_PATTERNS)
+        found = detect_patterns.detect_false_completions(entries, rx, window=1, trunc=10)
+        self.assertEqual(len(found[0]["agentClaim"]), 10)
+
+
 if __name__ == "__main__":
     unittest.main()

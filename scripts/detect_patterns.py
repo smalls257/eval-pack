@@ -48,30 +48,60 @@ def is_human(entry):
     return entry.get("type") in ("user", "human")
 
 
-DONE_RE = re.compile(r"(?i)(done|complete|finished|all set|that should|looks good now)")
-CORRECTION_RE = re.compile(r"(?i)(no|not|wrong|still|actually|but|fix|fail|error|broken|issue)")
-RETRY_RE = re.compile(r"(?i)(try again|retry|let me try|another approach|different approach)")
+# Defaults mirror config.DEFAULTS["detectionPatterns"]; kept here so the module works standalone.
+DEFAULT_PATTERNS = {
+    "done": [r"(?i)(done|complete|finished|all set|that should|looks good now)"],
+    "correction": [r"(?i)(no|not|wrong|still|actually|but|fix|fail|error|broken|issue)"],
+    "retry": [r"(?i)(try again|retry|let me try|another approach|different approach)"],
+}
 
 
-def detect_false_completions(entries):
+# A leading global flag group like (?i)… must be rewritten to a scoped (?i:…)
+# before OR-joining: Python 3.11+ rejects global flags anywhere but position 0.
+_GLOBAL_FLAGS_RE = re.compile(r"^\(\?([aiLmsux]+)\)")
+
+
+def _scoped(pat):
+    m = _GLOBAL_FLAGS_RE.match(pat)
+    if m:
+        return "(?{}:{})".format(m.group(1), pat[m.end():])
+    return "(?:{})".format(pat)
+
+
+def compile_patterns(patterns):
+    """OR-combine each group's regex list into one compiled pattern per group."""
+    return {
+        group: re.compile("|".join(_scoped(p) for p in pats))
+        for group, pats in patterns.items()
+    }
+
+
+def detect_false_completions(entries, rx, window, trunc):
     result = []
     for i in range(len(entries) - 1):
-        if entries[i].get("type") == "assistant" and is_human(entries[i + 1]):
-            agent_text = entry_text(entries[i])
-            user_text = entry_text(entries[i + 1])
-            if DONE_RE.search(agent_text) and CORRECTION_RE.search(user_text):
+        if entries[i].get("type") != "assistant":
+            continue
+        agent_text = entry_text(entries[i])
+        if not rx["done"].search(agent_text):
+            continue
+        for j in range(i + 1, min(i + 1 + window, len(entries))):
+            if not is_human(entries[j]):
+                continue
+            user_text = entry_text(entries[j])
+            if rx["correction"].search(user_text):
                 result.append({
                     "turn": i,
-                    "agentClaim": agent_text[:120],
-                    "userResponse": user_text[:120],
+                    "agentClaim": agent_text[:trunc],
+                    "userResponse": user_text[:trunc],
                 })
+            break  # judge only the first human reply in the window
     return result
 
 
-def detect_retries(entries):
+def detect_retries(entries, retry_re):
     return sum(
         1 for e in entries
-        if e.get("type") == "assistant" and RETRY_RE.search(entry_text(e))
+        if e.get("type") == "assistant" and retry_re.search(entry_text(e))
     )
 
 
@@ -151,6 +181,7 @@ def main():
     parser.add_argument("--config", default=None, help="Path to resolved eval-config.json")
     args = parser.parse_args()
     cfg = read_config(args.config)
+    rx = compile_patterns(cfg.get("detectionPatterns") or DEFAULT_PATTERNS)
 
     transcript_file = Path(args.transcript)
     output_dir = Path(args.output_dir)
@@ -162,8 +193,10 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
     entries = load_jsonl(transcript_file)
 
-    false_completions = detect_false_completions(entries)
-    retry_count = detect_retries(entries)
+    false_completions = detect_false_completions(
+        entries, rx, cfg["falseCompletionWindow"], cfg["claimTruncLen"]
+    )
+    retry_count = detect_retries(entries, rx["retry"])
     scope_drift = check_scope_drift(output_dir, cfg["scopeDriftFileThreshold"])
     partial_session = detect_partial_session(entries)
 
