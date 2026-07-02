@@ -300,6 +300,9 @@ def validate(cfg):
         for k, v in weights.items():
             if isinstance(v, bool) or not isinstance(v, (int, float)):
                 errors.append("tokenWeights.{}: expected a number, got {}".format(k, type(v).__name__))
+    # An empty field-name list would compile to a match-anything token regex — refuse it.
+    if cfg.get("tokenFieldNames") == []:
+        errors.append("tokenFieldNames: must not be empty")
     return errors
 
 

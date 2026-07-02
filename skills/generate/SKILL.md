@@ -133,6 +133,11 @@ If the transcript path is not available or the script fails, continue — `rende
 
 ## Step 3: Run Tests
 
+First read `testCommands` from `${PACK_DIR}/eval-config.json`. **If it is non-empty, run EXACTLY
+those commands** (in order, from the repo root), capture each command's real exit code and output,
+and base the test verdict on those real exit codes — do not guess at runners. Only when
+`testCommands` is empty fall back to the detection heuristics below:
+
 Identify and run appropriate tests for the changes made in this session:
 
 1. Check what files were changed using `git diff --name-only`

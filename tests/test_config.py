@@ -315,3 +315,9 @@ class TestDetectionCostKeys(unittest.TestCase):
         self.assertEqual(config.validate({"tokenWeights": {"input": 2}}), [])
         errs = config.validate({"tokenWeights": {"input": "two"}})
         self.assertTrue(any("tokenWeights" in e for e in errs))
+
+
+class TestTokenFieldNamesGuard(unittest.TestCase):
+    def test_empty_list_rejected(self):
+        errs = config.validate({"tokenFieldNames": []})
+        self.assertTrue(any("tokenFieldNames" in e for e in errs))
