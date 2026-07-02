@@ -103,7 +103,8 @@ Run the extract-metrics script against the current session transcript:
   --insertions "${INSERTIONS}" \
   --deletions "${DELETIONS}" \
   --files-changed "${FILES_CHANGED}" \
-  --changed-files "${CHANGED_FILES}"
+  --changed-files "${CHANGED_FILES}" \
+  --config "${PACK_DIR}/eval-config.json"
 ```
 
 Where:
