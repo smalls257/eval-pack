@@ -14,6 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))  # noqa: E402
 import redact  # noqa: E402
+import validate_contracts  # noqa: E402
 from config import read_config  # noqa: E402
 
 
@@ -435,6 +436,10 @@ def validate_pack(pack_dir):
     metrics = read_json(pack_dir / "metrics.json")
     if not metrics or not metrics.get("turnCount"):
         gaps.append("metrics.json missing or has no turnCount (metric extraction did not run)")
+
+    # Deterministic backstop: even if the orchestrating skill skipped the contract gate,
+    # a non-conforming pack must not render.
+    gaps.extend(validate_contracts.collect_gaps(pack_dir))
 
     return gaps
 

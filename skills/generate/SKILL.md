@@ -138,6 +138,22 @@ those commands** (in order, from the repo root), capture each command's real exi
 and base the test verdict on those real exit codes — do not guess at runners. Only when
 `testCommands` is empty fall back to the detection heuristics below:
 
+When `testCommands` ran, `test-results.json` MUST record the proof — one entry per configured
+command, verbatim, with its real exit code — and the verdict MUST follow the exit codes
+(all zero → `pass`, any nonzero → `fail`). A validator enforces this mechanically:
+
+```json
+{
+  "verdict": "fail",
+  "summary": "1 of 2 configured commands failed",
+  "commands": [
+    {"command": "<verbatim from testCommands>", "exitCode": 0},
+    {"command": "<verbatim from testCommands>", "exitCode": 1}
+  ],
+  "testsRun": [ {"name": "…", "passed": false, "output": "…"} ]
+}
+```
+
 Identify and run appropriate tests for the changes made in this session:
 
 1. Check what files were changed using `git diff --name-only`
@@ -241,6 +257,17 @@ Wait for the agent to finish. Confirm `${ABS_PACK_DIR}/analysis.json` exists and
 `title`. If it is missing or empty, the evaluator failed — re-dispatch once; if it
 fails again, stop and tell the user the analysis step failed. Do NOT write the
 analysis yourself as a fallback — that reintroduces the bias this step exists to remove.
+
+Then run the deterministic contract gate — it checks the analysis and test results against the
+resolved config (friction taxonomy, retrospective answers, rubric band, test-command proof):
+
+```bash
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/validate_contracts.py" "${ABS_PACK_DIR}"
+```
+
+If it exits non-zero: re-dispatch the evaluator ONCE, passing the printed `CONTRACT:` lines as
+corrections to address. If it fails again, STOP and show the user the violations — do not render.
+(render_html enforces the same gate; skipping this step cannot ship a non-conforming pack.)
 
 **If analysis is disabled** (`analysis` option is false):
 

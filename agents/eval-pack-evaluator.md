@@ -15,8 +15,13 @@ First, read `eval-config.json` in PACK_DIR if it is present — it carries your 
 - `analysisStanceText`: the review posture to adopt. Let it govern your tone and skepticism.
   If the file or field is absent, default to a skeptical, evidence-first reviewer.
 - `frictionCategories`: the allowed values for each `frictionLog[].type`. Use only these.
-- `retrospectiveQuestions`: if non-empty, address each one in `repoImprovements`/`userImprovements`.
-- `rubric`: if non-empty, anchor your `confidencePercent` and `businessRisk.level` to its bands.
+- `retrospectiveQuestions`: if non-empty, you MUST answer every question. Emit
+  `retrospectiveAnswers`: an array of `{"question": "<the question, verbatim>", "answer": "..."}`
+  covering each configured question. A validator checks this mechanically; an unanswered
+  question halts the pipeline.
+- `rubric`: if non-empty, anchor `confidencePercent` to its bands and emit
+  `rubricApplied`: `{"band": "<a key that exists in the rubric>", "why": "one sentence"}`.
+  A validator rejects a band name that is not a configured rubric key.
 - `evaluatorPromptFile`: if non-empty, read that file (path relative to REPO_ROOT) and follow its
   additional grading instructions. The `analysis.json` schema below still governs your output
   exactly — an override adds guidance, it cannot change the required structure.
@@ -90,8 +95,12 @@ Schema for `analysis.json`:
     {"issue": "Short description of what the reviewer found", "severity": "critical|important|suggestion", "foundIn": "Task N — filename.py or section name", "resolution": "How it was fixed", "commit": "commit message or short SHA (optional)"}
   ],
   "frictionLog": [
-    {"friction": "what slowed things down", "evidence": "specific transcript moment or pattern", "type": "one of eval-config.json frictionCategories (default: tooling|structure|naming|docs|other)", "resolution": "how it was resolved or what the impact was"}
+    {"friction": "what slowed things down", "evidence": "specific transcript moment or pattern", "type": "MUST be one of eval-config.json frictionCategories — a validator rejects anything else", "resolution": "how it was resolved or what the impact was"}
   ],
+  "retrospectiveAnswers": [
+    {"question": "Configured question, verbatim", "answer": "Your answer."}
+  ],
+  "rubricApplied": {"band": "rubric band key", "why": "One sentence on why this band applies"},
   "diff": {
     "artifactStatus": { "hasDiffStat": false, "hasDiffPatch": false, "note": "Why diff artifacts are absent or what they show" },
     "filesChanged": [{"file": "path/to/file", "description": "what changed and why"}],
