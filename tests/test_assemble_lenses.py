@@ -131,6 +131,63 @@ class TestLensGates(unittest.TestCase):
             patterns = json.loads((pack / "patterns.json").read_text(encoding="utf-8"))
             self.assertEqual(patterns["flags"], [])  # Airplane Test: zero lenses = untouched
 
+    def test_corrupt_patterns_warns_loudly(self):
+        import io, contextlib
+        with tempfile.TemporaryDirectory() as d:
+            pack = Path(d)
+            (pack / "lenses").mkdir()
+            (pack / "analysis.json").write_text(
+                json.dumps({"highlights": {"confidencePercent": 90}}), encoding="utf-8")
+            (pack / "patterns.json").write_text("{not json", encoding="utf-8")
+            self._cfg(d, [{"skill": "ghost-lens", "role": "scorer"}])
+            out = assemble_lenses.assemble(d)
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                assemble_lenses.write_outputs(d, out)
+            self.assertIn("patterns.json was unreadable", err.getvalue())
+
+    def test_lensverdict_honors_flagseverities_lensfailed_does_not(self):
+        with tempfile.TemporaryDirectory() as d:
+            pack = Path(d)
+            (pack / "lenses").mkdir()
+            (pack / "lenses" / "perf.json").write_text(
+                json.dumps({"skill": "perf", "role": "scorer", "score": 10, "rationale": "r"}),
+                encoding="utf-8")
+            (pack / "analysis.json").write_text(
+                json.dumps({"highlights": {"confidencePercent": 90}}), encoding="utf-8")
+            (pack / "patterns.json").write_text(json.dumps({"flags": []}), encoding="utf-8")
+            import config as _config
+            base = dict(json.loads(json.dumps(_config.DEFAULTS)))
+            base["analysisLenses"] = [{"skill": "perf", "role": "scorer"},
+                                       {"skill": "ghost", "role": "scorer"}]
+            base["verdictAggregation"] = "min"
+            base["flagSeverities"] = {"lensVerdict": "off", "lensFailed": "off"}
+            (pack / "eval-config.json").write_text(json.dumps(base), encoding="utf-8")
+            out = assemble_lenses.assemble(d)
+            assemble_lenses.write_outputs(d, out)
+            patterns = json.loads((pack / "patterns.json").read_text(encoding="utf-8"))
+            self.assertFalse(any(f["id"] == "lensVerdict" for f in patterns["flags"]))  # honored
+            self.assertTrue(any(f["id"] == "lensFailed" for f in patterns["flags"]))    # NOT suppressible
+
+    def test_write_outputs_idempotent_on_rerun(self):
+        with tempfile.TemporaryDirectory() as d:
+            pack = Path(d)
+            (pack / "lenses").mkdir()
+            (pack / "analysis.json").write_text(
+                json.dumps({"highlights": {"confidencePercent": 90}}), encoding="utf-8")
+            (pack / "patterns.json").write_text(
+                json.dumps({"flags": [{"id": "highRetry", "level": "amber",
+                                        "label": "High retry count", "count": 7}]}),
+                encoding="utf-8")
+            self._cfg(d, [{"skill": "ghost-lens", "role": "scorer"}])
+            out = assemble_lenses.assemble(d)
+            assemble_lenses.write_outputs(d, out)
+            assemble_lenses.write_outputs(d, out)  # re-run
+            patterns = json.loads((pack / "patterns.json").read_text(encoding="utf-8"))
+            self.assertEqual(sum(1 for f in patterns["flags"] if f["id"] == "lensFailed"), 1)
+            retry = next(f for f in patterns["flags"] if f["id"] == "highRetry")
+            self.assertEqual(retry["count"], 7)  # detect flags survive untouched
+
 
 if __name__ == "__main__":
     unittest.main()

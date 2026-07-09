@@ -74,8 +74,14 @@ def assemble(pack_dir):
     return out
 
 
-def _lens_flags(out):
-    """Deterministic flags for the verdict banner (rides the tested patterns pipeline)."""
+def _lens_flags(out, sev):
+    """Deterministic flags for the verdict banner (rides the tested patterns pipeline).
+
+    lensFailed is intentionally NOT suppressible via flagSeverities: it is the
+    can't-vanish gate for configured lenses — a config that could turn it off would
+    recreate the silent-vanishing hole it exists to close. lensVerdict honors the
+    user's flagSeverities retune like every other flag id.
+    """
     flags = []
     for f in out.get("failures", []):
         flags.append({"id": "lensFailed", "level": "red",
@@ -83,9 +89,11 @@ def _lens_flags(out):
                           f.get("skill", "?"), f.get("error", "error"))})
     core, final = out.get("coreScore"), out.get("finalScore")
     if final is not None and core is not None and final < core:
-        flags.append({"id": "lensVerdict", "level": "amber",
-                      "label": "Lens verdict: final {:g} ({} of core {:g} and {} scorer(s))".format(
-                          final, out.get("rule"), core, len(out.get("scorers", [])))})
+        level = sev.get("lensVerdict", "amber")
+        if level != "off":
+            flags.append({"id": "lensVerdict", "level": level,
+                          "label": "Lens verdict: final {:g} ({} of core {:g} and {} scorer(s))".format(
+                              final, out.get("rule"), core, len(out.get("scorers", [])))})
     return flags
 
 
@@ -93,13 +101,20 @@ def write_outputs(pack_dir, out):
     """Write lenses.json and append lens flags into patterns.json (never crash the eval)."""
     pack = Path(pack_dir)
     (pack / "lenses.json").write_text(json.dumps(out, indent=2), encoding="utf-8")
-    new_flags = _lens_flags(out)
+    cfg_path = pack / "eval-config.json"
+    cfg = config.read_config(str(cfg_path)) if cfg_path.is_file() else config.read_config()
+    new_flags = _lens_flags(out, cfg.get("flagSeverities") or {})
     if not new_flags:
         return
     ppath = pack / "patterns.json"
     try:
         patterns = json.loads(ppath.read_text(encoding="utf-8")) if ppath.is_file() else {"flags": []}
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as exc:
+        print(
+            "Warning: patterns.json was unreadable ({}) — heuristic flags lost; "
+            "writing lens flags only".format(exc),
+            file=sys.stderr,
+        )
         patterns = {"flags": []}
     existing = patterns.setdefault("flags", [])
     # idempotent on re-run: drop prior lens flags before appending
