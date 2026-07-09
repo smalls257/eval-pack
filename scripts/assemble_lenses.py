@@ -31,6 +31,19 @@ def assemble(pack_dir):
                 results.append({"skill": f.stem, "role": "unknown",
                                 "error": "malformed or unreadable lens output"})
 
+    cfg_path = pack / "eval-config.json"
+    cfg = config.read_config(str(cfg_path)) if cfg_path.is_file() else config.read_config()
+    rule = cfg.get("verdictAggregation", "core")
+
+    # Deterministic gate: a configured lens with no output file is a FAILURE, not an absence.
+    # The orchestrator is an LLM; prose promises don't count. (finding: vanishing lens)
+    produced = {r.get("skill") for r in results}
+    for lens in cfg.get("analysisLenses") or []:
+        skill = lens.get("skill")
+        if skill and skill not in produced:
+            results.append({"skill": skill, "role": lens.get("role", "unknown"),
+                            "error": "configured lens produced no output"})
+
     def _ok(r):
         return "error" not in r
 
@@ -40,10 +53,6 @@ def assemble(pack_dir):
     # A scorer that ran but returned a non-numeric score is a failure, not silently dropped.
     failures = [r for r in results if not _ok(r)
                 or (r.get("role") == "scorer" and r not in scorers)]
-
-    cfg_path = pack / "eval-config.json"
-    cfg = config.read_config(str(cfg_path)) if cfg_path.is_file() else config.read_config()
-    rule = cfg.get("verdictAggregation", "core")
 
     analysis_path = pack / "analysis.json"
     analysis = {}
@@ -65,12 +74,45 @@ def assemble(pack_dir):
     return out
 
 
+def _lens_flags(out):
+    """Deterministic flags for the verdict banner (rides the tested patterns pipeline)."""
+    flags = []
+    for f in out.get("failures", []):
+        flags.append({"id": "lensFailed", "level": "red",
+                      "label": "Lens failed: {} ({})".format(
+                          f.get("skill", "?"), f.get("error", "error"))})
+    core, final = out.get("coreScore"), out.get("finalScore")
+    if final is not None and core is not None and final < core:
+        flags.append({"id": "lensVerdict", "level": "amber",
+                      "label": "Lens verdict: final {:g} ({} of core {:g} and {} scorer(s))".format(
+                          final, out.get("rule"), core, len(out.get("scorers", [])))})
+    return flags
+
+
+def write_outputs(pack_dir, out):
+    """Write lenses.json and append lens flags into patterns.json (never crash the eval)."""
+    pack = Path(pack_dir)
+    (pack / "lenses.json").write_text(json.dumps(out, indent=2), encoding="utf-8")
+    new_flags = _lens_flags(out)
+    if not new_flags:
+        return
+    ppath = pack / "patterns.json"
+    try:
+        patterns = json.loads(ppath.read_text(encoding="utf-8")) if ppath.is_file() else {"flags": []}
+    except json.JSONDecodeError:
+        patterns = {"flags": []}
+    existing = patterns.setdefault("flags", [])
+    # idempotent on re-run: drop prior lens flags before appending
+    patterns["flags"] = [f for f in existing if f.get("id") not in ("lensFailed", "lensVerdict")] + new_flags
+    ppath.write_text(json.dumps(patterns, indent=2), encoding="utf-8")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Assemble lens outputs into lenses.json")
     parser.add_argument("pack_dir")
     args = parser.parse_args(argv)
     out = assemble(args.pack_dir)
-    (Path(args.pack_dir) / "lenses.json").write_text(json.dumps(out, indent=2), encoding="utf-8")
+    write_outputs(args.pack_dir, out)
     print("lenses.json: {} contributors, {} scorers, {} failures".format(
         len(out["contributors"]), len(out["scorers"]), len(out["failures"])))
     return 0
