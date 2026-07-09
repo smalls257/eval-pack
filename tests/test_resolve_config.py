@@ -87,6 +87,18 @@ class TestPromptFileGate(unittest.TestCase):
             r = _run([root, pack])
             self.assertEqual(r.returncode, 0, r.stderr)
 
+    def test_escaping_prompt_file_halts(self):
+        with tempfile.TemporaryDirectory() as outer:
+            (Path(outer) / "evil.md").write_text("x", encoding="utf-8")
+            root = Path(outer) / "repo"
+            root.mkdir()
+            (root / ".eval-pack.json").write_text(
+                json.dumps({"evaluatorPromptFile": "../evil.md"}), encoding="utf-8")
+            with tempfile.TemporaryDirectory() as pack:
+                r = _run([str(root), pack])
+                self.assertEqual(r.returncode, 1)
+                self.assertIn("outside the repo", r.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

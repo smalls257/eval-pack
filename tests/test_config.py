@@ -282,6 +282,17 @@ class TestResolveTimeGates(unittest.TestCase):
             self.assertEqual(cfg["redaction"], ["secret{1,3}"])  # comma survives (JSON, not split)
             self.assertEqual(cfg["rubric"], {"high": "ship"})
 
+    def test_redaction_env_comma_shorthand_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(config.ConfigError) as ctx:
+                config.load_config(d, env={"CLAUDE_PLUGIN_OPTION_redaction": "secret{1,3}"})
+            self.assertIn("JSON array", str(ctx.exception))
+
+    def test_env_json_list_deduped(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = config.load_config(d, env={"CLAUDE_PLUGIN_OPTION_frictionCategories": '["a","a","b"]'})
+            self.assertEqual(cfg["frictionCategories"], ["a", "b"])
+
 
 if __name__ == "__main__":
     unittest.main()

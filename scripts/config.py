@@ -122,6 +122,10 @@ _TYPES = {
 # Keys consumed during merge or by editors only — never part of the resolved config.
 _META_KEYS = {"extends", "$schema"}
 
+# List keys whose elements are regexes — comma shorthand would corrupt them (e.g. "a{1,3}"),
+# so env overrides for these MUST be JSON arrays.
+_COMMA_UNSAFE_KEYS = {"redaction"}
+
 # Allowed verdict aggregation rules (shared with scripts/aggregate.py).
 AGGREGATION_RULES = ("core", "min", "mean")
 
@@ -184,6 +188,13 @@ def _fresh_defaults():
 
 
 def _coerce(raw, typ, key):
+    """Coerce a raw env string to typ.
+
+    Encoding contract: values starting with '[' or '{' are parsed as JSON (the only
+    way to express dicts, nested values, or comma-containing elements like regexes);
+    other list values use the comma shorthand for simple token lists. Regex-bearing
+    list keys (_COMMA_UNSAFE_KEYS) reject the shorthand outright.
+    """
     if typ is bool:
         low = raw.strip().lower()
         if low in ("1", "true", "yes", "on"):
@@ -211,11 +222,16 @@ def _coerce(raw, typ, key):
             if not isinstance(val, typ):
                 raise ConfigError("CLAUDE_PLUGIN_OPTION_{}: expected {}, got {}".format(
                     key, typ.__name__, type(val).__name__))
-            return val
+            # Dedupe to match the file-layer list-merge semantics (consistency).
+            return _dedupe(val) if typ is list else val
         if typ is dict:
             raise ConfigError(
                 "CLAUDE_PLUGIN_OPTION_{}: dict values must be JSON (e.g. '{{\"k\": \"v\"}}')".format(key))
-        # legacy comma-list shorthand for simple values
+        if key in _COMMA_UNSAFE_KEYS:
+            raise ConfigError(
+                "CLAUDE_PLUGIN_OPTION_{}: values may contain commas (regexes) — "
+                "use a JSON array, e.g. '[\"secret{{1,3}}\"]'".format(key))
+        # legacy comma-list shorthand for simple token lists
         return _dedupe([s for s in raw.split(",") if s])
     return raw
 

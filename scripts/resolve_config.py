@@ -53,10 +53,20 @@ def main(argv=None):
     cfg["analysisStanceText"] = preset.read_text(encoding="utf-8")
 
     prompt_file = cfg.get("evaluatorPromptFile") or ""
-    if prompt_file and not (Path(args.project_root) / prompt_file).is_file():
-        print("ERROR: evaluatorPromptFile {!r} not found under {}".format(
-            prompt_file, args.project_root), file=sys.stderr)
-        return 1
+    if prompt_file:
+        # Confine to the repo (same rule as extends presets): reject ../ escapes and
+        # absolute out-of-repo paths — Path(root) / absolute yields the absolute path.
+        root_resolved = Path(args.project_root).resolve()
+        ppath = (Path(args.project_root) / prompt_file)
+        resolved = ppath.resolve()
+        if not (resolved == root_resolved or root_resolved in resolved.parents):
+            print("ERROR: evaluatorPromptFile {!r} resolves outside the repo".format(prompt_file),
+                  file=sys.stderr)
+            return 1
+        if not ppath.is_file():
+            print("ERROR: evaluatorPromptFile {!r} not found under {}".format(
+                prompt_file, args.project_root), file=sys.stderr)
+            return 1
 
     # Sensor: a verdict config where every failure-capable flag is disabled can never fail —
     # warn, don't block. Derived from FAILURE_FLAG_IDS so it can't rot when flags are added.
