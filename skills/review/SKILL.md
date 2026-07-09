@@ -84,7 +84,7 @@ Find the ticket key in this order, stopping at the first hit:
 ### Build the ticket line
 
 - If you have a full `TICKET_URL` (user pasted a URL): the line is `Ticket: <TICKET_URL>`.
-- Else if you have a bare `TICKET` key AND the plugin config `ticketBaseUrl` is non-empty:
+- Else if you have a bare `TICKET` key AND `ticketBaseUrl` from the resolved config (`.eval-pack.json` or legacy plugin option) is non-empty:
   the line is `Ticket: [<TICKET>](<ticketBaseUrl><TICKET>)`.
 - Else if you have a bare `TICKET` key and no `ticketBaseUrl`: the line is `Ticket: <TICKET>`.
 - Else (no ticket): omit the entire `## Ticket` section from the body.

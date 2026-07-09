@@ -294,6 +294,21 @@ class TestResolveTimeGates(unittest.TestCase):
             self.assertEqual(cfg["frictionCategories"], ["a", "b"])
 
 
+class TestUnifiedKeys(unittest.TestCase):
+    def test_new_defaults(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = config.load_config(d, env={})
+            self.assertEqual(cfg["outputDir"], ".eval-packs")
+            self.assertIs(cfg["analysis"], True)
+            self.assertIs(cfg["includeTranscript"], True)
+            self.assertEqual(cfg["ticketBaseUrl"], "")
+
+    def test_legacy_env_layer_still_wins(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = config.load_config(d, env={"CLAUDE_PLUGIN_OPTION_includeTranscript": "false"})
+            self.assertIs(cfg["includeTranscript"], False)
+
+
 if __name__ == "__main__":
     unittest.main()
 

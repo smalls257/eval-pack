@@ -82,6 +82,12 @@ DEFAULTS = {
     "tokenWeights": {},
     # Amber-flag the session when totalTokens exceeds this budget; 0 disables.
     "costBudgetTokens": 0,
+    # Pipeline options, unified from the legacy pluginConfigs home. The
+    # CLAUDE_PLUGIN_OPTION_* env layer keeps old plugin-option settings working.
+    "outputDir": ".eval-packs",
+    "analysis": True,
+    "includeTranscript": True,
+    "ticketBaseUrl": "",
 }
 
 # Known keys and their expected JSON/Python types. A key absent here is "unknown"
@@ -120,6 +126,10 @@ _TYPES = {
     "tokenFieldNames": list,
     "tokenWeights": dict,
     "costBudgetTokens": int,
+    "outputDir": str,
+    "analysis": bool,
+    "includeTranscript": bool,
+    "ticketBaseUrl": str,
 }
 
 # Keys consumed during merge or by editors only — never part of the resolved config.

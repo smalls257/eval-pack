@@ -109,7 +109,7 @@ Run the extract-metrics script against the current session transcript:
 
 Where:
 - `TRANSCRIPT_PATH` is the transcript file for this session
-- `PACK_DIR` is `<outputDir>/<session-id>` (outputDir from plugin config, default `.eval-packs`; session-id from current session)
+- `PACK_DIR` is `<outputDir>/<session-id>` (`outputDir` from the resolved `eval-config.json`, default `.eval-packs` — legacy plugin option still works via the env layer; session-id from current session)
 
 If the transcript path is not available, read the conversation history from context and write it to `${PACK_DIR}/transcript.jsonl` in JSONL format with fields: `type` (human/assistant), `timestamp`, `content`, and for assistant turns: `model`, `usage.input_tokens`, `usage.output_tokens`.
 
@@ -234,7 +234,7 @@ First compute the diff base (same logic as Step 0):
 
 - If `HEAD~1` exists, `DIFF_BASE=HEAD~1`; otherwise `DIFF_BASE=4b825dc642cb6eb9a060e54bf8d69288fbee4904` (empty tree).
 
-**If analysis is enabled** (plugin config `analysis` option, default true):
+**If analysis is enabled** (`analysis` in the resolved `eval-config.json`, default true):
 
 Resolve `PACK_DIR` to an absolute path and capture the repo root before dispatching, so
 the sub-agent (which may run from a different working directory) resolves files and git

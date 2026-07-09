@@ -406,7 +406,13 @@ def publish_openable(pack_dir, session_id, open_base, include_transcript=True):
 
 
 def _include_transcript():
-    """Read the includeTranscript userConfig (env). Default true."""
+    """Legacy shim: read includeTranscript straight from the env var. Default true.
+
+    main() now reads includeTranscript off the resolved config (cfg) instead,
+    so file-layer and .eval-pack.local.json overrides take effect there. This
+    function is kept only because tests exercise the raw env-var behavior
+    directly; it is no longer called from main().
+    """
     val = os.environ.get("CLAUDE_PLUGIN_OPTION_includeTranscript", "true")
     return str(val).strip().lower() not in ("false", "0", "no")
 
@@ -550,7 +556,7 @@ def main():
     # tools.json, transcript.jsonl, …) before zip/publish. transcript.html was masked at source.
     redact_pack(pack_dir, redaction_rules)
 
-    include_transcript = _include_transcript()
+    include_transcript = bool(cfg["includeTranscript"])
     write_zip(pack_dir, zip_path, args.session_id, include_transcript)
     print(f"Eval pack rendered to {zip_path}")
 
