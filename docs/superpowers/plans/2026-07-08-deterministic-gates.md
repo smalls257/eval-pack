@@ -2,7 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Convert every instruction-level promise in the eval-pack customization surface into a deterministic, code-enforced gate — and close the adversarial findings (cosmetic lens verdict, vanishing lenses, undiscoverable surface, unverifiable prompt knobs).
+**Goal:** Convert every instruction-level promise in the eval-pack customization surface into a deterministic, code-enforced gate; close the adversarial findings (cosmetic lens verdict, vanishing lenses, undiscoverable surface, unverifiable prompt knobs); and complete the developer loop — a cheap tune/re-evaluate cycle plus user-defined deterministic detectors (declarative + script) feeding the gated flags→verdict pipeline.
+
+**Execution order:** Tasks 1–8, then 11–14, then 9 (verification) and 10 (push/PR) LAST.
 
 **Architecture (the governing principle, from the user):** *We don't trust LLMs; we trust the harness and validation. Anything without a deterministic stop/gate is assumed broken.* Concretely: LLM-produced artifacts (analysis.json, test-results.json, lens outputs) are validated by scripts against the resolved config; violations HALT (or surface as red flags) via code paths that always run. Lens verdict influence flows through the already-tested `patterns.json` flags → `renderVerdict` pipeline (Python emits flags; the banner triage is existing, covered code). `render_html.py` is the backstop gate — it refuses to render a non-conforming pack even if the orchestrating LLM skips a step.
 
@@ -985,14 +987,15 @@ In Step 6 (Report), add a bullet:
 python3 -c "
 import sys; sys.path.insert(0, 'scripts'); import config
 c = config.read_config()
-assert len(c) == 37, len(c)
+assert len(c) == 39, len(c)
 assert c['scopeDriftFileThreshold'] == 10 and c['skillArgsMaxLen'] == 200
 assert c['outputDir'] == '.eval-packs' and c['analysis'] is True and c['includeTranscript'] is True
-print('baseline OK — 37 keys, defaults preserve behavior')
+assert c['customDetectors'] == [] and c['detectorScripts'] == []
+print('baseline OK — 39 keys, defaults preserve behavior')
 "
 ```
 
-- [ ] **Step 2: All suites** — `python3 -m unittest discover -s tests -p "test_*.py"` (expect ~165+, OK) and `node --test tests/lens-render.test.mjs tests/cost.test.mjs tests/lightbox-helpers.test.mjs` (expect 22+, 0 fail) and `node --check templates/html/scripts.js`.
+- [ ] **Step 2: All suites** — `python3 -m unittest discover -s tests -p "test_*.py"` (expect ~170+, OK) and `node --test tests/lens-render.test.mjs tests/cost.test.mjs tests/lightbox-helpers.test.mjs` (expect 22+, 0 fail) and `node --check templates/html/scripts.js`.
 
 - [ ] **Step 3: End-to-end gate proof** — a full render must REFUSE on a contract violation:
 
@@ -1028,3 +1031,499 @@ python3 -c "import json;p='$HOME/.claude/plugins/installed_plugins.json';d=json.
 - [ ] **Step 2: Refresh PR #13 body** — `gh pr edit 13 --body ...` with corrected numbers (37 config keys, current commit/test counts from `git rev-list --count main..HEAD` and the suite run) and a new "Deterministic gates" section: contract validator + render backstop, lens completeness gate, lens verdict integration, resolve-time gates, `!replace`, config unification, README/discoverability. Keep the existing structure and the Claude Code attribution footer.
 
 - [ ] **Step 3: Report** — which adversarial findings are closed (#1,#2,#3,#4,#5,#6,#7,#8,#9,#10,#11,#12) and what remains instruction-level by necessity (stance tone, prose quality — now bounded by mechanical checks on their artifacts).
+
+---
+
+### Task 11: The tuning loop — `/eval-pack:tune` skill
+
+Cheap inner loop: reuse the recorded facts (transcript, metrics, tools, test results) from an existing pack zip; re-run only what config affects (patterns → evaluator → lenses → contracts → render). Each tune appends a new round to the same pack, so the report's round history IS the before/after comparison.
+
+**Files:**
+- Create: `skills/tune/SKILL.md`
+
+- [ ] **Step 1: Create `skills/tune/SKILL.md`:**
+
+```markdown
+---
+description: Re-evaluate an existing eval pack with your current .eval-pack.json — the fast tuning loop for rubric/stance/lens/detector changes. Reuses recorded facts; re-runs only evaluation and rendering, appending a new round.
+tags: ["eval", "tune", "config"]
+---
+
+# Tune Eval Pack
+
+Re-evaluate an existing pack with the CURRENT configuration. Facts (transcript, metrics, tools,
+test results) are reused verbatim; only config-driven stages re-run. Use after editing
+`.eval-pack.json` — the round history in the report shows old vs new side by side.
+
+## Prerequisites
+
+​```bash
+PYTHON="${CLAUDE_PLUGIN_OPTION_pythonExecutable:-python3}"
+"$PYTHON" --version
+​```
+
+## Step 1: Locate and unpack the existing pack
+
+​```bash
+BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+OUTPUT_DIR=<outputDir from resolved config; default .eval-packs>
+ZIP=$(ls -t "${OUTPUT_DIR}"/*.zip 2>/dev/null | head -1)   # or the zip the user names
+SID=$(unzip -l "$ZIP" | awk 'NR==4{print $4}' | cut -d/ -f1)
+PACK_DIR="${OUTPUT_DIR}/${SID}"
+rm -rf "$PACK_DIR" && unzip -qo "$ZIP" -d "$OUTPUT_DIR"
+​```
+
+If no zip exists, STOP: "no pack to tune — run /eval-pack:generate first."
+If `${PACK_DIR}/transcript.jsonl` is missing (pack was built with `includeTranscript: false`),
+STOP and say so: tuning needs the recorded transcript — regenerate with it enabled.
+
+## Step 2: Re-resolve configuration (picks up your edits, fail-loud)
+
+​```bash
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/resolve_config.py" "$(pwd)" "${PACK_DIR}"
+​```
+
+Non-zero exit: STOP and show stderr verbatim.
+
+## Step 3: Re-run the config-driven stages
+
+​```bash
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/detect_patterns.py" "${PACK_DIR}/transcript.jsonl" "${PACK_DIR}" --config "${PACK_DIR}/eval-config.json"
+​```
+
+Then, if `analysis` is true in the resolved config: dispatch the independent evaluator EXACTLY as
+`skills/generate/SKILL.md` Step 4 specifies (same agent, same prompt, PACK_DIR/REPO_ROOT/DIFF_BASE),
+so the new analysis reflects the tuned stance/rubric/questions. If `analysis` is false, keep the
+existing analysis.json.
+
+Then run the lens step EXACTLY as generate Step 4.7 specifies (dispatch configured lenses, then
+`assemble_lenses.py "${PACK_DIR}"`), and the contract gate:
+
+​```bash
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/validate_contracts.py" "${PACK_DIR}"
+​```
+
+Non-zero: re-dispatch the evaluator ONCE with the printed CONTRACT lines; still failing → STOP.
+
+## Step 4: Re-render (appends a new round to the same zip)
+
+​```bash
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/render_html.py" "${OUTPUT_DIR}" "${SID}" "${CLAUDE_PLUGIN_ROOT}" "${PACK_DIR}/transcript.jsonl" --branch "${BRANCH}"
+​```
+
+## Step 5: Report the delta
+
+Compare the previous round's headline (confidence, flags) with the new one and tell the user what
+their config change did — e.g. "confidence 68 → 61 (new min aggregation); scopeDrift flag now off;
+2 new detector flags". Print the `Open:` link.
+```
+
+- [ ] **Step 2: Verify by inspection + resolve smoke** — `grep -c "resolve_config.py\|validate_contracts.py\|assemble_lenses.py" skills/tune/SKILL.md` ≥ 3; the referenced generate steps exist (`grep -n "Step 4.7" skills/generate/SKILL.md`).
+
+- [ ] **Step 3: Commit** — `git add skills/tune/SKILL.md && git commit -m "feat(tune): /eval-pack:tune — cheap re-evaluate loop over an existing pack"`
+
+---
+
+### Task 12: README "Tuning your eval" section
+
+**Files:**
+- Modify: `README.md` (after the Configuration section added in Task 8)
+
+- [ ] **Step 1: Append after the lens subsection of the Configuration section:**
+
+```markdown
+### Tuning your eval — the loop
+
+1. Edit `.eval-pack.json` (rubric, stance, detectors, lenses, thresholds…).
+2. Instant check: `python3 <plugin>/scripts/resolve_config.py . --check` — bad key/regex/band halts
+   here, not mid-run (or just run step 3; it validates first).
+3. `/eval-pack:tune` — re-evaluates the latest pack with your new config in minutes: recorded facts
+   (transcript, metrics, tests) are reused; only patterns, the evaluator, lenses, and the report
+   re-run. Each tune appends a **round**, so the report shows your before/after.
+4. Ship the config that produces the eval you trust; it's committed with the repo, so the whole
+   team gets it.
+```
+
+- [ ] **Step 2: Commit** — `git add README.md && git commit -m "docs: tuning-loop workflow in README"`
+
+---
+
+### Task 13: Declarative custom detectors (config-only policy checks)
+
+User-defined deterministic checks over the recorded session, validated at resolve time, feeding the gated flags→verdict pipeline. No code execution.
+
+**Files:**
+- Modify: `scripts/config.py` (DEFAULTS, `_TYPES`, `validate`, new `DETECTOR_SCOPES`)
+- Modify: `scripts/detect_patterns.py`
+- Modify: `schema/eval-pack.schema.json`
+- Test: `tests/test_config.py`, `tests/test_detect_patterns_config.py` (append)
+
+- [ ] **Step 1: Failing tests. Append to `tests/test_config.py`:**
+
+```python
+class TestCustomDetectorValidation(unittest.TestCase):
+    def test_valid_detector_ok(self):
+        self.assertEqual(config.validate({"customDetectors": [
+            {"id": "sudoUsed", "level": "red", "label": "sudo executed",
+             "scope": "bash", "pattern": r"\bsudo\b"}]}), [])
+
+    def test_bad_scope_level_pattern_rejected(self):
+        for bad in (
+            {"id": "x", "level": "red", "label": "l", "scope": "nope", "pattern": "a"},
+            {"id": "x", "level": "purple", "label": "l", "scope": "bash", "pattern": "a"},
+            {"id": "x", "level": "red", "label": "l", "scope": "bash", "pattern": "("},
+            {"level": "red", "label": "l", "scope": "bash", "pattern": "a"},  # no id
+        ):
+            errs = config.validate({"customDetectors": [bad]})
+            self.assertTrue(any("customDetectors" in e for e in errs), bad)
+```
+
+Append to `tests/test_detect_patterns_config.py`:
+
+```python
+class TestCustomDetectors(unittest.TestCase):
+    def _run_pack(self, detectors, lines):
+        import subprocess
+        with tempfile.TemporaryDirectory() as d:
+            pack = Path(d)
+            (pack / "transcript.jsonl").write_text(
+                "\n".join(json.dumps(x) for x in lines) + "\n", encoding="utf-8")
+            base = dict(json.loads(json.dumps(__import__("config").DEFAULTS)))
+            base["customDetectors"] = detectors
+            (pack / "eval-config.json").write_text(json.dumps(base), encoding="utf-8")
+            subprocess.run(
+                [sys.executable, str(SCRIPTS / "detect_patterns.py"),
+                 str(pack / "transcript.jsonl"), str(pack), "--config", str(pack / "eval-config.json")],
+                check=True, capture_output=True, text=True)
+            return json.loads((pack / "patterns.json").read_text(encoding="utf-8"))
+
+    def test_bash_scope_detector_fires(self):
+        lines = [{"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "name": "Bash", "id": "b1",
+             "input": {"command": "sudo rm -rf /tmp/x"}}]}}]
+        out = self._run_pack([{"id": "sudoUsed", "level": "red", "label": "sudo executed",
+                               "scope": "bash", "pattern": r"\bsudo\b"}], lines)
+        flag = next(f for f in out["flags"] if f["id"] == "sudoUsed")
+        self.assertEqual(flag["level"], "red")
+        self.assertEqual(flag["count"], 1)
+
+    def test_files_scope_and_threshold(self):
+        lines = [{"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "name": "Read", "id": "r1", "input": {"file_path": "/app/.env"}}]}}]
+        det = {"id": "envRead", "level": "amber", "label": ".env accessed",
+               "scope": "files", "pattern": r"\.env$", "threshold": 2}
+        out = self._run_pack([det], lines)
+        self.assertFalse(any(f["id"] == "envRead" for f in out["flags"]))  # 1 < threshold 2
+        det["threshold"] = 1
+        out = self._run_pack([det], lines)
+        self.assertTrue(any(f["id"] == "envRead" for f in out["flags"]))
+
+    def test_text_scope_fires_on_assistant_text(self):
+        lines = [{"type": "assistant", "message": {"content": [
+            {"type": "text", "text": "I will just hardcode the API key"}]}}]
+        out = self._run_pack([{"id": "hardcode", "level": "amber", "label": "hardcode mention",
+                               "scope": "text", "pattern": "(?i)hardcode"}], lines)
+        self.assertTrue(any(f["id"] == "hardcode" for f in out["flags"]))
+```
+
+- [ ] **Step 2: Run to verify failures.**
+
+- [ ] **Step 3: Implement.**
+
+a) `scripts/config.py`: constant near `FLAG_LEVELS`:
+
+```python
+# Scopes a declarative custom detector can scan.
+DETECTOR_SCOPES = ("bash", "files", "text", "user")
+```
+
+DEFAULTS (append, before the pipeline-options group if Task 7 already ran — order within DEFAULTS doesn't matter, keep comments):
+
+```python
+    # Declarative policy checks: {id, level, label, scope, pattern, threshold?} — deterministic
+    # regex checks over the recorded session, feeding the flags/verdict pipeline. No code exec.
+    "customDetectors": [],
+    # Repo-relative scripts run by detect_patterns; each prints {"flags":[...]} (validated).
+    # Same trust class as testCommands: your repo's own code.
+    "detectorScripts": [],
+```
+
+`_TYPES`: `"customDetectors": list,` and `"detectorScripts": list,`
+
+`validate` (before `return errors`):
+
+```python
+    dets = cfg.get("customDetectors")
+    if isinstance(dets, list):
+        for i, det in enumerate(dets):
+            if not isinstance(det, dict) or not det.get("id") or not det.get("label"):
+                errors.append("customDetectors[{}]: needs id, level, label, scope, pattern".format(i))
+                continue
+            if det.get("level") not in ("red", "amber", "green"):
+                errors.append("customDetectors[{}]: level must be red|amber|green".format(i))
+            if det.get("scope") not in DETECTOR_SCOPES:
+                errors.append("customDetectors[{}]: scope must be one of {}".format(
+                    i, list(DETECTOR_SCOPES)))
+            try:
+                re.compile(det.get("pattern") or "")
+            except re.error as exc:
+                errors.append("customDetectors[{}]: invalid pattern ({})".format(i, exc))
+            th = det.get("threshold", 1)
+            if isinstance(th, bool) or not isinstance(th, int) or th < 1:
+                errors.append("customDetectors[{}]: threshold must be an int >= 1".format(i))
+```
+
+b) `scripts/detect_patterns.py` — new function (near the other detectors), scanning per-scope strings:
+
+```python
+def collect_scope_strings(entries):
+    """Extract the scannable strings per detector scope from the transcript."""
+    scopes = {"bash": [], "files": [], "text": [], "user": []}
+    for e in entries:
+        etype = e.get("type")
+        msg = e.get("message") or e
+        content = msg.get("content")
+        if isinstance(content, str):
+            if etype == "assistant":
+                scopes["text"].append(content)
+            elif etype in ("user", "human"):
+                scopes["user"].append(content)
+            continue
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "text":
+                target = "text" if etype == "assistant" else "user"
+                scopes[target].append(block.get("text", ""))
+            elif block.get("type") == "tool_use":
+                inp = block.get("input") or {}
+                if block.get("name") == "Bash":
+                    scopes["bash"].append(str(inp.get("command", "")))
+                elif block.get("name") in ("Read", "Edit", "Write", "NotebookEdit"):
+                    scopes["files"].append(str(inp.get("file_path", "")))
+    return scopes
+
+
+def run_custom_detectors(detectors, scope_strings):
+    """Deterministic policy checks: returns [(id, level, label, count)] for fired detectors."""
+    fired = []
+    for det in detectors:
+        try:
+            rx = re.compile(det["pattern"])
+        except re.error:
+            continue  # unreachable when resolve validated; defensive for standalone runs
+        count = sum(1 for s in scope_strings.get(det["scope"], []) if rx.search(s))
+        if count >= det.get("threshold", 1):
+            fired.append((det["id"], det["level"], det["label"], count))
+    return fired
+```
+
+In `main()`, after the budget block and BEFORE the `if not flags:` fallback:
+
+```python
+    custom = cfg.get("customDetectors") or []
+    if custom:
+        scope_strings = collect_scope_strings(entries)
+        for fid, level, label, count in run_custom_detectors(custom, scope_strings):
+            add_flag(fid, level, label, count=count)
+```
+
+c) Schema (append; defaults byte-match `[]`):
+
+```json
+    "customDetectors": {
+      "type": "array",
+      "items": { "type": "object",
+        "properties": {
+          "id": {"type": "string"}, "level": {"type": "string", "enum": ["red", "amber", "green"]},
+          "label": {"type": "string"},
+          "scope": {"type": "string", "enum": ["bash", "files", "text", "user"]},
+          "pattern": {"type": "string"}, "threshold": {"type": "integer", "minimum": 1}
+        },
+        "required": ["id", "level", "label", "scope", "pattern"] },
+      "default": [],
+      "description": "Declarative policy checks (regex over the session) feeding the flags/verdict pipeline."
+    },
+    "detectorScripts": {
+      "type": "array", "items": { "type": "string" }, "default": [],
+      "description": "Repo-relative scripts printing {\"flags\":[...]}; run during pattern detection. Same trust class as testCommands."
+    },
+```
+
+- [ ] **Step 4: Run tests + full suite** — green (schema-sync passes: both new keys typed + defaulted).
+
+- [ ] **Step 5: Commit** — `git add scripts/config.py scripts/detect_patterns.py schema/eval-pack.schema.json tests/test_config.py tests/test_detect_patterns_config.py && git commit -m "feat(detectors): declarative customDetectors — user policy checks in the verdict pipeline"`
+
+---
+
+### Task 14: Script detectors (full-power hook, gated)
+
+Repo scripts run by `detect_patterns`; output validated by code; any failure becomes a visible red flag — never a crash, never a silent absence. Resolve-time gate: each path must exist inside the repo.
+
+**Files:**
+- Modify: `scripts/detect_patterns.py`, `scripts/resolve_config.py`
+- Test: `tests/test_detect_patterns_config.py`, `tests/test_resolve_config.py` (append)
+
+- [ ] **Step 1: Failing tests. Append to `tests/test_detect_patterns_config.py`:**
+
+```python
+class TestDetectorScripts(unittest.TestCase):
+    def _run_pack(self, script_body, lines=None):
+        import subprocess
+        with tempfile.TemporaryDirectory() as d:
+            pack = Path(d)
+            script = pack / "det.py"
+            script.write_text(script_body, encoding="utf-8")
+            (pack / "transcript.jsonl").write_text(
+                json.dumps(lines or {"type": "assistant", "message": {"content": "hi"}}) + "\n",
+                encoding="utf-8")
+            base = dict(json.loads(json.dumps(__import__("config").DEFAULTS)))
+            base["detectorScripts"] = [str(script)]
+            (pack / "eval-config.json").write_text(json.dumps(base), encoding="utf-8")
+            subprocess.run(
+                [sys.executable, str(SCRIPTS / "detect_patterns.py"),
+                 str(pack / "transcript.jsonl"), str(pack), "--config", str(pack / "eval-config.json")],
+                check=True, capture_output=True, text=True)
+            return json.loads((pack / "patterns.json").read_text(encoding="utf-8"))
+
+    def test_script_flags_merged(self):
+        out = self._run_pack(
+            'import json; print(json.dumps({"flags": ['
+            '{"id": "prodTouch", "level": "red", "label": "prod path modified"}]}))')
+        flag = next(f for f in out["flags"] if f["id"] == "prodTouch")
+        self.assertEqual(flag["level"], "red")
+
+    def test_failing_script_becomes_red_flag(self):
+        out = self._run_pack('raise SystemExit(3)')
+        self.assertTrue(any(f["id"] == "detectorFailed" and f["level"] == "red"
+                            for f in out["flags"]))
+
+    def test_malformed_output_becomes_red_flag(self):
+        out = self._run_pack('print("not json")')
+        self.assertTrue(any(f["id"] == "detectorFailed" for f in out["flags"]))
+
+    def test_bad_level_in_script_output_rejected(self):
+        out = self._run_pack(
+            'import json; print(json.dumps({"flags": [{"id": "x", "level": "purple", "label": "l"}]}))')
+        self.assertFalse(any(f["id"] == "x" for f in out["flags"]))
+        self.assertTrue(any(f["id"] == "detectorFailed" for f in out["flags"]))
+```
+
+Append to `tests/test_resolve_config.py`:
+
+```python
+class TestDetectorScriptGate(unittest.TestCase):
+    def test_missing_script_halts(self):
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as pack:
+            (Path(root) / ".eval-pack.json").write_text(
+                json.dumps({"detectorScripts": ["nope/det.py"]}), encoding="utf-8")
+            r = _run([root, pack])
+            self.assertEqual(r.returncode, 1)
+            self.assertIn("detectorScripts", r.stderr)
+
+    def test_escaping_script_path_halts(self):
+        with tempfile.TemporaryDirectory() as outer:
+            (Path(outer) / "evil.py").write_text("print('x')", encoding="utf-8")
+            root = Path(outer) / "repo"; root.mkdir()
+            (root / ".eval-pack.json").write_text(
+                json.dumps({"detectorScripts": ["../evil.py"]}), encoding="utf-8")
+            with tempfile.TemporaryDirectory() as pack:
+                r = _run([str(root), pack])
+                self.assertEqual(r.returncode, 1)
+                self.assertIn("outside the repo", r.stderr)
+```
+
+- [ ] **Step 2: Run to verify failures.**
+
+- [ ] **Step 3: Implement.**
+
+a) `scripts/detect_patterns.py` — add `import subprocess` to the imports, plus:
+
+```python
+def run_detector_scripts(scripts, transcript_path, output_dir):
+    """Run repo detector scripts; validate their output by code. A failing or malformed
+    script becomes a visible red flag — never a crash, never a silent absence."""
+    ok_flags, failures = [], []
+    for script in scripts:
+        name = Path(script).name
+        try:
+            proc = subprocess.run(
+                [sys.executable, str(script), str(transcript_path), str(output_dir)],
+                capture_output=True, text=True, timeout=120)
+            if proc.returncode != 0:
+                failures.append((name, "exit {}".format(proc.returncode)))
+                continue
+            data = json.loads(proc.stdout)
+            flags = data.get("flags")
+            if not isinstance(flags, list):
+                raise ValueError("no flags list")
+            for f in flags:
+                if (not isinstance(f, dict) or not f.get("id") or not f.get("label")
+                        or f.get("level") not in ("red", "amber", "green")):
+                    raise ValueError("bad flag shape: {!r}".format(f))
+            ok_flags.extend(flags)
+        except (subprocess.TimeoutExpired, json.JSONDecodeError, ValueError, OSError) as exc:
+            failures.append((name, str(exc)))
+    return ok_flags, failures
+```
+
+In `main()`, right after the customDetectors block (still before the `if not flags:` fallback):
+
+```python
+    scripts = cfg.get("detectorScripts") or []
+    if scripts:
+        script_flags, script_failures = run_detector_scripts(scripts, transcript_file, output_dir)
+        for f in script_flags:
+            add_flag(f["id"], f["level"], f["label"],
+                     **({"count": f["count"]} if isinstance(f.get("count"), int) else {}))
+        for name, err in script_failures:
+            add_flag("detectorFailed", "red", "Detector script failed: {} ({})".format(name, err))
+```
+
+b) `scripts/resolve_config.py` — after the evaluatorPromptFile gate:
+
+```python
+    root_resolved = Path(args.project_root).resolve()
+    for script in cfg.get("detectorScripts") or []:
+        spath = Path(args.project_root) / script
+        resolved = spath.resolve()
+        if not (resolved == root_resolved or root_resolved in resolved.parents):
+            print("ERROR: detectorScripts entry {!r} resolves outside the repo".format(script),
+                  file=sys.stderr)
+            return 1
+        if not spath.is_file():
+            print("ERROR: detectorScripts entry {!r} not found under {}".format(
+                script, args.project_root), file=sys.stderr)
+            return 1
+```
+
+NOTE: `detect_patterns` receives script paths via the resolved config verbatim; the tests above pass absolute in-tmp paths directly to the script runner (bypassing resolve) — that is fine: confinement is the resolve gate's job, execution robustness is detect_patterns' job.
+
+- [ ] **Step 4: Run tests + full suite** — green.
+
+- [ ] **Step 5: Commit** — `git add scripts/detect_patterns.py scripts/resolve_config.py tests/test_detect_patterns_config.py tests/test_resolve_config.py && git commit -m "feat(detectors): script detector hook — repo code, output validated, failures visible"`
+
+---
+
+**Post-14 addendum to Task 8 (README):** in the Configuration section's "Heuristics" group line, add `customDetectors` and `detectorScripts`; in the lens subsection, add a sibling paragraph:
+
+```markdown
+### Custom detectors — your own deterministic policy checks
+
+No LLM involved: a detector is a regex policy (`customDetectors`) or your own script
+(`detectorScripts`) run over the recorded session, feeding the same gated flags→verdict pipeline.
+
+​```json
+{ "customDetectors": [
+    { "id": "sudoUsed", "level": "red", "label": "sudo executed", "scope": "bash", "pattern": "\\bsudo\\b" },
+    { "id": "envRead", "level": "amber", "label": ".env accessed", "scope": "files", "pattern": "\\.env$" }
+  ],
+  "detectorScripts": ["eval-detectors/compliance.py"] }
+​```
+
+Scopes: `bash` (commands), `files` (paths), `text` (assistant), `user` (your prompts). A script
+prints `{"flags": [{"id", "level", "label"}]}`; malformed output or a nonzero exit becomes a red
+"Detector script failed" flag — it can't vanish.
+```
