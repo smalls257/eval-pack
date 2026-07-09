@@ -181,6 +181,50 @@ def check_scope_drift(output_dir, threshold):
         return False
 
 
+def collect_scope_strings(entries):
+    """Extract the scannable strings per detector scope from the transcript."""
+    scopes = {"bash": [], "files": [], "text": [], "user": []}
+    for e in entries:
+        etype = e.get("type")
+        msg = e.get("message") or e
+        content = msg.get("content")
+        if isinstance(content, str):
+            if etype == "assistant":
+                scopes["text"].append(content)
+            elif etype in ("user", "human"):
+                scopes["user"].append(content)
+            continue
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "text":
+                target = "text" if etype == "assistant" else "user"
+                scopes[target].append(block.get("text", ""))
+            elif block.get("type") == "tool_use":
+                inp = block.get("input") or {}
+                if block.get("name") == "Bash":
+                    scopes["bash"].append(str(inp.get("command", "")))
+                elif block.get("name") in ("Read", "Edit", "Write", "NotebookEdit"):
+                    scopes["files"].append(str(inp.get("file_path", "")))
+    return scopes
+
+
+def run_custom_detectors(detectors, scope_strings):
+    """Deterministic policy checks: returns [(id, level, label, count)] for fired detectors."""
+    fired = []
+    for det in detectors:
+        try:
+            rx = re.compile(det["pattern"])
+        except re.error:
+            continue  # unreachable when resolve validated; defensive for standalone runs
+        count = sum(1 for s in scope_strings.get(det["scope"], []) if rx.search(s))
+        if count >= det.get("threshold", 1):
+            fired.append((det["id"], det["level"], det["label"], count))
+    return fired
+
+
 def main():
     parser = argparse.ArgumentParser(description="Detect heuristic patterns in transcript")
     parser.add_argument("transcript", help="Path to transcript.jsonl")
@@ -250,6 +294,11 @@ def main():
             # "incl. cache" disambiguates from the report header's cache-exclusive token stat.
             add_flag("overBudget", "amber",
                      f"Over token budget ({total:,} incl. cache > {budget:,})")
+    custom = cfg.get("customDetectors") or []
+    if custom:
+        scope_strings = collect_scope_strings(entries)
+        for fid, level, label, count in run_custom_detectors(custom, scope_strings):
+            add_flag(fid, level, label, count=count)
     if not flags:
         if suppressed:
             # Suppression must not masquerade as a clean pass — say what was hidden.

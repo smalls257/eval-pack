@@ -128,6 +128,23 @@
     "outputDir": { "type": "string", "default": ".eval-packs", "description": "Directory where eval packs are written, relative to project root." },
     "analysis": { "type": "boolean", "default": true, "description": "Dispatch the AI evaluator; false emits heuristic flags only." },
     "includeTranscript": { "type": "boolean", "default": true, "description": "Bundle the raw transcript.jsonl in the pack." },
-    "ticketBaseUrl": { "type": "string", "default": "", "description": "Prefix turning a bare ticket key into a link in PR bodies." }
+    "ticketBaseUrl": { "type": "string", "default": "", "description": "Prefix turning a bare ticket key into a link in PR bodies." },
+    "customDetectors": {
+      "type": "array",
+      "items": { "type": "object",
+        "properties": {
+          "id": {"type": "string"}, "level": {"type": "string", "enum": ["red", "amber", "green"]},
+          "label": {"type": "string"},
+          "scope": {"type": "string", "enum": ["bash", "files", "text", "user"]},
+          "pattern": {"type": "string"}, "threshold": {"type": "integer", "minimum": 1}
+        },
+        "required": ["id", "level", "label", "scope", "pattern"] },
+      "default": [],
+      "description": "Declarative policy checks (regex over the session) feeding the flags/verdict pipeline."
+    },
+    "detectorScripts": {
+      "type": "array", "items": { "type": "string" }, "default": [],
+      "description": "Repo-relative scripts printing {\"flags\":[...]}; run during pattern detection. Same trust class as testCommands."
+    }
   }
 }

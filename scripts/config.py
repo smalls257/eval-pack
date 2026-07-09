@@ -88,6 +88,12 @@ DEFAULTS = {
     "analysis": True,
     "includeTranscript": True,
     "ticketBaseUrl": "",
+    # Declarative policy checks: {id, level, label, scope, pattern, threshold?} — deterministic
+    # regex checks over the recorded session, feeding the flags/verdict pipeline. No code exec.
+    "customDetectors": [],
+    # Repo-relative scripts run by detect_patterns; each prints {"flags":[...]} (validated).
+    # Same trust class as testCommands: your repo's own code.
+    "detectorScripts": [],
 }
 
 # Known keys and their expected JSON/Python types. A key absent here is "unknown"
@@ -130,6 +136,8 @@ _TYPES = {
     "analysis": bool,
     "includeTranscript": bool,
     "ticketBaseUrl": str,
+    "customDetectors": list,
+    "detectorScripts": list,
 }
 
 # Keys consumed during merge or by editors only — never part of the resolved config.
@@ -147,6 +155,9 @@ THEMES = ("dark", "light", "system")
 
 # Allowed per-flag severity overrides.
 FLAG_LEVELS = ("red", "amber", "green", "off")
+
+# Scopes a declarative custom detector can scan.
+DETECTOR_SCOPES = ("bash", "files", "text", "user")
 
 # Flag ids that can signal failure (used by the can-never-fail guard). Green-only ids
 # (testsPassing, cleanPass) are excluded — keep in sync with detect_patterns.main.
@@ -395,6 +406,24 @@ def validate(cfg):
                 "{}: literal '!replace' in resolved list — in a file layer the sentinel must "
                 "be the FIRST element (or omitted); for an env override use the JSON-array "
                 "form, which consumes it (env values replace anyway)".format(k))
+    dets = cfg.get("customDetectors")
+    if isinstance(dets, list):
+        for i, det in enumerate(dets):
+            if not isinstance(det, dict) or not det.get("id") or not det.get("label"):
+                errors.append("customDetectors[{}]: needs id, level, label, scope, pattern".format(i))
+                continue
+            if det.get("level") not in ("red", "amber", "green"):
+                errors.append("customDetectors[{}]: level must be red|amber|green".format(i))
+            if det.get("scope") not in DETECTOR_SCOPES:
+                errors.append("customDetectors[{}]: scope must be one of {}".format(
+                    i, list(DETECTOR_SCOPES)))
+            try:
+                re.compile(det.get("pattern") or "")
+            except re.error as exc:
+                errors.append("customDetectors[{}]: invalid pattern ({})".format(i, exc))
+            th = det.get("threshold", 1)
+            if isinstance(th, bool) or not isinstance(th, int) or th < 1:
+                errors.append("customDetectors[{}]: threshold must be an int >= 1".format(i))
     return errors
 
 

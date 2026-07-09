@@ -418,3 +418,20 @@ class TestListReplaceSentinel(unittest.TestCase):
                 d, env={"CLAUDE_PLUGIN_OPTION_frictionCategories": "!replace,x"})
             errs = config.validate(cfg)
             self.assertTrue(any("!replace" in e for e in errs))
+
+
+class TestCustomDetectorValidation(unittest.TestCase):
+    def test_valid_detector_ok(self):
+        self.assertEqual(config.validate({"customDetectors": [
+            {"id": "sudoUsed", "level": "red", "label": "sudo executed",
+             "scope": "bash", "pattern": r"\bsudo\b"}]}), [])
+
+    def test_bad_scope_level_pattern_rejected(self):
+        for bad in (
+            {"id": "x", "level": "red", "label": "l", "scope": "nope", "pattern": "a"},
+            {"id": "x", "level": "purple", "label": "l", "scope": "bash", "pattern": "a"},
+            {"id": "x", "level": "red", "label": "l", "scope": "bash", "pattern": "("},
+            {"level": "red", "label": "l", "scope": "bash", "pattern": "a"},  # no id
+        ):
+            errs = config.validate({"customDetectors": [bad]})
+            self.assertTrue(any("customDetectors" in e for e in errs), bad)
