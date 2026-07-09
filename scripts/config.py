@@ -166,6 +166,11 @@ FAILURE_FLAG_IDS = (
     "highRetry", "scopeDrift", "partialSession", "overBudget",
 )
 
+# Every flag id the built-in pipeline can emit (collision guard for customDetectors).
+BUILTIN_FLAG_IDS = FAILURE_FLAG_IDS + (
+    "testsPassing", "cleanPass", "flagsSuppressed", "lensFailed", "lensVerdict",
+)
+
 
 def _read_json(path):
     p = Path(path)
@@ -408,10 +413,17 @@ def validate(cfg):
                 "form, which consumes it (env values replace anyway)".format(k))
     dets = cfg.get("customDetectors")
     if isinstance(dets, list):
+        seen_ids = set()
         for i, det in enumerate(dets):
             if not isinstance(det, dict) or not det.get("id") or not det.get("label"):
                 errors.append("customDetectors[{}]: needs id, level, label, scope, pattern".format(i))
                 continue
+            det_id = det["id"]
+            if det_id in BUILTIN_FLAG_IDS:
+                errors.append("customDetectors[{}]: id {!r} collides with a built-in flag id".format(i, det_id))
+            if det_id in seen_ids:
+                errors.append("customDetectors[{}]: duplicate id {!r}".format(i, det_id))
+            seen_ids.add(det_id)
             if det.get("level") not in ("red", "amber", "green"):
                 errors.append("customDetectors[{}]: level must be red|amber|green".format(i))
             if det.get("scope") not in DETECTOR_SCOPES:

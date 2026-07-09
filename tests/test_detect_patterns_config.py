@@ -103,7 +103,7 @@ class TestSuppressionHonesty(unittest.TestCase):
 
 
 class TestCustomDetectors(unittest.TestCase):
-    def _run_pack(self, detectors, lines):
+    def _run_pack(self, detectors, lines, extra_cfg=None):
         import subprocess
         with tempfile.TemporaryDirectory() as d:
             pack = Path(d)
@@ -111,6 +111,7 @@ class TestCustomDetectors(unittest.TestCase):
                 "\n".join(json.dumps(x) for x in lines) + "\n", encoding="utf-8")
             base = dict(json.loads(json.dumps(__import__("config").DEFAULTS)))
             base["customDetectors"] = detectors
+            base.update(extra_cfg or {})
             (pack / "eval-config.json").write_text(json.dumps(base), encoding="utf-8")
             subprocess.run(
                 [sys.executable, str(SCRIPTS / "detect_patterns.py"),
@@ -145,3 +146,24 @@ class TestCustomDetectors(unittest.TestCase):
         out = self._run_pack([{"id": "hardcode", "level": "amber", "label": "hardcode mention",
                                "scope": "text", "pattern": "(?i)hardcode"}], lines)
         self.assertTrue(any(f["id"] == "hardcode" for f in out["flags"]))
+
+    def test_user_scope_and_off_suppression(self):
+        lines = [{"type": "user", "message": {"content": [
+            {"type": "text", "text": "please just hardcode the key"}]}}]
+        det = {"id": "userHardcode", "level": "amber", "label": "user asked to hardcode",
+               "scope": "user", "pattern": "(?i)hardcode"}
+        out = self._run_pack([det], lines)
+        self.assertTrue(any(f["id"] == "userHardcode" for f in out["flags"]))
+        # suppression via flagSeverities applies to custom ids
+        out2 = self._run_pack([det], lines, extra_cfg={"flagSeverities": {"userHardcode": "off"}})
+        self.assertFalse(any(f["id"] == "userHardcode" for f in out2["flags"]))
+        self.assertIn("userHardcode", out2["suppressedFlags"])
+
+    def test_green_custom_detector_replaces_cleanpass(self):
+        lines = [{"type": "assistant", "message": {"content": [
+            {"type": "text", "text": "policy satisfied"}]}}]
+        det = {"id": "policyOk", "level": "green", "label": "policy satisfied",
+               "scope": "text", "pattern": "policy satisfied"}
+        out = self._run_pack([det], lines)
+        self.assertTrue(any(f["id"] == "policyOk" for f in out["flags"]))
+        self.assertFalse(any(f["id"] == "cleanPass" for f in out["flags"]))

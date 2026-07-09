@@ -55,6 +55,9 @@ DEFAULT_PATTERNS = {
     "retry": [r"(?i)(try again|retry|let me try|another approach|different approach)"],
 }
 
+# Tools whose input.file_path the "files" detector scope observes.
+FILE_TOOLS = ("Read", "Edit", "Write", "NotebookEdit", "MultiEdit")
+
 
 # A leading global flag group like (?i)… must be rewritten to a scoped (?i:…)
 # before OR-joining: Python 3.11+ rejects global flags anywhere but position 0.
@@ -206,7 +209,7 @@ def collect_scope_strings(entries):
                 inp = block.get("input") or {}
                 if block.get("name") == "Bash":
                     scopes["bash"].append(str(inp.get("command", "")))
-                elif block.get("name") in ("Read", "Edit", "Write", "NotebookEdit"):
+                elif block.get("name") in FILE_TOOLS:
                     scopes["files"].append(str(inp.get("file_path", "")))
     return scopes
 
@@ -217,8 +220,15 @@ def run_custom_detectors(detectors, scope_strings):
     for det in detectors:
         try:
             rx = re.compile(det["pattern"])
-        except re.error:
-            continue  # unreachable when resolve validated; defensive for standalone runs
+        except re.error as exc:
+            # Sensor: a policy check that silently doesn't run reads as "clean" — warn loudly.
+            # (Resolve-time validation catches this in the pipeline; this guards standalone runs.)
+            print(
+                "Warning: customDetector {!r} pattern failed to compile ({}); skipped".format(
+                    det.get("id"), exc),
+                file=sys.stderr,
+            )
+            continue
         count = sum(1 for s in scope_strings.get(det["scope"], []) if rx.search(s))
         if count >= det.get("threshold", 1):
             fired.append((det["id"], det["level"], det["label"], count))

@@ -5,10 +5,14 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "$schema": { "type": "string" },
+    "$schema": {
+      "type": "string"
+    },
     "extends": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "description": "Preset config files to inherit, lowest-priority first."
     },
     "scopeDriftFileThreshold": {
@@ -28,13 +32,23 @@
     },
     "frictionCategories": {
       "type": "array",
-      "items": { "type": "string" },
-      "default": ["tooling", "structure", "naming", "docs", "other"],
+      "items": {
+        "type": "string"
+      },
+      "default": [
+        "tooling",
+        "structure",
+        "naming",
+        "docs",
+        "other"
+      ],
       "description": "Categories the evaluator classifies friction into. File-layer lists ADD to defaults; start the list with \"!replace\" to replace instead."
     },
     "testCommands": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "default": [],
       "description": "Commands the generate skill runs to determine the test verdict."
     },
@@ -45,7 +59,9 @@
     },
     "redaction": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "default": [],
       "description": "Regex patterns whose matches are masked in published transcripts."
     },
@@ -71,7 +87,9 @@
     },
     "retrospectiveQuestions": {
       "type": "array",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "default": [],
       "description": "Retrospective questions for the evaluator; empty uses the built-in set."
     },
@@ -85,65 +103,222 @@
       "items": {
         "type": "object",
         "properties": {
-          "skill": { "type": "string" },
-          "role": { "type": "string", "enum": ["contributor", "scorer"] }
+          "skill": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "contributor",
+              "scorer"
+            ]
+          }
         },
-        "required": ["skill", "role"]
+        "required": [
+          "skill",
+          "role"
+        ]
       },
       "default": [],
       "description": "Extension lenses that contribute analysis or feed the verdict."
     },
     "verdictAggregation": {
       "type": "string",
-      "enum": ["core", "min", "mean"],
+      "enum": [
+        "core",
+        "min",
+        "mean"
+      ],
       "default": "core",
       "description": "How scorer-lens scores combine with the core verdict."
     },
-    "brandName": { "type": "string", "default": "Eval Pack", "description": "Report brand name." },
-    "reportTitle": { "type": "string", "default": "", "description": "Report title override; empty uses the analysis title." },
-    "footerText": { "type": "string", "default": "", "description": "Custom footer text." },
-    "subjectNoun": { "type": "string", "default": "extension", "description": "Noun for the thing under review (e.g. service, feature)." },
-    "defaultTheme": { "type": "string", "enum": ["dark", "light", "system"], "default": "dark", "description": "Default report theme." },
-    "sections": { "type": "array", "items": { "type": "string" }, "default": [], "description": "Section toggle/order; empty uses the default set." },
-    "zipNameTemplate": { "type": "string", "default": "", "description": "Template for the zip filename." },
-    "commitUrlTemplate": { "type": "string", "default": "", "description": "Template turning a commit SHA into a link." },
-    "repoBaseUrl": { "type": "string", "default": "", "description": "Base URL for repo links." },
-    "messages": { "type": "object", "default": {}, "description": "Overridable UI strings (i18n)." },
-    "templateDir": { "type": "string", "default": "", "description": "Project-relative dir with report template overrides; empty uses bundled." },
+    "brandName": {
+      "type": "string",
+      "default": "Eval Pack",
+      "description": "Report brand name."
+    },
+    "reportTitle": {
+      "type": "string",
+      "default": "",
+      "description": "Report title override; empty uses the analysis title."
+    },
+    "footerText": {
+      "type": "string",
+      "default": "",
+      "description": "Custom footer text."
+    },
+    "subjectNoun": {
+      "type": "string",
+      "default": "extension",
+      "description": "Noun for the thing under review (e.g. service, feature)."
+    },
+    "defaultTheme": {
+      "type": "string",
+      "enum": [
+        "dark",
+        "light",
+        "system"
+      ],
+      "default": "dark",
+      "description": "Default report theme."
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Section toggle/order; empty uses the default set."
+    },
+    "zipNameTemplate": {
+      "type": "string",
+      "default": "",
+      "description": "Template for the zip filename."
+    },
+    "commitUrlTemplate": {
+      "type": "string",
+      "default": "",
+      "description": "Template turning a commit SHA into a link."
+    },
+    "repoBaseUrl": {
+      "type": "string",
+      "default": "",
+      "description": "Base URL for repo links."
+    },
+    "messages": {
+      "type": "object",
+      "default": {},
+      "description": "Overridable UI strings (i18n)."
+    },
+    "templateDir": {
+      "type": "string",
+      "default": "",
+      "description": "Project-relative dir with report template overrides; empty uses bundled."
+    },
     "detectionPatterns": {
       "type": "object",
       "default": {
-        "done": ["(?i)(done|complete|finished|all set|that should|looks good now)"],
-        "correction": ["(?i)(no|not|wrong|still|actually|but|fix|fail|error|broken|issue)"],
-        "retry": ["(?i)(try again|retry|let me try|another approach|different approach)"]
+        "done": [
+          "(?i)(done|complete|finished|all set|that should|looks good now)"
+        ],
+        "correction": [
+          "(?i)(no|not|wrong|still|actually|but|fix|fail|error|broken|issue)"
+        ],
+        "retry": [
+          "(?i)(try again|retry|let me try|another approach|different approach)"
+        ]
       },
       "description": "Heuristic detection regexes (lists OR-combined)."
     },
-    "falseCompletionWindow": { "type": "integer", "default": 1, "description": "Entries scanned for a user correction after a completion claim." },
-    "claimTruncLen": { "type": "integer", "default": 120, "description": "Truncation length for quoted claims in patterns.json." },
-    "flagSeverities": { "type": "object", "default": {}, "description": "Per-flag severity overrides: {flagId: red|amber|green|off}." },
-    "tokenFieldNames": { "type": "array", "items": { "type": "string" }, "default": ["subagent_tokens", "total_tokens"], "description": "Accepted subagent token field names. File-layer lists ADD to defaults; start the list with \"!replace\" to replace instead." },
-    "tokenWeights": { "type": "object", "default": {}, "description": "Optional weights for the total-token sum; empty = plain sum." },
-    "costBudgetTokens": { "type": "integer", "default": 0, "description": "Amber-flag when totalTokens exceeds this; 0 disables." },
-    "outputDir": { "type": "string", "default": ".eval-packs", "description": "Directory where eval packs are written, relative to project root." },
-    "analysis": { "type": "boolean", "default": true, "description": "Dispatch the AI evaluator; false emits heuristic flags only." },
-    "includeTranscript": { "type": "boolean", "default": true, "description": "Bundle the raw transcript.jsonl in the pack." },
-    "ticketBaseUrl": { "type": "string", "default": "", "description": "Prefix turning a bare ticket key into a link in PR bodies." },
+    "falseCompletionWindow": {
+      "type": "integer",
+      "default": 1,
+      "description": "Entries scanned for a user correction after a completion claim."
+    },
+    "claimTruncLen": {
+      "type": "integer",
+      "default": 120,
+      "description": "Truncation length for quoted claims in patterns.json."
+    },
+    "flagSeverities": {
+      "type": "object",
+      "default": {},
+      "description": "Per-flag severity overrides: {flagId: red|amber|green|off}."
+    },
+    "tokenFieldNames": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [
+        "subagent_tokens",
+        "total_tokens"
+      ],
+      "description": "Accepted subagent token field names. File-layer lists ADD to defaults; start the list with \"!replace\" to replace instead."
+    },
+    "tokenWeights": {
+      "type": "object",
+      "default": {},
+      "description": "Optional weights for the total-token sum; empty = plain sum."
+    },
+    "costBudgetTokens": {
+      "type": "integer",
+      "default": 0,
+      "description": "Amber-flag when totalTokens exceeds this; 0 disables."
+    },
+    "outputDir": {
+      "type": "string",
+      "default": ".eval-packs",
+      "description": "Directory where eval packs are written, relative to project root."
+    },
+    "analysis": {
+      "type": "boolean",
+      "default": true,
+      "description": "Dispatch the AI evaluator; false emits heuristic flags only."
+    },
+    "includeTranscript": {
+      "type": "boolean",
+      "default": true,
+      "description": "Bundle the raw transcript.jsonl in the pack."
+    },
+    "ticketBaseUrl": {
+      "type": "string",
+      "default": "",
+      "description": "Prefix turning a bare ticket key into a link in PR bodies."
+    },
     "customDetectors": {
       "type": "array",
-      "items": { "type": "object",
+      "items": {
+        "type": "object",
         "properties": {
-          "id": {"type": "string"}, "level": {"type": "string", "enum": ["red", "amber", "green"]},
-          "label": {"type": "string"},
-          "scope": {"type": "string", "enum": ["bash", "files", "text", "user"]},
-          "pattern": {"type": "string"}, "threshold": {"type": "integer", "minimum": 1}
+          "id": {
+            "type": "string"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "red",
+              "amber",
+              "green"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "bash",
+              "files",
+              "text",
+              "user"
+            ]
+          },
+          "pattern": {
+            "type": "string"
+          },
+          "threshold": {
+            "type": "integer",
+            "minimum": 1
+          }
         },
-        "required": ["id", "level", "label", "scope", "pattern"] },
+        "required": [
+          "id",
+          "level",
+          "label",
+          "scope",
+          "pattern"
+        ]
+      },
       "default": [],
-      "description": "Declarative policy checks (regex over the session) feeding the flags/verdict pipeline."
+      "description": "Declarative policy checks (regex over the session) feeding the flags/verdict pipeline. Scopes: bash (Bash commands), files (file paths of Read/Edit/Write/NotebookEdit/MultiEdit), text (assistant text), user (user text). Threshold counts MATCHING ITEMS (commands/paths/messages), not regex occurrences within one item."
     },
     "detectorScripts": {
-      "type": "array", "items": { "type": "string" }, "default": [],
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
       "description": "Repo-relative scripts printing {\"flags\":[...]}; run during pattern detection. Same trust class as testCommands."
     }
   }

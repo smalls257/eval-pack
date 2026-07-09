@@ -435,3 +435,11 @@ class TestCustomDetectorValidation(unittest.TestCase):
         ):
             errs = config.validate({"customDetectors": [bad]})
             self.assertTrue(any("customDetectors" in e for e in errs), bad)
+
+    def test_builtin_collision_and_duplicate_rejected(self):
+        det = {"id": "testsFailing", "level": "red", "label": "l", "scope": "bash", "pattern": "a"}
+        errs = config.validate({"customDetectors": [det]})
+        self.assertTrue(any("collides" in e for e in errs))
+        d1 = {"id": "mine", "level": "red", "label": "l", "scope": "bash", "pattern": "a"}
+        errs = config.validate({"customDetectors": [d1, dict(d1)]})
+        self.assertTrue(any("duplicate" in e for e in errs))
