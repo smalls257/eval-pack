@@ -106,5 +106,37 @@ class TestDisabledAnalysisSkips(unittest.TestCase):
             self.assertEqual(validate_contracts.collect_gaps(d), [])
 
 
+class TestCliContract(unittest.TestCase):
+    def test_exit_codes_and_stderr_prefix(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as d:
+            _pack(d, {"rubric": {"high": "x"}}, analysis={"title": "t"})
+            r = subprocess.run([sys.executable, str(SCRIPTS / "validate_contracts.py"), d],
+                               capture_output=True, text=True)
+            self.assertEqual(r.returncode, 1)
+            self.assertTrue(any(line.startswith("CONTRACT: ") for line in r.stderr.splitlines()))
+        with tempfile.TemporaryDirectory() as d:
+            _pack(d, {}, analysis={"title": "t"})
+            r = subprocess.run([sys.executable, str(SCRIPTS / "validate_contracts.py"), d],
+                               capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0)
+
+
+class TestConfigReadGaps(unittest.TestCase):
+    def test_malformed_config_is_a_gap(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "eval-config.json").write_text("{not json", encoding="utf-8")
+            gaps = validate_contracts.collect_gaps(d)
+            self.assertTrue(any("unparseable" in g for g in gaps))
+
+    def test_missing_config_defaults_keep_friction_live(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "analysis.json").write_text(
+                json.dumps({"title": "t", "frictionLog": [{"friction": "x", "type": "vibes"}]}),
+                encoding="utf-8")
+            gaps = validate_contracts.collect_gaps(d)
+            self.assertTrue(any("vibes" in g for g in gaps))
+
+
 if __name__ == "__main__":
     unittest.main()

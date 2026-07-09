@@ -26,56 +26,91 @@ def _read(pack, name):
         return None
 
 
+def _read_config(pack_dir):
+    """Missing config -> DEFAULTS (pipeline guarantees presence; standalone runs stay usable).
+    Present-but-unparseable -> DEFAULTS plus an explicit gap: corruption must not validate silently."""
+    p = Path(pack_dir) / "eval-config.json"
+    if not p.is_file():
+        return config.read_config(), None
+    try:
+        return json.loads(p.read_text(encoding="utf-8")), None
+    except json.JSONDecodeError as exc:
+        return config.read_config(), "eval-config.json present but unparseable ({})".format(exc)
+
+
+def _friction_gaps(cfg, analysis):
+    gaps = []
+    cats = set(cfg.get("frictionCategories") or [])
+    if not cats:
+        return gaps
+    for i, item in enumerate(analysis.get("frictionLog") or []):
+        t = item.get("type")
+        if t not in cats:
+            gaps.append("frictionLog[{}].type {!r} is not in frictionCategories {}".format(
+                i, t, sorted(cats)))
+    return gaps
+
+
+def _retrospective_gaps(cfg, analysis):
+    gaps = []
+    questions = cfg.get("retrospectiveQuestions") or []
+    if not questions:
+        return gaps
+    answered = {a.get("question") for a in analysis.get("retrospectiveAnswers") or []
+                if a.get("answer")}
+    for q in questions:
+        if q not in answered:
+            gaps.append("retrospectiveAnswers missing or blank answer for: {!r}".format(q))
+    return gaps
+
+
+def _rubric_gaps(cfg, analysis):
+    gaps = []
+    rubric = cfg.get("rubric") or {}
+    if not rubric:
+        return gaps
+    applied = analysis.get("rubricApplied") or {}
+    band = applied.get("band")
+    if not band:
+        gaps.append("rubricApplied missing: config sets a rubric but analysis names no band")
+    elif band not in rubric:
+        gaps.append("rubricApplied.band {!r} is not a configured rubric band {}".format(
+            band, sorted(rubric)))
+    return gaps
+
+
+def _command_gaps(cfg, results):
+    gaps = []
+    commands = cfg.get("testCommands") or []
+    if not commands:
+        return gaps
+    ran = {c.get("command"): c.get("exitCode") for c in results.get("commands") or []}
+    for cmd in commands:
+        if cmd not in ran:
+            gaps.append("test-results.commands missing configured command: {!r}".format(cmd))
+    exit_codes = [ran[c] for c in commands if c in ran]
+    if exit_codes and len(exit_codes) == len(commands):
+        expected = "pass" if all(x == 0 for x in exit_codes) else "fail"
+        if results.get("verdict") != expected:
+            gaps.append("test-results.verdict {!r} inconsistent with exit codes {} "
+                        "(expected {!r})".format(results.get("verdict"), exit_codes, expected))
+    return gaps
+
+
 def collect_gaps(pack_dir):
     """Return a list of human-readable contract violations; empty means conforming."""
     gaps = []
-    cfg_data = _read(pack_dir, "eval-config.json")
-    cfg = cfg_data if cfg_data is not None else config.read_config()
+    cfg, cfg_gap = _read_config(pack_dir)
+    if cfg_gap:
+        gaps.append(cfg_gap)
     analysis = _read(pack_dir, "analysis.json") or {}
     results = _read(pack_dir, "test-results.json") or {}
 
     if not analysis.get("disabled"):
-        # frictionLog types must come from the configured taxonomy.
-        cats = set(cfg.get("frictionCategories") or [])
-        if cats:
-            for i, item in enumerate(analysis.get("frictionLog") or []):
-                t = item.get("type")
-                if t not in cats:
-                    gaps.append(
-                        "frictionLog[{}].type {!r} is not in frictionCategories {}".format(
-                            i, t, sorted(cats)))
-        # every configured retrospective question must be answered, verbatim-keyed.
-        questions = cfg.get("retrospectiveQuestions") or []
-        if questions:
-            answered = {a.get("question") for a in analysis.get("retrospectiveAnswers") or []
-                        if a.get("answer")}
-            for q in questions:
-                if q not in answered:
-                    gaps.append("retrospectiveAnswers missing an answer for: {!r}".format(q))
-        # a configured rubric must be applied to a real band.
-        rubric = cfg.get("rubric") or {}
-        if rubric:
-            applied = analysis.get("rubricApplied") or {}
-            band = applied.get("band")
-            if not band:
-                gaps.append("rubricApplied missing: config sets a rubric but analysis names no band")
-            elif band not in rubric:
-                gaps.append("rubricApplied.band {!r} is not a configured rubric band {}".format(
-                    band, sorted(rubric)))
-
-    # configured test commands must be proven run, with a consistent verdict.
-    commands = cfg.get("testCommands") or []
-    if commands:
-        ran = {c.get("command"): c.get("exitCode") for c in results.get("commands") or []}
-        for cmd in commands:
-            if cmd not in ran:
-                gaps.append("test-results.commands missing configured command: {!r}".format(cmd))
-        exit_codes = [ran[c] for c in commands if c in ran]
-        if exit_codes and len(exit_codes) == len(commands):
-            expected = "pass" if all(x == 0 for x in exit_codes) else "fail"
-            if results.get("verdict") != expected:
-                gaps.append("test-results.verdict {!r} inconsistent with exit codes {} "
-                            "(expected {!r})".format(results.get("verdict"), exit_codes, expected))
+        gaps.extend(_friction_gaps(cfg, analysis))
+        gaps.extend(_retrospective_gaps(cfg, analysis))
+        gaps.extend(_rubric_gaps(cfg, analysis))
+    gaps.extend(_command_gaps(cfg, results))
     return gaps
 
 
