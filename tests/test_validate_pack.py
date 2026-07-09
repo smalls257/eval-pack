@@ -90,5 +90,57 @@ class WriteZipTranscriptTests(unittest.TestCase):
         os.environ.pop("CLAUDE_PLUGIN_OPTION_includeTranscript", None)
 
 
+class StandaloneConfigFallbackTests(unittest.TestCase):
+    """Standalone render (no eval-config.json) must honor the legacy env var.
+
+    read_config(None) ignores env by design (fresh DEFAULTS), so without the
+    fallback a user-requested transcript exclusion would be silently dropped —
+    a privacy-adjacent Silent Fallback.
+    """
+
+    def _with_env(self, value, fn):
+        import os
+        old = os.environ.get("CLAUDE_PLUGIN_OPTION_includeTranscript")
+        if value is None:
+            os.environ.pop("CLAUDE_PLUGIN_OPTION_includeTranscript", None)
+        else:
+            os.environ["CLAUDE_PLUGIN_OPTION_includeTranscript"] = value
+        try:
+            return fn()
+        finally:
+            if old is None:
+                os.environ.pop("CLAUDE_PLUGIN_OPTION_includeTranscript", None)
+            else:
+                os.environ["CLAUDE_PLUGIN_OPTION_includeTranscript"] = old
+
+    def test_standalone_cfg_falls_back_to_env(self):
+        with tempfile.TemporaryDirectory() as d:
+            missing = Path(d) / "eval-config.json"  # main()'s no-config branch
+            def resolve():
+                # read_config(None) ignores env (by design) …
+                self.assertIs(render_html.read_config(None)["includeTranscript"], True)
+                # … but render-time resolution must honor the legacy env var.
+                return render_html._resolve_render_config(missing)
+            cfg = self._with_env("false", resolve)
+            self.assertIs(cfg["includeTranscript"], False)
+
+    def test_standalone_defaults_true_without_env(self):
+        with tempfile.TemporaryDirectory() as d:
+            missing = Path(d) / "eval-config.json"
+            cfg = self._with_env(None, lambda: render_html._resolve_render_config(missing))
+            self.assertIs(cfg["includeTranscript"], True)
+
+    def test_resolved_config_file_wins_over_env(self):
+        # Pipeline path: env was already layered at resolve time — the resolved
+        # file is authoritative, so render must NOT re-apply the raw env var.
+        with tempfile.TemporaryDirectory() as d:
+            cfg_path = Path(d) / "eval-config.json"
+            resolved = render_html.read_config(None)
+            resolved["includeTranscript"] = True
+            cfg_path.write_text(json.dumps(resolved), encoding="utf-8")
+            cfg = self._with_env("false", lambda: render_html._resolve_render_config(cfg_path))
+            self.assertIs(cfg["includeTranscript"], True)
+
+
 if __name__ == "__main__":
     unittest.main()

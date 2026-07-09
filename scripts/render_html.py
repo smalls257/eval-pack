@@ -406,15 +406,29 @@ def publish_openable(pack_dir, session_id, open_base, include_transcript=True):
 
 
 def _include_transcript():
-    """Legacy shim: read includeTranscript straight from the env var. Default true.
+    """Legacy env shim: read includeTranscript straight from the env var. Default true.
 
-    main() now reads includeTranscript off the resolved config (cfg) instead,
-    so file-layer and .eval-pack.local.json overrides take effect there. This
-    function is kept only because tests exercise the raw env-var behavior
-    directly; it is no longer called from main().
+    Used by standalone renders (no resolved eval-config.json in the pack dir)
+    via _resolve_render_config, and exercised directly by tests. The pipeline
+    path reads the resolved eval-config.json instead, where the env layer was
+    already applied at resolve time.
     """
     val = os.environ.get("CLAUDE_PLUGIN_OPTION_includeTranscript", "true")
     return str(val).strip().lower() not in ("false", "0", "no")
+
+
+def _resolve_render_config(cfg_path):
+    """Return the render-time config: the resolved eval-config.json, or defaults.
+
+    Standalone render without a resolved config: honor the legacy env var so a
+    transcript the user asked to exclude is never silently bundled (Sensor —
+    read_config(None) returns fresh DEFAULTS and ignores env by design).
+    """
+    if cfg_path.is_file():
+        return read_config(cfg_path)
+    cfg = read_config(None)
+    cfg["includeTranscript"] = _include_transcript()
+    return cfg
 
 
 def validate_pack(pack_dir):
@@ -469,7 +483,7 @@ def main():
 
     pack_dir = args.output_dir / args.session_id
     cfg_path = pack_dir / "eval-config.json"
-    cfg = read_config(cfg_path if cfg_path.is_file() else None)
+    cfg = _resolve_render_config(cfg_path)
     redaction_rules = cfg["redaction"]
     user_template_dir = None
     if cfg["templateDir"]:
