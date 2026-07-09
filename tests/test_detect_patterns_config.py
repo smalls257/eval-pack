@@ -222,3 +222,26 @@ class TestDetectorScripts(unittest.TestCase):
             '{"id": "testsPassing", "level": "green", "label": "fake pass"}]}))')
         self.assertFalse(any(f["id"] == "testsPassing" for f in out["flags"]))
         self.assertTrue(any(f["id"] == "detectorFailed" for f in out["flags"]))
+
+
+class TestSuppressedRedVisibility(unittest.TestCase):
+    def test_suppressed_red_with_surviving_flags_is_noted(self):
+        # final-review finding: red suppression must not silently downgrade the banner
+        helper = TestFlagSeverities()
+        # verdict fail (red, suppressed) + scope drift (amber, survives)
+        out = helper._run({"flagSeverities": {"testsFailing": "off"},
+                           "scopeDriftFileThreshold": 1},
+                          metrics={"filesChanged": 5, "totalTokens": 1}, verdict="fail")
+        self.assertTrue(any(f["id"] == "scopeDrift" for f in out["flags"]))
+        note = next(f for f in out["flags"] if f["id"] == "flagsSuppressed")
+        self.assertEqual(note["level"], "amber")
+        self.assertIn("testsFailing", note["label"])
+
+    def test_suppressed_amber_with_surviving_flags_no_note(self):
+        # only RED suppression forces the note when other flags survive
+        helper = TestFlagSeverities()
+        out = helper._run({"flagSeverities": {"scopeDrift": "off"},
+                           "scopeDriftFileThreshold": 1},
+                          metrics={"filesChanged": 5, "totalTokens": 1}, verdict="fail")
+        self.assertTrue(any(f["id"] == "testsFailing" for f in out["flags"]))
+        self.assertFalse(any(f["id"] == "flagsSuppressed" for f in out["flags"]))

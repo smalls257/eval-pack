@@ -489,6 +489,11 @@ def main():
     redaction_rules = cfg["redaction"]
     user_template_dir = None
     if cfg["templateDir"]:
+        # templateDir is deliberately NOT repo-confined (unlike extends/evaluatorPromptFile/
+        # detectorScripts): it only sources static template files copied INTO the pack, from a
+        # path the repo's own committed config names — same trust class as testCommands. A
+        # confinement gate here would block legitimate shared-theme dirs without closing any
+        # attack a repo config couldn't already perform via detectorScripts.
         user_template_dir = Path.cwd() / cfg["templateDir"]
         if not user_template_dir.is_dir():
             # Fail loud: a configured override that doesn't exist must not silently use bundled.

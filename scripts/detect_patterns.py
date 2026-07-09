@@ -296,11 +296,14 @@ def main():
     # Built-in flags carry a stable id so users can retune severity per-flag.
     sev = cfg.get("flagSeverities") or {}
     suppressed = []
+    suppressed_red = []
 
     def add_flag(fid, default_level, label, **extra):
         level = sev.get(fid, default_level)
         if level == "off":
             suppressed.append(fid)
+            if default_level == "red":
+                suppressed_red.append(fid)
             return
         flags.append(dict({"id": fid, "level": level, "label": label}, **extra))
 
@@ -361,6 +364,13 @@ def main():
             })
         else:
             flags.append({"id": "cleanPass", "level": "green", "label": "Clean first-pass implementation"})
+    elif suppressed_red:
+        # A suppressed RED must not silently downgrade the banner to the surviving flags'
+        # level — say which red(s) were turned off (Sensor: no invisible downgrades).
+        flags.append({
+            "id": "flagsSuppressed", "level": "amber",
+            "label": "Red flag(s) suppressed by flagSeverities: {}".format(", ".join(suppressed_red)),
+        })
 
     result = {
         "falseCompletions": false_completions,
