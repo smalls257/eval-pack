@@ -30,7 +30,7 @@
       "type": "array",
       "items": { "type": "string" },
       "default": ["tooling", "structure", "naming", "docs", "other"],
-      "description": "Categories the evaluator classifies friction into."
+      "description": "Categories the evaluator classifies friction into. File-layer lists ADD to defaults; start the list with \"!replace\" to replace instead."
     },
     "testCommands": {
       "type": "array",
@@ -122,7 +122,7 @@
     "falseCompletionWindow": { "type": "integer", "default": 1, "description": "Entries scanned for a user correction after a completion claim." },
     "claimTruncLen": { "type": "integer", "default": 120, "description": "Truncation length for quoted claims in patterns.json." },
     "flagSeverities": { "type": "object", "default": {}, "description": "Per-flag severity overrides: {flagId: red|amber|green|off}." },
-    "tokenFieldNames": { "type": "array", "items": { "type": "string" }, "default": ["subagent_tokens", "total_tokens"], "description": "Accepted subagent token field names." },
+    "tokenFieldNames": { "type": "array", "items": { "type": "string" }, "default": ["subagent_tokens", "total_tokens"], "description": "Accepted subagent token field names. File-layer lists ADD to defaults; start the list with \"!replace\" to replace instead." },
     "tokenWeights": { "type": "object", "default": {}, "description": "Optional weights for the total-token sum; empty = plain sum." },
     "costBudgetTokens": { "type": "integer", "default": 0, "description": "Amber-flag when totalTokens exceeds this; 0 disables." }
   }

@@ -362,3 +362,26 @@ class TestTokenFieldNamesGuard(unittest.TestCase):
     def test_empty_list_rejected(self):
         errs = config.validate({"tokenFieldNames": []})
         self.assertTrue(any("tokenFieldNames" in e for e in errs))
+
+
+class TestListReplaceSentinel(unittest.TestCase):
+    def test_replace_sentinel_replaces_instead_of_concat(self):
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, ".eval-pack.json",
+                   {"frictionCategories": ["!replace", "ci-flake", "review-latency"]})
+            cfg = config.load_config(d, env={})
+            self.assertEqual(cfg["frictionCategories"], ["ci-flake", "review-latency"])
+
+    def test_without_sentinel_still_concats(self):
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, ".eval-pack.json", {"frictionCategories": ["ci-flake"]})
+            cfg = config.load_config(d, env={})
+            self.assertEqual(cfg["frictionCategories"],
+                             ["tooling", "structure", "naming", "docs", "other", "ci-flake"])
+
+    def test_sentinel_works_across_layers(self):
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, ".eval-pack.json", {"frictionCategories": ["ci-flake"]})
+            _write(d, ".eval-pack.local.json", {"frictionCategories": ["!replace", "mine"]})
+            cfg = config.load_config(d, env={})
+            self.assertEqual(cfg["frictionCategories"], ["mine"])

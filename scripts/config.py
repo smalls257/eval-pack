@@ -168,7 +168,11 @@ def _strip_meta(d):
 def _overlay(base, layer):
     for k, v in layer.items():
         if isinstance(v, list) and isinstance(base.get(k), list):
-            base[k] = _dedupe(base[k] + v)
+            if v and v[0] == "!replace":
+                # explicit replace: user opts out of additive merge for this list
+                base[k] = list(v[1:])
+            else:
+                base[k] = _dedupe(base[k] + v)
         else:
             base[k] = v
     return base
@@ -249,8 +253,10 @@ def load_config(project_root, env=None):
 
     List merge differs by layer: file layers (presets, .eval-pack.json,
     .eval-pack.local.json) concat-then-dedupe onto the base, but a
-    CLAUDE_PLUGIN_OPTION_* env override REPLACES the list outright. Raises
-    ConfigError on malformed JSON or an uncoercible env value.
+    CLAUDE_PLUGIN_OPTION_* env override REPLACES the list outright. A
+    file-layer list starting with "!replace" replaces the base list instead
+    of concatenating. Raises ConfigError on malformed JSON or an uncoercible
+    env value.
     """
     env = os.environ if env is None else env
     root = Path(project_root)
