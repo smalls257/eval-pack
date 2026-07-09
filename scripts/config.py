@@ -227,7 +227,13 @@ def _coerce(raw, typ, key):
                 raise ConfigError("CLAUDE_PLUGIN_OPTION_{}: expected {}, got {}".format(
                     key, typ.__name__, type(val).__name__))
             # Dedupe to match the file-layer list-merge semantics (consistency).
-            return _dedupe(val) if typ is list else val
+            if typ is list:
+                if val and val[0] == "!replace":
+                    # env values replace anyway — consume the sentinel so it can never
+                    # leak into a resolved list as literal data
+                    val = val[1:]
+                return _dedupe(val)
+            return val
         if typ is dict:
             raise ConfigError(
                 "CLAUDE_PLUGIN_OPTION_{}: dict values must be JSON (e.g. '{{\"k\": \"v\"}}')".format(key))
@@ -356,6 +362,13 @@ def validate(cfg):
     # An empty field-name list would compile to a match-anything token regex — refuse it.
     if cfg.get("tokenFieldNames") == []:
         errors.append("tokenFieldNames: must not be empty")
+    # The merge sentinel is consumed by _overlay/_coerce; a literal survivor means a
+    # misplaced sentinel (not first element) or an unforeseen path — never legal data.
+    for k, typ in _TYPES.items():
+        if typ is list and isinstance(cfg.get(k), list) and "!replace" in cfg[k]:
+            errors.append(
+                "{}: literal '!replace' in resolved list — the sentinel must be the "
+                "FIRST element of a file-layer list (or omitted)".format(k))
     return errors
 
 

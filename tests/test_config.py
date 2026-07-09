@@ -385,3 +385,13 @@ class TestListReplaceSentinel(unittest.TestCase):
             _write(d, ".eval-pack.local.json", {"frictionCategories": ["!replace", "mine"]})
             cfg = config.load_config(d, env={})
             self.assertEqual(cfg["frictionCategories"], ["mine"])
+
+    def test_env_json_list_sentinel_stripped(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = config.load_config(
+                d, env={"CLAUDE_PLUGIN_OPTION_frictionCategories": '["!replace", "x"]'})
+            self.assertEqual(cfg["frictionCategories"], ["x"])
+
+    def test_resolved_list_with_literal_sentinel_rejected(self):
+        errs = config.validate({"frictionCategories": ["a", "!replace", "b"]})
+        self.assertTrue(any("!replace" in e for e in errs))
