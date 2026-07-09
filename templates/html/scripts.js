@@ -168,7 +168,7 @@ function renderPageHeader(data) {
   }
 }
 
-function renderHighlights(analysis) {
+function renderHighlights(analysis, lenses) {
   const h = (analysis || {}).highlights || {};
   const cs = h.completionStatus || {};
 
@@ -187,7 +187,8 @@ function renderHighlights(analysis) {
   const confCard = document.getElementById('confidence-card');
   const confVal = document.getElementById('confidence-value');
   const confNotes = document.getElementById('confidence-notes');
-  const pct = h.confidencePercent;
+  const eff = effectiveConfidence(analysis, lenses);
+  const pct = eff.value;
   if (confCard && pct != null) {
     const n = Math.max(0, Math.min(100, Number(pct) || 0));
     const tier = n >= 75 ? 'high' : n >= 40 ? 'mid' : 'low';
@@ -196,6 +197,8 @@ function renderHighlights(analysis) {
     if (confVal) confVal.innerHTML =
       html`${n}%<div class="confidence-bar"><div class="confidence-bar-fill" style="width:${n}%"></div></div>`;
     if (confNotes) confNotes.textContent = h.confidenceNotes || '';
+    if (confNotes && eff.note) confNotes.textContent =
+      (h.confidenceNotes ? h.confidenceNotes + ' — ' : '') + eff.note;
   } else if (confCard) {
     confCard.style.display = 'none';
   }
@@ -1157,6 +1160,29 @@ function lensScore(x) {
   return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : '—';
 }
 
+// Verdict-facing confidence: when scorer lenses ran under a non-core rule, the aggregated
+// finalScore IS the confidence a user should lead with (finding: cosmetic finalScore).
+function effectiveConfidence(analysis, lenses) {
+  const core = ((analysis || {}).highlights || {}).confidencePercent;
+  const l = lenses || {};
+  const scorers = l.scorers || [];
+  if (l.rule && l.rule !== 'core' && scorers.length && l.finalScore != null) {
+    return { value: l.finalScore,
+             note: `${l.rule} of core ${l.coreScore} and ${scorers.length} scorer lens(es)` };
+  }
+  return { value: core != null ? core : null, note: null };
+}
+
+// A lens finding may be a plain string or {type, detail} — render both, never [object Object].
+function lensFindingText(f) {
+  if (typeof f === 'string') return f;
+  if (f && typeof f === 'object') {
+    const detail = f.detail != null ? String(f.detail) : '';
+    return f.type ? `${f.type}: ${detail}` : detail || JSON.stringify(f);
+  }
+  return String(f);
+}
+
 function renderLenses(data) {
   const lenses = data.lenses;
   const tabBtn = document.querySelector('.tab-btn[data-panel="lenses"]');
@@ -1176,10 +1202,11 @@ function renderLenses(data) {
     parts.push(html`<p class="lens-agg">Verdict aggregation — core <strong>${lensScore(lenses.coreScore)}</strong> <code>${lenses.rule}</code> lenses → final <strong>${lensScore(lenses.finalScore)}</strong></p>`);
   }
   (lenses.scorers || []).forEach(s => {
-    parts.push(html`<div class="lens-card"><div class="lens-meta">scorer · ${s.skill}</div><p>score <strong>${lensScore(s.score)}</strong> — ${s.rationale}</p></div>`);
+    const findings = (s.findings || []).map(f => html`<li>${lensFindingText(f)}</li>`).join('');
+    parts.push(html`<div class="lens-card"><div class="lens-meta">scorer · ${s.skill}</div><p>score <strong>${lensScore(s.score)}</strong> — ${s.rationale}</p>${safe(findings ? html`<ul>${safe(findings)}</ul>` : '')}</div>`);
   });
   (lenses.contributors || []).forEach(c => {
-    const findings = (c.findings || []).map(f => html`<li>${f}</li>`).join('');
+    const findings = (c.findings || []).map(f => html`<li>${lensFindingText(f)}</li>`).join('');
     parts.push(html`<div class="lens-card"><div class="lens-meta">contributor · ${c.skill}</div><h4>${c.title}</h4><ul>${safe(findings)}</ul></div>`);
   });
   (lenses.failures || []).forEach(f => {
@@ -1194,7 +1221,7 @@ function renderSession(data) {
 
   renderBranding(data);
   renderPageHeader(data);
-  renderHighlights(analysis);
+  renderHighlights(analysis, data.lenses);
   renderVerdict(data);
   renderStats(data);
   renderFlags(data);
@@ -1281,5 +1308,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, estimateCost, modelRates, estimateSubagentCost, sumReportedCost, artifactHref, artifactLinkable };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, estimateCost, modelRates, estimateSubagentCost, sumReportedCost, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText };
 }
