@@ -265,8 +265,13 @@ resolved config (friction taxonomy, retrospective answers, rubric band, test-com
 "$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/validate_contracts.py" "${ABS_PACK_DIR}"
 ```
 
-If it exits non-zero: re-dispatch the evaluator ONCE, passing the printed `CONTRACT:` lines as
-corrections to address. If it fails again, STOP and show the user the violations — do not render.
+If it exits non-zero, route each `CONTRACT:` line to its owner:
+- **Analysis violations** (frictionLog / retrospectiveAnswers / rubricApplied): re-dispatch the
+  evaluator ONCE, passing those lines as corrections.
+- **Test violations** (test-results.commands / verdict): the evaluator cannot fix these — redo
+  Step 3 so `test-results.json` records every configured command with its real exit code and a
+  verdict consistent with them.
+Re-run the gate. If it still fails, STOP and show the user the violations — do not render.
 (render_html enforces the same gate; skipping this step cannot ship a non-conforming pack.)
 
 **If analysis is disabled** (`analysis` option is false):

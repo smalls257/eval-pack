@@ -437,10 +437,6 @@ def validate_pack(pack_dir):
     if not metrics or not metrics.get("turnCount"):
         gaps.append("metrics.json missing or has no turnCount (metric extraction did not run)")
 
-    # Deterministic backstop: even if the orchestrating skill skipped the contract gate,
-    # a non-conforming pack must not render.
-    gaps.extend(validate_contracts.collect_gaps(pack_dir))
-
     return gaps
 
 
@@ -489,6 +485,17 @@ def main():
             print(f"  - {g}", file=sys.stderr)
         print("Fix the gap(s) above and re-run; no partial pack was written.", file=sys.stderr)
         shutil.rmtree(pack_dir, ignore_errors=True)
+        sys.exit(1)
+
+    # Deterministic backstop: even if the orchestrating skill skipped the contract gate,
+    # a non-conforming pack must not render. Contract gaps PRESERVE the pack dir —
+    # analysis.json/test-results.json are the evidence needed to fix the violation.
+    contract_gaps = validate_contracts.collect_gaps(pack_dir)
+    if contract_gaps:
+        print("Refusing to render — contract violations (pack dir preserved for inspection):",
+              file=sys.stderr)
+        for g in contract_gaps:
+            print(f"  CONTRACT: {g}", file=sys.stderr)
         sys.exit(1)
 
     agent_screenshot_names = set()
