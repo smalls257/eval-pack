@@ -412,6 +412,14 @@ def validate(cfg):
                 "{}: literal '!replace' in resolved list — in a file layer the sentinel must "
                 "be the FIRST element (or omitted); for an env override use the JSON-array "
                 "form, which consumes it (env values replace anyway)".format(k))
+        elif typ is dict and isinstance(cfg.get(k), dict):
+            # Dicts replace wholesale — the list sentinel is meaningless inside them and
+            # would compile into detection regexes as literal text. Fail loud.
+            for group, val in cfg[k].items():
+                if isinstance(val, list) and "!replace" in val:
+                    errors.append(
+                        "{}.{}: '!replace' is a LIST-merge sentinel; dict values replace "
+                        "wholesale — remove it and supply every group you want".format(k, group))
     dets = cfg.get("customDetectors")
     if isinstance(dets, list):
         seen_ids = set()

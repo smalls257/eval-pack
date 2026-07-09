@@ -443,3 +443,15 @@ class TestCustomDetectorValidation(unittest.TestCase):
         d1 = {"id": "mine", "level": "red", "label": "l", "scope": "bash", "pattern": "a"}
         errs = config.validate({"customDetectors": [d1, dict(d1)]})
         self.assertTrue(any("duplicate" in e for e in errs))
+
+
+class TestSentinelInDictValues(unittest.TestCase):
+    def test_sentinel_inside_detectionpatterns_rejected(self):
+        # the README truth-audit footgun: dict values replace wholesale; the list
+        # sentinel inside them would compile as literal regex text
+        errs = config.validate({"detectionPatterns": {"done": ["!replace", "fertig"]}})
+        self.assertTrue(any("detectionPatterns.done" in e and "wholesale" in e for e in errs))
+
+    def test_clean_detectionpatterns_ok(self):
+        errs = config.validate({"detectionPatterns": {"done": ["(?i)fertig"]}})
+        self.assertEqual([e for e in errs if "detectionPatterns" in e], [])

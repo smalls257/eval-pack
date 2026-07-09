@@ -128,8 +128,8 @@ Key groups (full key list + types: `schema/eval-pack.schema.json`):
   taxonomy `frictionLog` entries must draw from — validated), `evaluatorPromptFile` (extra
   grading guidance from a file in your repo). These gates are enforced by
   `scripts/validate_contracts.py`, not by prose: a violation halts the pipeline before render.
-- **Heuristics** — `detectionPatterns` (regex lists; start a list with `"!replace"` to replace
-  defaults instead of adding), `falseCompletionWindow`, `scopeDriftFileThreshold`,
+- **Heuristics** — `detectionPatterns` (a dict of regex lists — providing it replaces the WHOLE
+  dict, so supply every group you want: done/correction/retry), `falseCompletionWindow`, `scopeDriftFileThreshold`,
   `retryAmberThreshold`, `flagSeverities` (retune or `"off"` any flag by id), `costBudgetTokens`,
   `customDetectors` and `detectorScripts` (your own deterministic policy checks — see below).
 - **Tests & tickets** — `testCommands` (run verbatim; real exit codes drive the verdict, enforced
