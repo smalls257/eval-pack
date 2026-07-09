@@ -68,6 +68,19 @@ def main(argv=None):
                 prompt_file, args.project_root), file=sys.stderr)
             return 1
 
+    root_resolved = Path(args.project_root).resolve()
+    for script in cfg.get("detectorScripts") or []:
+        spath = Path(args.project_root) / script
+        resolved = spath.resolve()
+        if not (resolved == root_resolved or root_resolved in resolved.parents):
+            print("ERROR: detectorScripts entry {!r} resolves outside the repo".format(script),
+                  file=sys.stderr)
+            return 1
+        if not spath.is_file():
+            print("ERROR: detectorScripts entry {!r} not found under {}".format(
+                script, args.project_root), file=sys.stderr)
+            return 1
+
     # Sensor: a verdict config where every failure-capable flag is disabled can never fail —
     # warn, don't block. Derived from FAILURE_FLAG_IDS so it can't rot when flags are added.
     sev = cfg.get("flagSeverities") or {}

@@ -157,3 +157,24 @@ class TestCanNeverFailGuardCoversFailureSet(unittest.TestCase):
             r = _run([root, pack])
             self.assertEqual(r.returncode, 0)
             self.assertIn("can never fail", r.stderr)
+
+
+class TestDetectorScriptGate(unittest.TestCase):
+    def test_missing_script_halts(self):
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as pack:
+            (Path(root) / ".eval-pack.json").write_text(
+                json.dumps({"detectorScripts": ["nope/det.py"]}), encoding="utf-8")
+            r = _run([root, pack])
+            self.assertEqual(r.returncode, 1)
+            self.assertIn("detectorScripts", r.stderr)
+
+    def test_escaping_script_path_halts(self):
+        with tempfile.TemporaryDirectory() as outer:
+            (Path(outer) / "evil.py").write_text("print('x')", encoding="utf-8")
+            root = Path(outer) / "repo"; root.mkdir()
+            (root / ".eval-pack.json").write_text(
+                json.dumps({"detectorScripts": ["../evil.py"]}), encoding="utf-8")
+            with tempfile.TemporaryDirectory() as pack:
+                r = _run([str(root), pack])
+                self.assertEqual(r.returncode, 1)
+                self.assertIn("outside the repo", r.stderr)

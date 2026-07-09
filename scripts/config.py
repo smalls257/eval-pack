@@ -169,6 +169,7 @@ FAILURE_FLAG_IDS = (
 # Every flag id the built-in pipeline can emit (collision guard for customDetectors).
 BUILTIN_FLAG_IDS = FAILURE_FLAG_IDS + (
     "testsPassing", "cleanPass", "flagsSuppressed", "lensFailed", "lensVerdict",
+    "detectorFailed",
 )
 
 

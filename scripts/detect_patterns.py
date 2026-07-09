@@ -2,6 +2,7 @@
 import argparse
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))  # noqa: E402
@@ -235,6 +236,33 @@ def run_custom_detectors(detectors, scope_strings):
     return fired
 
 
+def run_detector_scripts(scripts, transcript_path, output_dir):
+    """Run repo detector scripts; validate their output by code. A failing or malformed
+    script becomes a visible red flag — never a crash, never a silent absence."""
+    ok_flags, failures = [], []
+    for script in scripts:
+        name = Path(script).name
+        try:
+            proc = subprocess.run(
+                [sys.executable, str(script), str(transcript_path), str(output_dir)],
+                capture_output=True, text=True, timeout=120)
+            if proc.returncode != 0:
+                failures.append((name, "exit {}".format(proc.returncode)))
+                continue
+            data = json.loads(proc.stdout)
+            flags = data.get("flags")
+            if not isinstance(flags, list):
+                raise ValueError("no flags list")
+            for f in flags:
+                if (not isinstance(f, dict) or not f.get("id") or not f.get("label")
+                        or f.get("level") not in ("red", "amber", "green")):
+                    raise ValueError("bad flag shape: {!r}".format(f))
+            ok_flags.extend(flags)
+        except (subprocess.TimeoutExpired, json.JSONDecodeError, ValueError, OSError) as exc:
+            failures.append((name, str(exc)))
+    return ok_flags, failures
+
+
 def main():
     parser = argparse.ArgumentParser(description="Detect heuristic patterns in transcript")
     parser.add_argument("transcript", help="Path to transcript.jsonl")
@@ -309,6 +337,14 @@ def main():
         scope_strings = collect_scope_strings(entries)
         for fid, level, label, count in run_custom_detectors(custom, scope_strings):
             add_flag(fid, level, label, count=count)
+    scripts = cfg.get("detectorScripts") or []
+    if scripts:
+        script_flags, script_failures = run_detector_scripts(scripts, transcript_file, output_dir)
+        for f in script_flags:
+            add_flag(f["id"], f["level"], f["label"],
+                     **({"count": f["count"]} if isinstance(f.get("count"), int) else {}))
+        for name, err in script_failures:
+            add_flag("detectorFailed", "red", "Detector script failed: {} ({})".format(name, err))
     if not flags:
         if suppressed:
             # Suppression must not masquerade as a clean pass — say what was hidden.

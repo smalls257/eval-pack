@@ -167,3 +167,45 @@ class TestCustomDetectors(unittest.TestCase):
         out = self._run_pack([det], lines)
         self.assertTrue(any(f["id"] == "policyOk" for f in out["flags"]))
         self.assertFalse(any(f["id"] == "cleanPass" for f in out["flags"]))
+
+
+class TestDetectorScripts(unittest.TestCase):
+    def _run_pack(self, script_body, lines=None):
+        import subprocess
+        with tempfile.TemporaryDirectory() as d:
+            pack = Path(d)
+            script = pack / "det.py"
+            script.write_text(script_body, encoding="utf-8")
+            (pack / "transcript.jsonl").write_text(
+                json.dumps(lines or {"type": "assistant", "message": {"content": "hi"}}) + "\n",
+                encoding="utf-8")
+            base = dict(json.loads(json.dumps(__import__("config").DEFAULTS)))
+            base["detectorScripts"] = [str(script)]
+            (pack / "eval-config.json").write_text(json.dumps(base), encoding="utf-8")
+            subprocess.run(
+                [sys.executable, str(SCRIPTS / "detect_patterns.py"),
+                 str(pack / "transcript.jsonl"), str(pack), "--config", str(pack / "eval-config.json")],
+                check=True, capture_output=True, text=True)
+            return json.loads((pack / "patterns.json").read_text(encoding="utf-8"))
+
+    def test_script_flags_merged(self):
+        out = self._run_pack(
+            'import json; print(json.dumps({"flags": ['
+            '{"id": "prodTouch", "level": "red", "label": "prod path modified"}]}))')
+        flag = next(f for f in out["flags"] if f["id"] == "prodTouch")
+        self.assertEqual(flag["level"], "red")
+
+    def test_failing_script_becomes_red_flag(self):
+        out = self._run_pack('raise SystemExit(3)')
+        self.assertTrue(any(f["id"] == "detectorFailed" and f["level"] == "red"
+                            for f in out["flags"]))
+
+    def test_malformed_output_becomes_red_flag(self):
+        out = self._run_pack('print("not json")')
+        self.assertTrue(any(f["id"] == "detectorFailed" for f in out["flags"]))
+
+    def test_bad_level_in_script_output_rejected(self):
+        out = self._run_pack(
+            'import json; print(json.dumps({"flags": [{"id": "x", "level": "purple", "label": "l"}]}))')
+        self.assertFalse(any(f["id"] == "x" for f in out["flags"]))
+        self.assertTrue(any(f["id"] == "detectorFailed" for f in out["flags"]))
