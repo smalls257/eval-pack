@@ -170,7 +170,7 @@ class TestCustomDetectors(unittest.TestCase):
 
 
 class TestDetectorScripts(unittest.TestCase):
-    def _run_pack(self, script_body, lines=None):
+    def _run_pack(self, script_body, lines=None, extra_cfg=None):
         import subprocess
         with tempfile.TemporaryDirectory() as d:
             pack = Path(d)
@@ -181,6 +181,7 @@ class TestDetectorScripts(unittest.TestCase):
                 encoding="utf-8")
             base = dict(json.loads(json.dumps(__import__("config").DEFAULTS)))
             base["detectorScripts"] = [str(script)]
+            base.update(extra_cfg or {})
             (pack / "eval-config.json").write_text(json.dumps(base), encoding="utf-8")
             subprocess.run(
                 [sys.executable, str(SCRIPTS / "detect_patterns.py"),
@@ -208,4 +209,16 @@ class TestDetectorScripts(unittest.TestCase):
         out = self._run_pack(
             'import json; print(json.dumps({"flags": [{"id": "x", "level": "purple", "label": "l"}]}))')
         self.assertFalse(any(f["id"] == "x" for f in out["flags"]))
+        self.assertTrue(any(f["id"] == "detectorFailed" for f in out["flags"]))
+
+    def test_detectorfailed_not_suppressible(self):
+        out = self._run_pack('raise SystemExit(3)',
+                             extra_cfg={"flagSeverities": {"detectorFailed": "off"}})
+        self.assertTrue(any(f["id"] == "detectorFailed" for f in out["flags"]))
+
+    def test_script_flag_counterfeiting_builtin_rejected(self):
+        out = self._run_pack(
+            'import json; print(json.dumps({"flags": ['
+            '{"id": "testsPassing", "level": "green", "label": "fake pass"}]}))')
+        self.assertFalse(any(f["id"] == "testsPassing" for f in out["flags"]))
         self.assertTrue(any(f["id"] == "detectorFailed" for f in out["flags"]))

@@ -15,6 +15,22 @@ sys.path.insert(0, str(Path(__file__).parent))  # noqa: E402
 import config  # noqa: E402
 
 
+def _confined_repo_file(project_root, entry):
+    """Return an error string unless entry resolves to an existing file inside project_root.
+
+    Confine to the repo (same rule as extends presets): reject ../ escapes and
+    absolute out-of-repo paths — Path(root) / absolute yields the absolute path.
+    """
+    root_resolved = Path(project_root).resolve()
+    path = Path(project_root) / entry
+    resolved = path.resolve()
+    if not (resolved == root_resolved or root_resolved in resolved.parents):
+        return "resolves outside the repo"
+    if not path.is_file():
+        return "not found under {}".format(project_root)
+    return None
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Resolve eval-pack configuration")
     parser.add_argument("project_root", help="Repo root containing .eval-pack.json")
@@ -54,31 +70,15 @@ def main(argv=None):
 
     prompt_file = cfg.get("evaluatorPromptFile") or ""
     if prompt_file:
-        # Confine to the repo (same rule as extends presets): reject ../ escapes and
-        # absolute out-of-repo paths — Path(root) / absolute yields the absolute path.
-        root_resolved = Path(args.project_root).resolve()
-        ppath = (Path(args.project_root) / prompt_file)
-        resolved = ppath.resolve()
-        if not (resolved == root_resolved or root_resolved in resolved.parents):
-            print("ERROR: evaluatorPromptFile {!r} resolves outside the repo".format(prompt_file),
-                  file=sys.stderr)
-            return 1
-        if not ppath.is_file():
-            print("ERROR: evaluatorPromptFile {!r} not found under {}".format(
-                prompt_file, args.project_root), file=sys.stderr)
+        err = _confined_repo_file(args.project_root, prompt_file)
+        if err:
+            print("ERROR: evaluatorPromptFile {!r} {}".format(prompt_file, err), file=sys.stderr)
             return 1
 
-    root_resolved = Path(args.project_root).resolve()
     for script in cfg.get("detectorScripts") or []:
-        spath = Path(args.project_root) / script
-        resolved = spath.resolve()
-        if not (resolved == root_resolved or root_resolved in resolved.parents):
-            print("ERROR: detectorScripts entry {!r} resolves outside the repo".format(script),
-                  file=sys.stderr)
-            return 1
-        if not spath.is_file():
-            print("ERROR: detectorScripts entry {!r} not found under {}".format(
-                script, args.project_root), file=sys.stderr)
+        err = _confined_repo_file(args.project_root, script)
+        if err:
+            print("ERROR: detectorScripts entry {!r} {}".format(script, err), file=sys.stderr)
             return 1
 
     # Sensor: a verdict config where every failure-capable flag is disabled can never fail —

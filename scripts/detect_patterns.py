@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))  # noqa: E402
-from config import read_config  # noqa: E402
+from config import read_config, BUILTIN_FLAG_IDS  # noqa: E402
 
 
 def load_jsonl(path):
@@ -257,6 +257,8 @@ def run_detector_scripts(scripts, transcript_path, output_dir):
                 if (not isinstance(f, dict) or not f.get("id") or not f.get("label")
                         or f.get("level") not in ("red", "amber", "green")):
                     raise ValueError("bad flag shape: {!r}".format(f))
+                if f.get("id") in BUILTIN_FLAG_IDS:
+                    raise ValueError("script flag id {!r} collides with a built-in".format(f.get("id")))
             ok_flags.extend(flags)
         except (subprocess.TimeoutExpired, json.JSONDecodeError, ValueError, OSError) as exc:
             failures.append((name, str(exc)))
@@ -344,7 +346,11 @@ def main():
             add_flag(f["id"], f["level"], f["label"],
                      **({"count": f["count"]} if isinstance(f.get("count"), int) else {}))
         for name, err in script_failures:
-            add_flag("detectorFailed", "red", "Detector script failed: {} ({})".format(name, err))
+            # detectorFailed is intentionally NOT suppressible via flagSeverities: it is the
+            # can't-vanish gate for detector scripts — a config that could turn it off would
+            # recreate the silent-absence hole it exists to close (mirrors lensFailed).
+            flags.append({"id": "detectorFailed", "level": "red",
+                          "label": "Detector script failed: {} ({})".format(name, err)})
     if not flags:
         if suppressed:
             # Suppression must not masquerade as a clean pass — say what was hidden.
