@@ -39,7 +39,7 @@ or `default`. Reference the JSON Schema so editors validate it:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/smalls257/eval-pack/main/schema/eval-pack.schema.json",
+  "$schema": "./.eval-pack.schema.json",
   "testCommands": ["npm test"],
   "ticketPattern": "ABC-\\d+",
   "subjectNoun": "plugin"
@@ -72,7 +72,15 @@ Write the files:
    silent default.
 2. `.eval-pack.local.json` (gitignored) — only if the user has per-developer secrets/redaction
    they don't want committed. Otherwise skip it.
-3. `.claude/settings.json` — register the marketplace (merge into existing content; create if
+3. `.eval-pack.schema.json` (committed) — copy it from
+   `${CLAUDE_PLUGIN_ROOT}/schema/eval-pack.schema.json` so the `$schema` reference resolves
+   offline and editors validate immediately:
+
+   ```bash
+   cp "${CLAUDE_PLUGIN_ROOT}/schema/eval-pack.schema.json" .eval-pack.schema.json
+   ```
+
+4. `.claude/settings.json` — register the marketplace (merge into existing content; create if
    absent):
 
 ```json
@@ -85,7 +93,7 @@ Write the files:
 }
 ```
 
-4. `.gitignore` — ensure these lines exist (create the file if missing):
+5. `.gitignore` — ensure these lines exist (create the file if missing):
 
 ```
 # Eval packs live on PR branches, not main
@@ -117,6 +125,13 @@ Tell the user:
   `/plugin marketplace add smalls257/eval-pack` then `/plugin install eval-pack@eval-pack`.
 - They can now use `/eval-pack:generate` and `/eval-pack:review`; re-run `/eval-pack:setup` any
   time to adjust the configuration.
+- The full customization surface, grouped: prompts (stance/rubric/retrospectiveQuestions/
+  evaluatorPromptFile), heuristics (detectionPatterns/flagSeverities/thresholds/costBudgetTokens/
+  customDetectors/detectorScripts for your own deterministic policy checks), tests & tickets
+  (testCommands/ticketPattern), security (redaction/publishOpenable), report
+  (branding/templateDir/sections), and extension lenses (analysisLenses + verdictAggregation) —
+  with a pointer to the README Configuration section, `.eval-pack.schema.json` for details, and
+  `/eval-pack:tune` for a fast re-evaluate loop after config changes.
 
 ## Extending in your own space (no plugin-source edits)
 
