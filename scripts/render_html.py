@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))  # noqa: E402
 import redact  # noqa: E402
 import validate_contracts  # noqa: E402
-from config import read_config  # noqa: E402
+from config import coerce_env_bool, read_config  # noqa: E402
 
 
 def run_script(script_path, args):
@@ -406,15 +406,17 @@ def publish_openable(pack_dir, session_id, open_base, include_transcript=True):
 
 
 def _include_transcript():
-    """Legacy env shim: read includeTranscript straight from the env var. Default true.
+    """Legacy env shim (standalone renders + direct test): canonical coercion, default True.
 
-    Used by standalone renders (no resolved eval-config.json in the pack dir)
-    via _resolve_render_config, and exercised directly by tests. The pipeline
-    path reads the resolved eval-config.json instead, where the env layer was
-    already applied at resolve time.
+    Delegates to config.coerce_env_bool so the standalone path accepts exactly
+    the env layer's spellings (e.g. "off" is False) and raises ConfigError on
+    garbage instead of silently bundling the transcript. The pipeline path
+    reads the resolved eval-config.json, where env was applied at resolve time.
     """
-    val = os.environ.get("CLAUDE_PLUGIN_OPTION_includeTranscript", "true")
-    return str(val).strip().lower() not in ("false", "0", "no")
+    raw = os.environ.get("CLAUDE_PLUGIN_OPTION_includeTranscript")
+    if raw in (None, ""):
+        return True
+    return coerce_env_bool(raw, "includeTranscript")
 
 
 def _resolve_render_config(cfg_path):

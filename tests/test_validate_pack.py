@@ -130,6 +130,22 @@ class StandaloneConfigFallbackTests(unittest.TestCase):
             cfg = self._with_env(None, lambda: render_html._resolve_render_config(missing))
             self.assertIs(cfg["includeTranscript"], True)
 
+    def test_standalone_env_off_excludes_transcript(self):
+        # "off" is False in the pipeline's canonical coercer — the standalone
+        # path must agree, or the transcript is silently bundled.
+        with tempfile.TemporaryDirectory() as d:
+            missing = Path(d) / "eval-config.json"
+            cfg = self._with_env("off", lambda: render_html._resolve_render_config(missing))
+            self.assertIs(cfg["includeTranscript"], False)
+
+    def test_standalone_env_garbage_raises(self):
+        # Garbage must fail loud (ConfigError), never silently bundle.
+        import config as _config
+        with tempfile.TemporaryDirectory() as d:
+            missing = Path(d) / "eval-config.json"
+            with self.assertRaises(_config.ConfigError):
+                self._with_env("maybe", lambda: render_html._resolve_render_config(missing))
+
     def test_resolved_config_file_wins_over_env(self):
         # Pipeline path: env was already layered at resolve time — the resolved
         # file is authoritative, so render must NOT re-apply the raw env var.

@@ -259,6 +259,16 @@ def _coerce(raw, typ, key):
     return raw
 
 
+def coerce_env_bool(raw, key):
+    """Public canonical env->bool coercion (same contract as the env layer).
+
+    Accepts the env layer's spellings (1/true/yes/on, 0/false/no/off) and
+    raises ConfigError on anything else — callers outside the layered loader
+    (e.g. standalone renders) must not hand-roll a divergent parser.
+    """
+    return _coerce(raw, bool, key)
+
+
 def _apply_env(cfg, env):
     for key, typ in _TYPES.items():
         raw = env.get("CLAUDE_PLUGIN_OPTION_" + key)
