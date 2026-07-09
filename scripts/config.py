@@ -29,6 +29,9 @@ DEFAULTS = {
     # Ticket-key regex the review skill matches for PR-body linking.
     "ticketPattern": r"[A-Z][A-Z0-9]+-[0-9]+",
     # Regex patterns whose matches are masked in published transcripts (security).
+    # Note: a LEADING "!replace" is the list-replace sentinel, not a pattern, and the
+    # literal string is never legal in a resolved list (leak guard in validate()); to
+    # mask that text use an equivalent regex, e.g. "!replac[e]".
     "redaction": [],
     # Whether to write an openable (unzipped) copy of the pack to a temp dir.
     "publishOpenable": True,
@@ -261,8 +264,10 @@ def load_config(project_root, env=None):
     .eval-pack.local.json) concat-then-dedupe onto the base, but a
     CLAUDE_PLUGIN_OPTION_* env override REPLACES the list outright. A
     file-layer list starting with "!replace" replaces the base list instead
-    of concatenating. Raises ConfigError on malformed JSON or an uncoercible
-    env value.
+    of concatenating. The leak invariant (no literal sentinel in a resolved
+    list) is enforced by validate(), not by this loader — callers must
+    validate before trusting list values. Raises ConfigError on malformed
+    JSON or an uncoercible env value.
     """
     env = os.environ if env is None else env
     root = Path(project_root)
@@ -367,8 +372,9 @@ def validate(cfg):
     for k, typ in _TYPES.items():
         if typ is list and isinstance(cfg.get(k), list) and "!replace" in cfg[k]:
             errors.append(
-                "{}: literal '!replace' in resolved list — the sentinel must be the "
-                "FIRST element of a file-layer list (or omitted)".format(k))
+                "{}: literal '!replace' in resolved list — in a file layer the sentinel must "
+                "be the FIRST element (or omitted); for an env override use the JSON-array "
+                "form, which consumes it (env values replace anyway)".format(k))
     return errors
 
 

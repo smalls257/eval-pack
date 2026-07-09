@@ -395,3 +395,11 @@ class TestListReplaceSentinel(unittest.TestCase):
     def test_resolved_list_with_literal_sentinel_rejected(self):
         errs = config.validate({"frictionCategories": ["a", "!replace", "b"]})
         self.assertTrue(any("!replace" in e for e in errs))
+
+    def test_env_comma_shorthand_sentinel_rejected_loudly(self):
+        # deliberate design: shorthand can't carry the sentinel — validate rejects, never guesses
+        with tempfile.TemporaryDirectory() as d:
+            cfg = config.load_config(
+                d, env={"CLAUDE_PLUGIN_OPTION_frictionCategories": "!replace,x"})
+            errs = config.validate(cfg)
+            self.assertTrue(any("!replace" in e for e in errs))
