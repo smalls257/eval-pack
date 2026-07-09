@@ -253,6 +253,36 @@ class TestFailLoudRegressions(unittest.TestCase):
                 self.assertIs(cfg["publishOpenable"], False, token)
 
 
+class TestResolveTimeGates(unittest.TestCase):
+    def test_rubric_values_must_be_strings(self):
+        errs = config.validate({"rubric": {"high": 42}})
+        self.assertTrue(any("rubric" in e for e in errs))
+        self.assertEqual(config.validate({"rubric": {"high": "no bugs"}}), [])
+
+    def test_extends_in_local_raises(self):
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, "base.json", {"retryAmberThreshold": 2})
+            _write(d, ".eval-pack.local.json", {"extends": ["base.json"]})
+            with self.assertRaises(config.ConfigError) as ctx:
+                config.load_config(d, env={})
+            self.assertIn("local", str(ctx.exception))
+
+    def test_env_dict_raises_clearly(self):
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(config.ConfigError) as ctx:
+                config.load_config(d, env={"CLAUDE_PLUGIN_OPTION_rubric": "high=good"})
+            self.assertIn("JSON", str(ctx.exception))
+
+    def test_env_json_array_and_object_accepted(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = config.load_config(d, env={
+                "CLAUDE_PLUGIN_OPTION_redaction": '["secret{1,3}"]',
+                "CLAUDE_PLUGIN_OPTION_rubric": '{"high": "ship"}',
+            })
+            self.assertEqual(cfg["redaction"], ["secret{1,3}"])  # comma survives (JSON, not split)
+            self.assertEqual(cfg["rubric"], {"high": "ship"})
+
+
 if __name__ == "__main__":
     unittest.main()
 

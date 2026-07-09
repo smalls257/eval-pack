@@ -200,8 +200,22 @@ def _coerce(raw, typ, key):
             raise ConfigError(
                 "CLAUDE_PLUGIN_OPTION_{}: expected int, got {!r}".format(key, raw)
             ) from exc
-    if typ is list:
-        # Dedupe to match the file-layer list-merge semantics (consistency).
+    if typ in (list, dict):
+        raw_s = raw.strip()
+        if raw_s.startswith("[") or raw_s.startswith("{"):
+            try:
+                val = json.loads(raw_s)
+            except json.JSONDecodeError as exc:
+                raise ConfigError(
+                    "CLAUDE_PLUGIN_OPTION_{}: invalid JSON ({})".format(key, exc)) from exc
+            if not isinstance(val, typ):
+                raise ConfigError("CLAUDE_PLUGIN_OPTION_{}: expected {}, got {}".format(
+                    key, typ.__name__, type(val).__name__))
+            return val
+        if typ is dict:
+            raise ConfigError(
+                "CLAUDE_PLUGIN_OPTION_{}: dict values must be JSON (e.g. '{{\"k\": \"v\"}}')".format(key))
+        # legacy comma-list shorthand for simple values
         return _dedupe([s for s in raw.split(",") if s])
     return raw
 
@@ -226,6 +240,10 @@ def load_config(project_root, env=None):
     root = Path(project_root)
     project_cfg = _read_json(root / ".eval-pack.json")
     local_cfg = _read_json(root / ".eval-pack.local.json")
+    if "extends" in local_cfg:
+        raise ConfigError(
+            "extends is not allowed in .eval-pack.local.json (project file only) — "
+            "it would be silently ignored otherwise")
 
     merged = _fresh_defaults()
     root_resolved = root.resolve()
@@ -258,6 +276,12 @@ def validate(cfg):
             errors.append("{}: expected int, got bool".format(k))
         elif not isinstance(v, typ):
             errors.append("{}: expected {}, got {}".format(k, typ.__name__, type(v).__name__))
+    rubric = cfg.get("rubric")
+    if isinstance(rubric, dict):
+        for band, criteria in rubric.items():
+            if not isinstance(criteria, str):
+                errors.append("rubric.{}: criteria must be a string, got {}".format(
+                    band, type(criteria).__name__))
     rules = cfg.get("redaction")
     if isinstance(rules, list):
         for pat in rules:

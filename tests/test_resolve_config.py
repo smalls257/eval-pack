@@ -70,6 +70,24 @@ class TestStanceEmbedding(unittest.TestCase):
             self.assertFalse((Path(pack) / "eval-config.json").exists())
 
 
+class TestPromptFileGate(unittest.TestCase):
+    def test_missing_evaluator_prompt_file_halts(self):
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as pack:
+            (Path(root) / ".eval-pack.json").write_text(
+                json.dumps({"evaluatorPromptFile": "nope/prompt.md"}), encoding="utf-8")
+            r = _run([root, pack])
+            self.assertEqual(r.returncode, 1)
+            self.assertIn("evaluatorPromptFile", r.stderr)
+
+    def test_existing_prompt_file_ok(self):
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as pack:
+            (Path(root) / "prompt.md").write_text("extra guidance", encoding="utf-8")
+            (Path(root) / ".eval-pack.json").write_text(
+                json.dumps({"evaluatorPromptFile": "prompt.md"}), encoding="utf-8")
+            r = _run([root, pack])
+            self.assertEqual(r.returncode, 0, r.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
 

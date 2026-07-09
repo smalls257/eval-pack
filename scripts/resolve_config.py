@@ -52,6 +52,12 @@ def main(argv=None):
         return 1
     cfg["analysisStanceText"] = preset.read_text(encoding="utf-8")
 
+    prompt_file = cfg.get("evaluatorPromptFile") or ""
+    if prompt_file and not (Path(args.project_root) / prompt_file).is_file():
+        print("ERROR: evaluatorPromptFile {!r} not found under {}".format(
+            prompt_file, args.project_root), file=sys.stderr)
+        return 1
+
     # Sensor: a verdict config where every failure-capable flag is disabled can never fail —
     # warn, don't block. Derived from FAILURE_FLAG_IDS so it can't rot when flags are added.
     sev = cfg.get("flagSeverities") or {}
