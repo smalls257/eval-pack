@@ -8,7 +8,7 @@
   },
   "plugins": [
     {
-      "name": "eval-pack",
+      "name": "eval-pack-next",
       "description": "Generate eval packs \u2014 PRE-RELEASE (0.4.0-rc.x): deterministic gates, lenses, detectors, tune loop",
       "source": {
         "source": "github",
