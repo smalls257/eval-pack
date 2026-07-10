@@ -188,6 +188,43 @@ class TestLensGates(unittest.TestCase):
             ghost = next(f for f in out["failures"] if f["skill"] == "ghost-lens")
             self.assertNotIn("templateHtml", ghost)
 
+    def test_lens_self_supplied_templatehtml_is_stripped(self):
+        # A lens's lenses/<skill>.json is LLM-authored — the untrusted source this feature
+        # defends against. If it self-declares templateHtml with no configured template,
+        # that markup must NOT survive to be rendered as trusted (stored-XSS guard).
+        # Provenance: templateHtml is resolve-embedded ONLY.
+        with tempfile.TemporaryDirectory() as d:
+            pack = Path(d)
+            (pack / "lenses").mkdir()
+            (pack / "lenses" / "evil.json").write_text(
+                json.dumps({"skill": "evil", "role": "scorer", "score": 50, "rationale": "x",
+                            "templateHtml": "<img src=x onerror=alert(1)>"}),
+                encoding="utf-8")
+            (pack / "analysis.json").write_text(
+                json.dumps({"highlights": {"confidencePercent": 90}}), encoding="utf-8")
+            self._cfg(d, [{"skill": "evil", "role": "scorer"}])  # NO template configured
+            out = assemble_lenses.assemble(d)
+            evil = next(s for s in out["scorers"] if s["skill"] == "evil")
+            self.assertNotIn("templateHtml", evil)
+
+    def test_configured_template_still_attached_after_strip(self):
+        # Positive guard: the pop-then-set order must not break the legit path — a lens WITH
+        # a configured (resolve-embedded) template still gets exactly that markup attached.
+        with tempfile.TemporaryDirectory() as d:
+            pack = Path(d)
+            (pack / "lenses").mkdir()
+            (pack / "lenses" / "perf.json").write_text(
+                json.dumps({"skill": "perf", "role": "scorer", "score": 61, "rationale": "slow",
+                            "templateHtml": "<img src=x onerror=alert(1)>"}),  # self-declared decoy
+                encoding="utf-8")
+            (pack / "analysis.json").write_text(
+                json.dumps({"highlights": {"confidencePercent": 90}}), encoding="utf-8")
+            self._cfg(d, [{"skill": "perf", "role": "scorer", "templateHtml": "<b>{{score}}</b>"}])
+            out = assemble_lenses.assemble(d)
+            perf = next(s for s in out["scorers"] if s["skill"] == "perf")
+            # The confined config markup wins; the lens's self-declared decoy never survives.
+            self.assertEqual(perf["templateHtml"], "<b>{{score}}</b>")
+
     def test_write_outputs_idempotent_on_rerun(self):
         with tempfile.TemporaryDirectory() as d:
             pack = Path(d)
