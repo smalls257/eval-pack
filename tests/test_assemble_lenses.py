@@ -169,6 +169,25 @@ class TestLensGates(unittest.TestCase):
             self.assertFalse(any(f["id"] == "lensVerdict" for f in patterns["flags"]))  # honored
             self.assertTrue(any(f["id"] == "lensFailed" for f in patterns["flags"]))    # NOT suppressible
 
+    def test_templatehtml_carried_onto_result_not_onto_failure(self):
+        with tempfile.TemporaryDirectory() as d:
+            pack = Path(d)
+            (pack / "lenses").mkdir()
+            (pack / "lenses" / "perf.json").write_text(
+                json.dumps({"skill": "perf", "role": "scorer", "score": 61, "rationale": "slow"}),
+                encoding="utf-8")
+            (pack / "analysis.json").write_text(
+                json.dumps({"highlights": {"confidencePercent": 90}}), encoding="utf-8")
+            self._cfg(d, [
+                {"skill": "perf", "role": "scorer", "templateHtml": "<b>{{score}}</b>"},
+                {"skill": "ghost-lens", "role": "scorer"},
+            ])
+            out = assemble_lenses.assemble(d)
+            perf = next(s for s in out["scorers"] if s["skill"] == "perf")
+            self.assertEqual(perf["templateHtml"], "<b>{{score}}</b>")
+            ghost = next(f for f in out["failures"] if f["skill"] == "ghost-lens")
+            self.assertNotIn("templateHtml", ghost)
+
     def test_write_outputs_idempotent_on_rerun(self):
         with tempfile.TemporaryDirectory() as d:
             pack = Path(d)

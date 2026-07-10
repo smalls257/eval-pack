@@ -112,6 +112,10 @@
               "contributor",
               "scorer"
             ]
+          },
+          "template": {
+            "type": "string",
+            "description": "Repo-relative path to an HTML template (mustache-lite) controlling how this lens renders. Markup is trusted (repo file, resolve-time confined); interpolated values are always HTML-escaped."
           }
         },
         "required": [

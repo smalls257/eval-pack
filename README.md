@@ -168,6 +168,38 @@ Guarantees, enforced by code: a configured lens that produces no output becomes 
 verdict banner and confidence card only through your declared aggregation rule; a failing lens
 never crashes the eval. Bundled examples: `requirement-drift`, `verification-rigor`.
 
+#### Custom rendering for a lens
+
+By default a lens renders as a generic card (meta line, rationale, findings list). To control
+how a specific lens's output looks in the report, point it at a repo-authored HTML template:
+
+```json
+{ "analysisLenses": [
+    { "skill": "acme-security-lens", "role": "scorer", "template": ".eval-pack/templates/security.html" }
+  ] }
+```
+
+The template is a small mustache-lite snippet rendered against your lens's own JSON output:
+
+```html
+<p>Risk score: <strong>{{score}}</strong></p>
+<ul>
+  {{#findings}}<li>{{.}}</li>{{/findings}}
+</ul>
+```
+
+Supported syntax: `{{field}}` / `{{dot.path}}` (interpolates a value), `{{#arrayField}}...{{/arrayField}}`
+(repeats the body once per array item, one level deep), and `{{.}}` inside a section (the item
+itself, rendered the same readable way as the default findings list). Unknown fields render as
+empty strings — a typo never crashes the report.
+
+Security model: the template file is resolved and embedded at pack-build time from your repo
+(same confinement as `evaluatorPromptFile`/`detectorScripts` — no `../` escapes, must exist) so
+the **markup is trusted**. Every value it interpolates, however, is untrusted LLM output from the
+lens's own JSON, and is **always HTML-escaped** — there is no way for a template to opt out of
+escaping a value. If the template itself fails to render for a given record, that lens falls back
+to a visible "template failed" card instead of a blank or broken one.
+
 ### Custom detectors — your own deterministic policy checks
 
 No LLM involved: a detector is a regex policy (`customDetectors`) or your own script

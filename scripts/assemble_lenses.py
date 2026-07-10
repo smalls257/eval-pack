@@ -54,6 +54,15 @@ def assemble(pack_dir):
     failures = [r for r in results if not _ok(r)
                 or (r.get("role") == "scorer" and r not in scorers)]
 
+    # Attach each lens's repo-authored template markup (embedded at resolve time) to its
+    # result so the renderer can use it; failures keep the default (visible) rendering.
+    tpl_by_skill = {l.get("skill"): l.get("templateHtml")
+                    for l in cfg.get("analysisLenses") or [] if l.get("templateHtml")}
+    for r in results:
+        t = tpl_by_skill.get(r.get("skill"))
+        if t and "error" not in r:
+            r["templateHtml"] = t
+
     analysis_path = pack / "analysis.json"
     analysis = {}
     if analysis_path.is_file():

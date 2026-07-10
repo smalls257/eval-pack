@@ -373,6 +373,8 @@ def validate(cfg):
                 errors.append(
                     "analysisLenses[{}]: role must be 'contributor' or 'scorer'".format(i)
                 )
+            if isinstance(lens, dict) and "template" in lens and not isinstance(lens.get("template"), str):
+                errors.append("analysisLenses[{}]: template must be a string path".format(i))
     theme = cfg.get("defaultTheme")
     if theme is not None and theme not in THEMES:
         errors.append("defaultTheme: {!r} is not one of {}".format(theme, list(THEMES)))

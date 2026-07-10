@@ -201,6 +201,13 @@ class TestLensKeys(unittest.TestCase):
         no_skill = config.validate({"analysisLenses": [{"role": "scorer"}]})
         self.assertTrue(any("analysisLenses" in e for e in no_skill))
 
+    def test_lens_template_must_be_string(self):
+        errs = config.validate({"analysisLenses": [
+            {"skill": "x", "role": "scorer", "template": 7}]})
+        self.assertTrue(any("template" in e for e in errs))
+        self.assertEqual(config.validate({"analysisLenses": [
+            {"skill": "x", "role": "scorer", "template": "t.html"}]}), [])
+
 
 class TestCosmeticKeys(unittest.TestCase):
     def test_new_defaults(self):

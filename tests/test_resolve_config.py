@@ -178,3 +178,37 @@ class TestDetectorScriptGate(unittest.TestCase):
                 r = _run([str(root), pack])
                 self.assertEqual(r.returncode, 1)
                 self.assertIn("outside the repo", r.stderr)
+
+
+class TestLensTemplateGate(unittest.TestCase):
+    def test_missing_template_halts(self):
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as pack:
+            (Path(root) / ".eval-pack.json").write_text(json.dumps({
+                "analysisLenses": [{"skill": "s", "role": "scorer", "template": "nope.html"}]}),
+                encoding="utf-8")
+            r = _run([root, pack])
+            self.assertEqual(r.returncode, 1)
+            self.assertIn("template", r.stderr)
+
+    def test_escaping_template_halts(self):
+        with tempfile.TemporaryDirectory() as outer:
+            (Path(outer) / "evil.html").write_text("x", encoding="utf-8")
+            root = Path(outer) / "repo"; root.mkdir()
+            (root / ".eval-pack.json").write_text(json.dumps({
+                "analysisLenses": [{"skill": "s", "role": "scorer", "template": "../evil.html"}]}),
+                encoding="utf-8")
+            with tempfile.TemporaryDirectory() as pack:
+                r = _run([str(root), pack])
+                self.assertEqual(r.returncode, 1)
+                self.assertIn("outside the repo", r.stderr)
+
+    def test_valid_template_embedded(self):
+        with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as pack:
+            (Path(root) / "t.html").write_text("<b>{{score}}</b>", encoding="utf-8")
+            (Path(root) / ".eval-pack.json").write_text(json.dumps({
+                "analysisLenses": [{"skill": "s", "role": "scorer", "template": "t.html"}]}),
+                encoding="utf-8")
+            r = _run([root, pack])
+            self.assertEqual(r.returncode, 0, r.stderr)
+            cfg = json.loads((Path(pack) / "eval-config.json").read_text())
+            self.assertEqual(cfg["analysisLenses"][0]["templateHtml"], "<b>{{score}}</b>")

@@ -81,6 +81,16 @@ def main(argv=None):
             print("ERROR: detectorScripts entry {!r} {}".format(script, err), file=sys.stderr)
             return 1
 
+    for lens in cfg.get("analysisLenses") or []:
+        tpl = lens.get("template")
+        if tpl:
+            err = _confined_repo_file(args.project_root, tpl)
+            if err:
+                print("ERROR: analysisLenses template {!r} {}".format(tpl, err), file=sys.stderr)
+                return 1
+            # Embed the trusted repo markup so the pack is self-contained (mirrors stance embedding).
+            lens["templateHtml"] = (Path(args.project_root) / tpl).read_text(encoding="utf-8")
+
     # Sensor: a verdict config where every failure-capable flag is disabled can never fail —
     # warn, don't block. Derived from FAILURE_FLAG_IDS so it can't rot when flags are added.
     sev = cfg.get("flagSeverities") or {}

@@ -1193,6 +1193,33 @@ function lensFindingText(f) {
   return String(f);
 }
 
+// Resolve a dot-path into a lens record.
+function lensPath(obj, path) {
+  return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
+}
+
+function lensValueText(v) {
+  if (v == null) return '';
+  return typeof v === 'object' ? lensFindingText(v) : String(v);
+}
+
+// Render a repo-authored lens template (mustache-lite). The MARKUP is trusted — it came
+// from a repo file, resolve-time confined — but every interpolated VALUE is untrusted LLM
+// output and is ALWAYS escaped. Supported: {{field}} / {{dot.path}} (escaped value),
+// {{#arrayField}}...{{/arrayField}} (repeat per item, one level), {{.}} (the item, via
+// lensFindingText, escaped). Unknown fields render as empty strings.
+function renderLensTemplate(tpl, data) {
+  let out = tpl.replace(/\{\{#([\w.]+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (m, key, body) => {
+    const arr = lensPath(data, key);
+    if (!Array.isArray(arr)) return '';
+    return arr.map(item => body
+      .replace(/\{\{\.\}\}/g, escapeHtml(lensFindingText(item)))
+      .replace(/\{\{([\w.]+)\}\}/g, (mm, k) => escapeHtml(lensValueText(lensPath(item, k))))
+    ).join('');
+  });
+  return out.replace(/\{\{([\w.]+)\}\}/g, (m, k) => escapeHtml(lensValueText(lensPath(data, k))));
+}
+
 function renderLenses(data) {
   const lenses = data.lenses;
   const tabBtn = document.querySelector('.tab-btn[data-panel="lenses"]');
@@ -1211,11 +1238,29 @@ function renderLenses(data) {
   if (lenses.finalScore != null) {
     parts.push(html`<p class="lens-agg">Verdict aggregation — core <strong>${lensScore(lenses.coreScore)}</strong> <code>${lenses.rule}</code> lenses → final <strong>${lensScore(lenses.finalScore)}</strong></p>`);
   }
+  // A record with a repo-authored templateHtml renders via the mustache-lite interpolator
+  // (markup trusted, values escaped); on interpolation failure fall back to a VISIBLE
+  // failure card rather than a blank/broken one.
+  const customCard = (rec, headExtra) => {
+    try {
+      return html`<div class="lens-card lens-custom"><div class="lens-head"><span class="lens-meta">${rec.role} · ${rec.skill}</span>${safe(headExtra || '')}</div>${safe(renderLensTemplate(rec.templateHtml, rec))}</div>`;
+    } catch (e) {
+      return html`<div class="lens-card lens-fail"><div class="lens-meta">template failed · ${rec.skill}</div><p>${String(e)}</p></div>`;
+    }
+  };
   (lenses.scorers || []).forEach(s => {
+    if (s.templateHtml) {
+      parts.push(customCard(s, html`<span class="lens-score">${lensScore(s.score)}</span>`));
+      return;
+    }
     const findings = (s.findings || []).map(f => html`<li>${lensFindingText(f)}</li>`).join('');
     parts.push(html`<div class="lens-card"><div class="lens-head"><span class="lens-meta">scorer · ${s.skill}</span><span class="lens-score">${lensScore(s.score)}</span></div><p class="lens-rationale">${s.rationale}</p>${safe(findings ? html`<ul class="lens-findings">${safe(findings)}</ul>` : '')}</div>`);
   });
   (lenses.contributors || []).forEach(c => {
+    if (c.templateHtml) {
+      parts.push(customCard(c));
+      return;
+    }
     const findings = (c.findings || []).map(f => html`<li>${lensFindingText(f)}</li>`).join('');
     parts.push(html`<div class="lens-card"><div class="lens-head"><span class="lens-meta">contributor · ${c.skill}</span></div><h4>${c.title}</h4><ul class="lens-findings">${safe(findings)}</ul></div>`);
   });
@@ -1318,5 +1363,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, estimateCost, modelRates, estimateSubagentCost, sumReportedCost, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, estimateCost, modelRates, estimateSubagentCost, sumReportedCost, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText };
 }

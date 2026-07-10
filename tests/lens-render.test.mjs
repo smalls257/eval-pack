@@ -3,7 +3,8 @@ import assert from 'node:assert';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 global.window = { __EVAL_PACK_TEST__: true };
-const { effectiveConfidence, lensFindingText } = require('../templates/html/scripts.js');
+const { effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText } =
+  require('../templates/html/scripts.js');
 
 test('effectiveConfidence uses finalScore when a non-core rule ran scorers', () => {
   const analysis = { highlights: { confidencePercent: 90 } };
@@ -41,4 +42,23 @@ test('lensFindingText never emits raw JSON for unknown objects', () => {
   const out = lensFindingText({ foo: 'bar', n: 2 });
   assert.ok(!out.includes('{'), out);
   assert.strictEqual(out, 'foo: bar · n: 2');
+});
+
+test('renderLensTemplate escapes interpolated values, preserves markup', () => {
+  const out = renderLensTemplate('<b>{{rationale}}</b>', { rationale: '<script>x</script>' });
+  assert.strictEqual(out, '<b>&lt;script&gt;x&lt;/script&gt;</b>');
+});
+
+test('renderLensTemplate sections iterate arrays with {{.}} and item fields', () => {
+  const out = renderLensTemplate('<ul>{{#findings}}<li>{{.}}|{{type}}</li>{{/findings}}</ul>',
+    { findings: [{ type: 'met', detail: 'ok' }] });
+  assert.strictEqual(out, '<ul><li>met: ok|met</li></ul>');
+});
+
+test('renderLensTemplate unknown fields empty, dot paths work', () => {
+  assert.strictEqual(renderLensTemplate('{{nope}}[{{a.b}}]', { a: { b: 5 } }), '[5]');
+});
+
+test('renderLensTemplate non-array section renders empty', () => {
+  assert.strictEqual(renderLensTemplate('{{#x}}boom{{/x}}', { x: 'not-array' }), '');
 });
