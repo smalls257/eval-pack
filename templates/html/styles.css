@@ -384,9 +384,7 @@ main.container {
   display: flex;
   align-items: center;
   gap: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  flex-wrap: wrap; /* 11 tabs: wrap to a second row so the action buttons never truncate */
 }
 
 .tab-nav::-webkit-scrollbar { display: none; }
@@ -1176,3 +1174,58 @@ details[open] .collapsible-trigger::before { content: '▾ '; }
 .badge-agent { background: #2e7d32; }
 .badge-test { background: #1565c0; }
 .badge-unknown { background: #616161; }
+
+/* ── Lenses tab ─────────────────────────────────────────────────────────────── */
+.lens-agg {
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+.lens-agg code { color: var(--accent); }
+.lens-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+}
+.lens-card.lens-fail { border-color: rgba(229, 72, 77, 0.4); }
+.lens-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.lens-meta {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.lens-fail .lens-meta { color: var(--red); }
+.lens-score {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.lens-card h4 { margin: 0 0 8px; font-size: 15px; color: var(--text); }
+.lens-rationale {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+.lens-findings {
+  margin: 0;
+  padding-left: 18px;
+}
+.lens-findings li {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 6px;
+}

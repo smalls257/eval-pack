@@ -27,3 +27,18 @@ test('lensFindingText handles strings and {type,detail} objects', () => {
   assert.strictEqual(lensFindingText({ detail: 'just detail' }), 'just detail');
   assert.strictEqual(lensFindingText(42), '42');
 });
+
+test('lensFindingText renders verification-rigor claim shape readably', () => {
+  assert.strictEqual(
+    lensFindingText({ claim: 'tests pass', backed: true, evidence: 'Ran 216 tests OK' }),
+    '✓ tests pass — Ran 216 tests OK');
+  assert.strictEqual(
+    lensFindingText({ claim: 'done', backed: false, evidence: 'none' }),
+    '✗ done');
+});
+
+test('lensFindingText never emits raw JSON for unknown objects', () => {
+  const out = lensFindingText({ foo: 'bar', n: 2 });
+  assert.ok(!out.includes('{'), out);
+  assert.strictEqual(out, 'foo: bar · n: 2');
+});

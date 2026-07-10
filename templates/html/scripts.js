@@ -1173,12 +1173,22 @@ function effectiveConfidence(analysis, lenses) {
   return { value: core != null ? core : null, note: null };
 }
 
-// A lens finding may be a plain string or {type, detail} — render both, never [object Object].
+// A lens finding may be a plain string or a shaped object — render every known shape
+// readably, and degrade unknown objects to "key: value" lines, never raw JSON.
 function lensFindingText(f) {
   if (typeof f === 'string') return f;
   if (f && typeof f === 'object') {
+    // verification-rigor shape: {claim, backed, evidence}
+    if (f.claim != null) {
+      const mark = f.backed === true ? '✓' : f.backed === false ? '✗' : '•';
+      const ev = f.evidence && f.evidence !== 'none' ? ` — ${f.evidence}` : '';
+      return `${mark} ${f.claim}${ev}`;
+    }
+    // requirement-drift shape: {type, detail}
     const detail = f.detail != null ? String(f.detail) : '';
-    return f.type ? `${f.type}: ${detail}` : detail || JSON.stringify(f);
+    if (f.type || detail) return f.type ? `${f.type}: ${detail}` : detail;
+    // unknown object: readable key-value join, not JSON
+    return Object.entries(f).map(([k, v]) => `${k}: ${String(v)}`).join(' · ');
   }
   return String(f);
 }
@@ -1203,11 +1213,11 @@ function renderLenses(data) {
   }
   (lenses.scorers || []).forEach(s => {
     const findings = (s.findings || []).map(f => html`<li>${lensFindingText(f)}</li>`).join('');
-    parts.push(html`<div class="lens-card"><div class="lens-meta">scorer · ${s.skill}</div><p>score <strong>${lensScore(s.score)}</strong> — ${s.rationale}</p>${safe(findings ? html`<ul>${safe(findings)}</ul>` : '')}</div>`);
+    parts.push(html`<div class="lens-card"><div class="lens-head"><span class="lens-meta">scorer · ${s.skill}</span><span class="lens-score">${lensScore(s.score)}</span></div><p class="lens-rationale">${s.rationale}</p>${safe(findings ? html`<ul class="lens-findings">${safe(findings)}</ul>` : '')}</div>`);
   });
   (lenses.contributors || []).forEach(c => {
     const findings = (c.findings || []).map(f => html`<li>${lensFindingText(f)}</li>`).join('');
-    parts.push(html`<div class="lens-card"><div class="lens-meta">contributor · ${c.skill}</div><h4>${c.title}</h4><ul>${safe(findings)}</ul></div>`);
+    parts.push(html`<div class="lens-card"><div class="lens-head"><span class="lens-meta">contributor · ${c.skill}</span></div><h4>${c.title}</h4><ul class="lens-findings">${safe(findings)}</ul></div>`);
   });
   (lenses.failures || []).forEach(f => {
     parts.push(html`<div class="lens-card lens-fail"><div class="lens-meta">failed · ${f.skill}</div><p>${f.error}</p></div>`);
