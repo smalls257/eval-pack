@@ -1,15 +1,20 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "eval-pack",
-  "version": "0.3.3",
-  "description": "Generate eval packs — polished HTML reports capturing how code was produced, with metrics, heuristics, and AI-driven analysis",
+  "version": "0.4.0-rc.1",
+  "description": "Generate eval packs \u2014 polished HTML reports capturing how code was produced, with metrics, heuristics, and AI-driven analysis",
   "author": {
     "name": "Jason Smith",
     "email": "wallawalla1337@gmail.com"
   },
   "repository": "https://github.com/smalls257/eval-pack",
   "license": "MIT",
-  "keywords": ["eval", "review", "metrics", "reporting"],
+  "keywords": [
+    "eval",
+    "review",
+    "metrics",
+    "reporting"
+  ],
   "skills": "./skills/",
   "agents": [
     "./agents/eval-pack-evaluator.md",
@@ -44,7 +49,7 @@
     "ticketBaseUrl": {
       "type": "string",
       "title": "Ticket base URL",
-      "description": "Prefix used to turn a bare ticket key into a link in PR bodies, e.g. https://YOURORG.atlassian.net/browse/ — leave empty to render bare keys as plain text.",
+      "description": "Prefix used to turn a bare ticket key into a link in PR bodies, e.g. https://YOURORG.atlassian.net/browse/ \u2014 leave empty to render bare keys as plain text.",
       "default": ""
     }
   }

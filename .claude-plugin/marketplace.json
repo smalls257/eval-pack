@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "eval-pack",
-  "description": "Eval pack — polished HTML reports capturing how AI-assisted code was produced",
+  "name": "eval-pack-next",
+  "description": "Eval pack \u2014 PRE-RELEASE channel (rc builds; stable lives on main)",
   "owner": {
     "name": "Jason Smith",
     "email": "wallawalla1337@gmail.com"
@@ -9,8 +9,12 @@
   "plugins": [
     {
       "name": "eval-pack",
-      "description": "Generate eval packs — HTML reports with metrics, heuristics, and AI-driven analysis for PR review",
-      "source": "./",
+      "description": "Generate eval packs \u2014 PRE-RELEASE (0.4.0-rc.x): deterministic gates, lenses, detectors, tune loop",
+      "source": {
+        "source": "github",
+        "repo": "smalls257/eval-pack",
+        "ref": "feat/config-foundation"
+      },
       "category": "productivity"
     }
   ]
