@@ -930,8 +930,12 @@ details[open] .collapsible-trigger::before { content: '▾ '; }
 }
 
 .modal-overlay .lightbox-img {
-  max-width: 82vw;
-  max-height: 72vh;
+  /* Fixed viewport box, consistent across every screenshot regardless of native
+     dimensions — so the zoom baseline is identical shot-to-shot. object-fit:contain
+     letterboxes each image into the same box (aspect preserved, no distortion). */
+  width: 82vw;
+  height: 72vh;
+  object-fit: contain;
   border-radius: var(--radius);
   display: block;
   transform-origin: center center;
