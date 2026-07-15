@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "eval-pack-next",
-  "version": "0.4.0-rc.7",
+  "version": "0.4.0-rc.8",
   "description": "PRE-RELEASE of eval-pack (commands: /eval-pack-next:*) \u2014 deterministic gates, lenses, detectors, tune loop. Coexists with stable eval-pack.",
   "author": {
     "name": "Jason Smith",

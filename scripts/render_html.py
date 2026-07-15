@@ -444,6 +444,26 @@ def verify_openable(open_dir):
     return uri
 
 
+def clickable_link(uri, label=None, env=None):
+    """Render `uri` as a clickable terminal hyperlink (OSC 8), unless colour is disabled.
+
+    Neither Claude Code nor most terminals auto-linkify file:// (they linkify http at
+    best), so a bare file URI prints as dead text the user must copy. An OSC 8 hyperlink
+    makes the text itself clickable — Claude Code honours OSC 8 in tool output, as do
+    iTerm2/WezTerm/kitty/VS Code. NOTE: we do NOT gate on isatty — Claude Code pipes tool
+    stdout (never a TTY), so an isatty gate would suppress the link in the exact path that
+    matters. Instead honour the NO_COLOR convention (https://no-color.org) and TERM=dumb so
+    logs/CI can opt out to the plain URL; the label defaults to the URI, and the adjacent
+    'Openable report folder:' line always prints the plain path as a copy-paste fallback.
+    """
+    env = os.environ if env is None else env
+    label = label if label is not None else uri
+    if env.get("NO_COLOR") or env.get("TERM", "") in ("", "dumb"):
+        return label
+    # OSC 8: ESC ] 8 ; ; <uri> ST <label> ESC ] 8 ; ; ST   (ST = ESC \)
+    return f"\033]8;;{uri}\033\\{label}\033]8;;\033\\"
+
+
 def _include_transcript():
     """Legacy env shim (standalone renders + direct test): canonical coercion, default True.
 
@@ -655,7 +675,7 @@ def main():
                     # Print BOTH the clickable URI and the plain folder path: the URI opens
                     # the report directly; the folder path lets the user navigate there in
                     # Explorer/Finder when the terminal doesn't linkify (common on Windows).
-                    print(f"Open: {uri}")
+                    print(f"Open: {clickable_link(uri)}")
                     print(f"Openable report folder: {open_dir}")
                 else:
                     print(
