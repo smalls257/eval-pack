@@ -42,17 +42,6 @@ def slugify(s):
     return re.sub(r"[^a-zA-Z0-9._-]", "-", s.replace("/", "-").replace(" ", "-"))
 
 
-def openable_report_uri(open_dir):
-    """A correct, clickable file:// URI for the openable report's index.html.
-
-    Sensor: a hand-built ``file://{path}`` breaks on Windows (backslashes + a bare
-    drive letter yield ``file://C:\\...``, not ``file:///C:/...``) and truncates on
-    any path containing a space. Path.as_uri() produces a properly percent-encoded,
-    platform-correct URI so the printed link actually opens the report.
-    """
-    return (Path(open_dir) / "index.html").as_uri()
-
-
 def load_jsonl(path):
     entries = []
     with open(path, encoding="utf-8") as f:
@@ -422,17 +411,22 @@ def verify_zip_integrity(zip_path, session_id):
     """Deterministic gate: the written zip must reopen clean and contain the report's
     index.html. A corrupt or incomplete zip is a real failure — the durable artifact
     is broken, so we must NOT report success. Returns None on success, else an error string."""
+    index_member = f"{session_id}/index.html"
     try:
         with zipfile.ZipFile(zip_path, "r") as zf:
             bad = zf.testzip()               # None => all CRCs good
             if bad is not None:
                 return f"corrupt member in zip: {bad}"
-            names = set(zf.namelist())
-    except (zipfile.BadZipFile, OSError) as exc:
+            if index_member not in set(zf.namelist()):
+                return f"zip missing {index_member}"
+            zf.read(index_member)            # prove the report member itself reads (CRC/decompress ok)
+    except Exception as exc:
+        # This function's whole job is to convert ANY way the zip is broken into a
+        # deterministic error string. A narrow except list is a Leaky Narrative: the caller
+        # would have to know which decompressor exceptions (zlib.error — NOT an OSError) leak.
+        # zlib.error from a corrupt deflate stream must not escape as an uncaught traceback,
+        # or the gate's unlink/rmtree cleanup is skipped and the broken zip survives.
         return f"zip unreadable: {type(exc).__name__}: {exc}"
-    index_member = f"{session_id}/index.html"
-    if index_member not in names:
-        return f"zip missing {index_member}"
     return None
 
 

@@ -57,6 +57,50 @@ class VerifyZipIntegrityTests(unittest.TestCase):
                 f"expected 'unreadable' or 'corrupt' in message, got: {result!r}",
             )
 
+    def test_returns_error_for_corrupt_member_bytes(self):
+        # C1: a member present with an intact stored CRC header but a corrupt deflate
+        # stream makes testzip() raise zlib.error from decompress — NOT a BadZipFile or
+        # OSError. That escaped the old narrow except, giving an uncaught traceback and
+        # skipping cleanup. The gate must convert ANY corruption class to a string.
+        import struct
+
+        with tempfile.TemporaryDirectory() as tmp:
+            pack_dir = self._make_pack_dir(tmp, with_index=True)
+            # Deflate-compressible content so the member is truly zlib-encoded (not stored).
+            (pack_dir / "index.html").write_text(
+                "<html>" + "report " * 200 + "</html>", encoding="utf-8"
+            )
+            zip_path = Path(tmp) / "out.zip"
+            render_html.write_zip(pack_dir, zip_path, "sess123")
+
+            raw = bytearray(zip_path.read_bytes())
+            # Locate the LOCAL file header (PK\x03\x04) for sess123/index.html, then
+            # corrupt the FIRST byte of its deflate stream so decompression itself fails
+            # (invalid code lengths) — while leaving the stored CRC/size fields intact.
+            needle = b"sess123/index.html"
+            pos, lfh = 0, None
+            while True:
+                j = raw.find(needle, pos)
+                if j == -1:
+                    break
+                if j - 30 >= 0 and raw[j - 30:j - 26] == b"PK\x03\x04":
+                    lfh = j - 30
+                    break
+                pos = j + 1
+            self.assertIsNotNone(lfh, "could not locate index.html local file header")
+            fnlen, = struct.unpack_from("<H", raw, lfh + 26)
+            eflen, = struct.unpack_from("<H", raw, lfh + 28)
+            data_start = lfh + 30 + fnlen + eflen
+            raw[data_start] ^= 0xFF  # corrupt the deflate block header
+            zip_path.write_bytes(raw)
+
+            err = render_html.verify_zip_integrity(zip_path, "sess123")
+            self.assertIsNotNone(err)  # a STRING, never a raise
+            self.assertTrue(
+                "unreadable" in err or "corrupt" in err,
+                f"expected 'unreadable' or 'corrupt' in message, got: {err!r}",
+            )
+
     def test_returns_error_for_missing_zip_file(self):
         with tempfile.TemporaryDirectory() as tmp:
             zip_path = Path(tmp) / "does-not-exist.zip"
