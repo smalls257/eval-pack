@@ -40,6 +40,17 @@ def slugify(s):
     return re.sub(r"[^a-zA-Z0-9._-]", "-", s.replace("/", "-").replace(" ", "-"))
 
 
+def openable_report_uri(open_dir):
+    """A correct, clickable file:// URI for the openable report's index.html.
+
+    Sensor: a hand-built ``file://{path}`` breaks on Windows (backslashes + a bare
+    drive letter yield ``file://C:\\...``, not ``file:///C:/...``) and truncates on
+    any path containing a space. Path.as_uri() produces a properly percent-encoded,
+    platform-correct URI so the printed link actually opens the report.
+    """
+    return (Path(open_dir) / "index.html").as_uri()
+
+
 def load_jsonl(path):
     entries = []
     with open(path, encoding="utf-8") as f:
@@ -585,7 +596,7 @@ def main():
         open_base = (
             Path(cfg["openableDir"]) if cfg["openableDir"]
             else (Path(args.open_base) if args.open_base else Path(tempfile.gettempdir()))
-        )
+        ).resolve()  # absolute so as_uri() can't raise on a relative path (and the note can't misattribute)
         if cfg["openableDir"] and _is_within(open_base, Path.cwd()):
             # Refuse to drop the openable copy inside the repo — it could be committed/pushed.
             print(
@@ -596,10 +607,20 @@ def main():
         else:
             try:
                 open_dir = publish_openable(pack_dir, args.session_id, open_base, include_transcript)
-                print(f"Open: file://{open_dir}/index.html")
+                # Print BOTH the clickable URI and the plain folder path: the URI opens
+                # the report directly; the folder path lets the user navigate there in
+                # Explorer/Finder when the terminal doesn't linkify (common on Windows).
+                print(f"Open: {openable_report_uri(open_dir)}")
+                print(f"Openable report folder: {open_dir}")
             except Exception as ex:
-                # Buffer: the zip is the durable artifact; the openable copy is a convenience.
-                print(f"Warning: could not write openable copy: {ex}", file=sys.stderr)
+                # Buffer: the zip is the durable artifact, so we don't fail the render.
+                # Sensor: but say so LOUDLY on stdout (not a swallowed stderr warning) with
+                # the target and reason, so a failed openable copy is never silently missing.
+                print(
+                    f"Note: could not write the openable copy under {open_base} "
+                    f"({type(ex).__name__}: {ex}). The zip above is complete — "
+                    f"unzip it and open index.html.",
+                )
 
     shutil.rmtree(pack_dir)
 
