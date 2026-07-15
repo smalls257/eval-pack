@@ -11,6 +11,8 @@ import tempfile
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
+from urllib.request import url2pathname
 
 sys.path.insert(0, str(Path(__file__).parent))  # noqa: E402
 import redact  # noqa: E402
@@ -416,6 +418,38 @@ def publish_openable(pack_dir, session_id, open_base, include_transcript=True):
     return open_dir
 
 
+def verify_zip_integrity(zip_path, session_id):
+    """Deterministic gate: the written zip must reopen clean and contain the report's
+    index.html. A corrupt or incomplete zip is a real failure — the durable artifact
+    is broken, so we must NOT report success. Returns None on success, else an error string."""
+    try:
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            bad = zf.testzip()               # None => all CRCs good
+            if bad is not None:
+                return f"corrupt member in zip: {bad}"
+            names = set(zf.namelist())
+    except (zipfile.BadZipFile, OSError) as exc:
+        return f"zip unreadable: {type(exc).__name__}: {exc}"
+    index_member = f"{session_id}/index.html"
+    if index_member not in names:
+        return f"zip missing {index_member}"
+    return None
+
+
+def verify_openable(open_dir):
+    """Deterministic gate: only advertise an openable report whose index.html actually
+    exists AND whose file:// URI round-trips back to that real file — so we never print a
+    link that doesn't open. Returns the verified URI string, or None if unverifiable."""
+    index = Path(open_dir) / "index.html"
+    if not index.is_file():
+        return None
+    uri = index.as_uri()
+    decoded = Path(url2pathname(urlparse(uri).path))
+    if not decoded.is_file():
+        return None
+    return uri
+
+
 def _include_transcript():
     """Legacy env shim (standalone renders + direct test): canonical coercion, default True.
 
@@ -590,6 +624,18 @@ def main():
 
     include_transcript = bool(cfg["includeTranscript"])
     write_zip(pack_dir, zip_path, args.session_id, include_transcript)
+
+    # Gate 1 (halts): the zip is the durable artifact. If it doesn't reopen clean and
+    # contain the report's index.html, the render must NOT report success.
+    zip_err = verify_zip_integrity(zip_path, args.session_id)
+    if zip_err:
+        print(f"Error: eval pack zip failed verification ({zip_err}).", file=sys.stderr)
+        try:
+            zip_path.unlink()  # don't leave a broken zip masquerading as a pack
+        except OSError:
+            pass
+        shutil.rmtree(pack_dir, ignore_errors=True)
+        sys.exit(1)
     print(f"Eval pack rendered to {zip_path}")
 
     if cfg["publishOpenable"]:
@@ -607,11 +653,22 @@ def main():
         else:
             try:
                 open_dir = publish_openable(pack_dir, args.session_id, open_base, include_transcript)
-                # Print BOTH the clickable URI and the plain folder path: the URI opens
-                # the report directly; the folder path lets the user navigate there in
-                # Explorer/Finder when the terminal doesn't linkify (common on Windows).
-                print(f"Open: {openable_report_uri(open_dir)}")
-                print(f"Openable report folder: {open_dir}")
+                # Gate 2 (non-fatal): only advertise the link when index.html actually
+                # exists AND its file:// URI round-trips back to that real file — so we
+                # never print a link that doesn't open. The zip above is already durable.
+                uri = verify_openable(open_dir)
+                if uri:
+                    # Print BOTH the clickable URI and the plain folder path: the URI opens
+                    # the report directly; the folder path lets the user navigate there in
+                    # Explorer/Finder when the terminal doesn't linkify (common on Windows).
+                    print(f"Open: {uri}")
+                    print(f"Openable report folder: {open_dir}")
+                else:
+                    print(
+                        f"Note: openable copy at {open_dir} could not be verified "
+                        f"(index.html missing) — the zip above is complete; "
+                        f"unzip it and open index.html.",
+                    )
             except Exception as ex:
                 # Buffer: the zip is the durable artifact, so we don't fail the render.
                 # Sensor: but say so LOUDLY on stdout (not a swallowed stderr warning) with
