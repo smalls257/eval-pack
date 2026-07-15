@@ -1138,10 +1138,16 @@ function renderBranding(data) {
     });
   }
 
+  // footerText overrides the brand span only — NOT the whole footer — so the version
+  // stamp and generated-at timestamp always survive.
   if (cfg.footerText) {
-    const footer = document.querySelector('.footer');
-    if (footer) footer.textContent = cfg.footerText;
+    const brand = document.getElementById('footer-brand');
+    if (brand) brand.textContent = cfg.footerText;
   }
+
+  // Stamp the eval-pack version that produced this report.
+  const ver = document.getElementById('eval-pack-version');
+  if (ver && data.evalPackVersion) ver.textContent = `eval-pack v${data.evalPackVersion}`;
 }
 
 // messages: override any labeled UI string by element id, e.g. {"page-title":"…"} (i18n hook).

@@ -214,6 +214,18 @@ _REPORT_CONFIG_KEYS = (
 )
 
 
+def read_plugin_version(plugin_root):
+    """The eval-pack version from the plugin manifest, stamped into the report footer.
+    Empty string when the manifest is missing/unreadable — a version stamp is informational,
+    so its absence must not fail the render (Buffer: the report is the durable artifact)."""
+    try:
+        manifest = json.loads(
+            (Path(plugin_root) / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+        return manifest.get("version", "")
+    except (OSError, json.JSONDecodeError):
+        return ""
+
+
 def report_config(cfg):
     """The subset of resolved config surfaced to the report template."""
     return {k: cfg[k] for k in _REPORT_CONFIG_KEYS}
@@ -625,6 +637,7 @@ def main():
         "rounds": list(prev_data.get("rounds") or []) + [new_round],
         "transcript": load_jsonl(transcript_jsonl) if transcript_jsonl.is_file() else [],
         "evalConfig": report_config(cfg),
+        "evalPackVersion": read_plugin_version(args.plugin_root),
     }
 
     # Redact the data dict at the value level BEFORE it is serialized into index.html /
