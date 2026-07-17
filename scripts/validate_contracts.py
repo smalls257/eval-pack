@@ -15,6 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))  # noqa: E402
 import config  # noqa: E402
+from discover_repos import discover  # noqa: E402
 
 
 def _read(pack, name):
@@ -113,39 +114,44 @@ def _canon_root(p):
 
 
 def _repo_coverage_gaps(pack_dir):
-    """Multi-repo coverage backstop.
+    """Deterministic, non-skippable multi-repo coverage backstop.
 
-    discover_repos.py finds every repo/worktree a session touched; repo_diffs.py
-    records what the user chose to evaluate or skip. A repo that was touched but
-    left in neither bucket would let the evaluator silently score just one repo
-    of a multi-repo session (Sensor: the change surface's boundary must be
-    observable and complete, not assumed). This is opt-in: packs with no
-    discovered-repos.json — or an empty discovery (a non-git session, or the
-    feature engaged but found nothing) — are legacy and conform trivially.
+    Re-derives which repos the session WROTE to from the pack's own transcript
+    (ground truth), NOT from the skill-written discovered-repos.json — so a skill
+    run that skipped the discovery step cannot silently pass a multi-repo session
+    as a single-repo eval (Sensor: the change surface's boundary is observed at
+    render time, not assumed to have been observed upstream).
+
+    Fires only when the session wrote to >= 2 repos (the multi-repo case). A
+    single write-touched repo is the ordinary case the legacy single-diff flow
+    already covers, so it is not gated here (backward compatible).
     """
-    discovered = _read(pack_dir, "discovered-repos.json")
-    if not discovered:
-        return []
+    tpath = Path(pack_dir) / "transcript.jsonl"
+    if not tpath.is_file():
+        return []   # no transcript to derive from (should not happen at real render)
+
+    discovered = discover(str(tpath))
+    write_repos = [r for r in discovered if "write" in (r.get("signals") or [])]
+    if len(write_repos) < 2:
+        return []   # single/zero write-touched repo: legacy single-diff flow covers it
 
     diffs = _read(pack_dir, "repo-diffs.json")
     if diffs is None:
-        return ["repos discovered but none evaluated — run repo_diffs.py (repo-diffs.json missing)"]
+        roots = ", ".join(r.get("repoRoot") for r in write_repos)
+        return ["session wrote to {} repos but repo-diffs.json is missing — run the "
+                "multi-repo discovery/diff step (repos: {})".format(len(write_repos), roots)]
 
     accounted = {_canon_root(r.get("repoRoot")) for r in diffs.get("repos") or []}
     accounted |= {_canon_root(s.get("repoRoot")) for s in diffs.get("skipped") or []}
 
     gaps = []
-    for repo in discovered:
-        root = repo.get("repoRoot")
-        if _canon_root(root) not in accounted:
-            gaps.append(
-                "repo touched but neither evaluated nor skipped: {} (branch {}) — "
-                "resolve or skip it".format(root, repo.get("branch")))
-
+    for r in write_repos:
+        if _canon_root(r.get("repoRoot")) not in accounted:
+            gaps.append("repo written to but neither evaluated nor skipped: {} (branch {}) "
+                        "— resolve or skip it".format(r.get("repoRoot"), r.get("branch")))
     for err in diffs.get("errors") or []:
         gaps.append("repo diff failed for {}: {} — fix the base ref or skip the repo".format(
             err.get("repoRoot"), err.get("error")))
-
     return gaps
 
 

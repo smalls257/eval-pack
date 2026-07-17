@@ -72,7 +72,49 @@ class DiscoverReposTests(unittest.TestCase):
             roots = {Path(e["repoRoot"]).resolve() for e in got}
             self.assertEqual(roots, {repo_a.resolve(), repo_b.resolve()})
             entry_b = next(e for e in got if Path(e["repoRoot"]).resolve() == repo_b.resolve())
-            self.assertIn("file_path", entry_b["signals"])
+            self.assertIn("write", entry_b["signals"])
+
+    def test_write_vs_read_signal_split(self):
+        with tempfile.TemporaryDirectory() as d:
+            repo_a = _init_repo(Path(d) / "repo_a")
+            repo_b = _init_repo(Path(d) / "repo_b")
+            (repo_a / "edited.py").write_text("x = 1\n", encoding="utf-8")
+            (repo_b / "read.py").write_text("y = 2\n", encoding="utf-8")
+            t = Path(d) / "transcript.jsonl"
+            _write_transcript(t, [
+                {
+                    "type": "assistant",
+                    "cwd": str(repo_a),
+                    "message": {
+                        "content": [
+                            {
+                                "type": "tool_use",
+                                "name": "Edit",
+                                "input": {"file_path": str(repo_a / "edited.py")},
+                            }
+                        ]
+                    },
+                },
+                {
+                    "type": "assistant",
+                    "cwd": str(repo_a),
+                    "message": {
+                        "content": [
+                            {
+                                "type": "tool_use",
+                                "name": "Read",
+                                "input": {"file_path": str(repo_b / "read.py")},
+                            }
+                        ]
+                    },
+                },
+            ])
+            got = discover_repos.discover(str(t))
+            entry_a = next(e for e in got if Path(e["repoRoot"]).resolve() == repo_a.resolve())
+            entry_b = next(e for e in got if Path(e["repoRoot"]).resolve() == repo_b.resolve())
+            self.assertIn("write", entry_a["signals"])
+            self.assertIn("read", entry_b["signals"])
+            self.assertNotIn("write", entry_b["signals"])
 
     def test_cd_target_discovered(self):
         with tempfile.TemporaryDirectory() as d:

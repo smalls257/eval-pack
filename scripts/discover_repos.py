@@ -18,7 +18,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-FILE_TOOLS = {"Edit", "Write", "Read", "MultiEdit", "NotebookEdit"}
+WRITE_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
+READ_TOOLS = {"Read"}
+FILE_TOOLS = WRITE_TOOLS | READ_TOOLS
 GIT_TIMEOUT_SECS = 10
 
 # Prepended to EVERY git invocation. See _git for the WHY. core.fsmonitor=
@@ -87,7 +89,8 @@ def _candidate_dirs(entries):
             if name in FILE_TOOLS:
                 file_path = inp.get("file_path")
                 if isinstance(file_path, str) and file_path.startswith("/"):
-                    hits.append((str(Path(file_path).parent), "file_path"))
+                    signal = "write" if name in WRITE_TOOLS else "read"
+                    hits.append((str(Path(file_path).parent), signal))
             elif name == "Bash":
                 for target in _cd_targets(inp.get("command")):
                     hits.append((target, "cd"))

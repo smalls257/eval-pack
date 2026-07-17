@@ -1,5 +1,7 @@
 # tests/test_validate_contracts.py
 import json
+import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -9,6 +11,54 @@ SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 import validate_contracts  # noqa: E402
 import config  # noqa: E402
+
+
+def _run(cmd, cwd=None):
+    out = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+    if out.returncode != 0:
+        raise RuntimeError(f"{cmd} failed: {out.stderr}")
+    return out.stdout
+
+
+def _init_repo(path):
+    path.mkdir(parents=True, exist_ok=True)
+    _run(["git", "init", "-q"], cwd=str(path))
+    _run(["git", "config", "user.email", "t@example.com"], cwd=str(path))
+    _run(["git", "config", "user.name", "T"], cwd=str(path))
+    _run(["git", "commit", "--allow-empty", "-q", "-m", "init"], cwd=str(path))
+    return path
+
+
+def _edit_entry(repo, filename):
+    return {
+        "type": "assistant",
+        "cwd": str(repo),
+        "message": {
+            "content": [
+                {"type": "tool_use", "name": "Edit",
+                 "input": {"file_path": str(repo / filename)}},
+            ]
+        },
+    }
+
+
+def _read_entry(repo, filename):
+    return {
+        "type": "assistant",
+        "cwd": str(repo),
+        "message": {
+            "content": [
+                {"type": "tool_use", "name": "Read",
+                 "input": {"file_path": str(repo / filename)}},
+            ]
+        },
+    }
+
+
+def _write_transcript(pack_dir, entries):
+    t = Path(pack_dir) / "transcript.jsonl"
+    t.write_text("\n".join(json.dumps(e) for e in entries) + "\n", encoding="utf-8")
+    return t
 
 
 def _pack(d, cfg_over=None, analysis=None, test_results=None):
@@ -123,99 +173,99 @@ class TestCliContract(unittest.TestCase):
 
 
 class TestRepoCoverageContract(unittest.TestCase):
-    def _discovered(self, d, repos):
-        (Path(d) / "discovered-repos.json").write_text(json.dumps(repos), encoding="utf-8")
+    """Coverage is re-derived from transcript.jsonl (ground truth) via discover_repos.discover,
+    NOT from the skill-written discovered-repos.json — so a skill run that skipped discovery
+    can't silently pass a multi-repo session as single-repo (Sensor: observed at render time)."""
 
     def _diffs(self, d, repos=None, skipped=None, errors=None):
         (Path(d) / "repo-diffs.json").write_text(json.dumps({
             "repos": repos or [], "skipped": skipped or [], "errors": errors or [],
         }), encoding="utf-8")
 
-    def test_no_discovered_repos_file_no_gap(self):
+    def test_single_write_repo_no_gap(self):
         with tempfile.TemporaryDirectory() as d:
+            repo = _init_repo(Path(d) / "repo")
+            (repo / "a.py").write_text("x = 1\n", encoding="utf-8")
+            _write_transcript(d, [_edit_entry(repo, "a.py")])
             self.assertEqual(validate_contracts._repo_coverage_gaps(d), [])
 
-    def test_all_discovered_accounted_no_gap(self):
+    def test_two_write_repos_no_diffs_file_is_gap(self):
         with tempfile.TemporaryDirectory() as d:
-            self._discovered(d, [
-                {"repoRoot": "/repo/a", "branch": "main"},
-                {"repoRoot": "/repo/b", "branch": "main"},
-            ])
-            self._diffs(d, repos=[{"repoRoot": "/repo/a"}], skipped=[{"repoRoot": "/repo/b"}])
-            self.assertEqual(validate_contracts._repo_coverage_gaps(d), [])
-
-    def test_unaccounted_repo_is_gap(self):
-        with tempfile.TemporaryDirectory() as d:
-            self._discovered(d, [
-                {"repoRoot": "/repo/a", "branch": "main"},
-                {"repoRoot": "/repo/b", "branch": "feature-x"},
-            ])
-            self._diffs(d, repos=[{"repoRoot": "/repo/a"}])
+            repo_a = _init_repo(Path(d) / "repo_a")
+            repo_b = _init_repo(Path(d) / "repo_b")
+            (repo_a / "a.py").write_text("x = 1\n", encoding="utf-8")
+            (repo_b / "b.py").write_text("y = 2\n", encoding="utf-8")
+            _write_transcript(d, [_edit_entry(repo_a, "a.py"), _edit_entry(repo_b, "b.py")])
             gaps = validate_contracts._repo_coverage_gaps(d)
-            self.assertTrue(any("/repo/b" in g and "feature-x" in g for g in gaps))
+            self.assertTrue(gaps)
+            joined = " ".join(gaps)
+            self.assertIn("repo-diffs.json", joined)
+            self.assertIn(os.path.realpath(repo_a), joined)
+            self.assertIn(os.path.realpath(repo_b), joined)
+
+    def test_two_write_repos_all_accounted_no_gap(self):
+        with tempfile.TemporaryDirectory() as d:
+            repo_a = _init_repo(Path(d) / "repo_a")
+            repo_b = _init_repo(Path(d) / "repo_b")
+            (repo_a / "a.py").write_text("x = 1\n", encoding="utf-8")
+            (repo_b / "b.py").write_text("y = 2\n", encoding="utf-8")
+            _write_transcript(d, [_edit_entry(repo_a, "a.py"), _edit_entry(repo_b, "b.py")])
+            self._diffs(d, repos=[{"repoRoot": os.path.realpath(repo_a)}],
+                        skipped=[{"repoRoot": os.path.realpath(repo_b)}])
+            self.assertEqual(validate_contracts._repo_coverage_gaps(d), [])
+
+    def test_two_write_repos_one_unaccounted_is_gap(self):
+        with tempfile.TemporaryDirectory() as d:
+            repo_a = _init_repo(Path(d) / "repo_a")
+            repo_b = _init_repo(Path(d) / "repo_b")
+            (repo_a / "a.py").write_text("x = 1\n", encoding="utf-8")
+            (repo_b / "b.py").write_text("y = 2\n", encoding="utf-8")
+            _write_transcript(d, [_edit_entry(repo_a, "a.py"), _edit_entry(repo_b, "b.py")])
+            self._diffs(d, repos=[{"repoRoot": os.path.realpath(repo_a)}])
+            gaps = validate_contracts._repo_coverage_gaps(d)
+            self.assertTrue(any(os.path.realpath(repo_b) in g for g in gaps))
+            self.assertFalse(any(os.path.realpath(repo_a) in g for g in gaps))
+
+    def test_read_only_repo_not_gated(self):
+        with tempfile.TemporaryDirectory() as d:
+            repo_a = _init_repo(Path(d) / "repo_a")
+            repo_b = _init_repo(Path(d) / "repo_b")
+            (repo_a / "a.py").write_text("x = 1\n", encoding="utf-8")
+            (repo_b / "b.py").write_text("y = 2\n", encoding="utf-8")
+            _write_transcript(d, [_edit_entry(repo_a, "a.py"), _read_entry(repo_b, "b.py")])
+            # Only repo_a is write-touched; repo_b was merely read (e.g. a dependency
+            # or cache repo) — this must NOT force multi-repo coverage.
+            self.assertEqual(validate_contracts._repo_coverage_gaps(d), [])
 
     def test_errored_base_is_gap(self):
         with tempfile.TemporaryDirectory() as d:
-            self._discovered(d, [{"repoRoot": "/repo/a", "branch": "main"}])
-            self._diffs(d, repos=[{"repoRoot": "/repo/a"}],
-                        errors=[{"repoRoot": "/repo/a", "error": "base ref not found"}])
+            repo_a = _init_repo(Path(d) / "repo_a")
+            repo_b = _init_repo(Path(d) / "repo_b")
+            (repo_a / "a.py").write_text("x = 1\n", encoding="utf-8")
+            (repo_b / "b.py").write_text("y = 2\n", encoding="utf-8")
+            _write_transcript(d, [_edit_entry(repo_a, "a.py"), _edit_entry(repo_b, "b.py")])
+            self._diffs(d, repos=[{"repoRoot": os.path.realpath(repo_a)}],
+                        skipped=[{"repoRoot": os.path.realpath(repo_b)}],
+                        errors=[{"repoRoot": os.path.realpath(repo_a), "error": "base ref not found"}])
             gaps = validate_contracts._repo_coverage_gaps(d)
-            self.assertTrue(any("/repo/a" in g and "base ref not found" in g for g in gaps))
+            self.assertTrue(any(os.path.realpath(repo_a) in g and "base ref not found" in g
+                                 for g in gaps))
 
-    def test_discovered_but_no_diffs_file_is_gap(self):
+    def test_no_transcript_no_gap(self):
         with tempfile.TemporaryDirectory() as d:
-            self._discovered(d, [{"repoRoot": "/repo/a", "branch": "main"}])
-            gaps = validate_contracts._repo_coverage_gaps(d)
-            self.assertTrue(any("repo-diffs.json" in g for g in gaps))
-
-    def test_symlink_var_path_variant_still_matches(self):
-        import os
-        with tempfile.TemporaryDirectory() as real_d:
-            link = Path(real_d) / "link"
-            target = Path(real_d) / "target"
-            target.mkdir()
-            os.symlink(target, link)
-            # discovered uses the canonical (symlink-resolved) path; the selection
-            # echoed the symlinked form — same repo, different string.
-            canonical = os.path.realpath(target)
-            symlinked = str(link)
-            self.assertNotEqual(canonical, symlinked)
-            with tempfile.TemporaryDirectory() as d:
-                self._discovered(d, [{"repoRoot": canonical, "branch": "main"}])
-                self._diffs(d, repos=[{"repoRoot": symlinked}])
-                self.assertEqual(validate_contracts._repo_coverage_gaps(d), [])
-
-    def test_trailing_slash_variant_matches(self):
-        with tempfile.TemporaryDirectory() as d:
-            self._discovered(d, [{"repoRoot": "/a/repo", "branch": "main"}])
-            self._diffs(d, repos=[{"repoRoot": "/a/repo/"}])
             self.assertEqual(validate_contracts._repo_coverage_gaps(d), [])
-
-    def test_empty_discovered_list_is_noop(self):
-        with tempfile.TemporaryDirectory() as d:
-            self._discovered(d, [])
-            self.assertEqual(validate_contracts._repo_coverage_gaps(d), [])
-
-    def test_genuinely_unaccounted_still_gaps(self):
-        with tempfile.TemporaryDirectory() as d:
-            self._discovered(d, [
-                {"repoRoot": "/a/repo", "branch": "main"},
-                {"repoRoot": "/totally/different/repo", "branch": "feature-x"},
-            ])
-            self._diffs(d, repos=[{"repoRoot": "/a/repo"}])
-            gaps = validate_contracts._repo_coverage_gaps(d)
-            self.assertTrue(any("/totally/different/repo" in g for g in gaps))
 
     def test_unaccounted_repo_fails_collect_gaps(self):
         with tempfile.TemporaryDirectory() as d:
             _pack(d, analysis={"title": "t"})
-            self._discovered(d, [
-                {"repoRoot": "/repo/a", "branch": "main"},
-                {"repoRoot": "/repo/b", "branch": "feature-x"},
-            ])
-            self._diffs(d, repos=[{"repoRoot": "/repo/a"}])
+            repo_a = _init_repo(Path(d) / "repo_a")
+            repo_b = _init_repo(Path(d) / "repo_b")
+            (repo_a / "a.py").write_text("x = 1\n", encoding="utf-8")
+            (repo_b / "b.py").write_text("y = 2\n", encoding="utf-8")
+            _write_transcript(d, [_edit_entry(repo_a, "a.py"), _edit_entry(repo_b, "b.py")])
             gaps = validate_contracts.collect_gaps(d)
-            self.assertTrue(any("/repo/b" in g for g in gaps))
+            self.assertTrue(any(os.path.realpath(repo_a) in g or os.path.realpath(repo_b) in g
+                                 for g in gaps))
 
 
 class TestConfigReadGaps(unittest.TestCase):
