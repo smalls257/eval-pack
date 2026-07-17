@@ -122,6 +122,64 @@ class TestCliContract(unittest.TestCase):
             self.assertEqual(r.returncode, 0)
 
 
+class TestRepoCoverageContract(unittest.TestCase):
+    def _discovered(self, d, repos):
+        (Path(d) / "discovered-repos.json").write_text(json.dumps(repos), encoding="utf-8")
+
+    def _diffs(self, d, repos=None, skipped=None, errors=None):
+        (Path(d) / "repo-diffs.json").write_text(json.dumps({
+            "repos": repos or [], "skipped": skipped or [], "errors": errors or [],
+        }), encoding="utf-8")
+
+    def test_no_discovered_repos_file_no_gap(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(validate_contracts._repo_coverage_gaps(d), [])
+
+    def test_all_discovered_accounted_no_gap(self):
+        with tempfile.TemporaryDirectory() as d:
+            self._discovered(d, [
+                {"repoRoot": "/repo/a", "branch": "main"},
+                {"repoRoot": "/repo/b", "branch": "main"},
+            ])
+            self._diffs(d, repos=[{"repoRoot": "/repo/a"}], skipped=[{"repoRoot": "/repo/b"}])
+            self.assertEqual(validate_contracts._repo_coverage_gaps(d), [])
+
+    def test_unaccounted_repo_is_gap(self):
+        with tempfile.TemporaryDirectory() as d:
+            self._discovered(d, [
+                {"repoRoot": "/repo/a", "branch": "main"},
+                {"repoRoot": "/repo/b", "branch": "feature-x"},
+            ])
+            self._diffs(d, repos=[{"repoRoot": "/repo/a"}])
+            gaps = validate_contracts._repo_coverage_gaps(d)
+            self.assertTrue(any("/repo/b" in g and "feature-x" in g for g in gaps))
+
+    def test_errored_base_is_gap(self):
+        with tempfile.TemporaryDirectory() as d:
+            self._discovered(d, [{"repoRoot": "/repo/a", "branch": "main"}])
+            self._diffs(d, repos=[{"repoRoot": "/repo/a"}],
+                        errors=[{"repoRoot": "/repo/a", "error": "base ref not found"}])
+            gaps = validate_contracts._repo_coverage_gaps(d)
+            self.assertTrue(any("/repo/a" in g and "base ref not found" in g for g in gaps))
+
+    def test_discovered_but_no_diffs_file_is_gap(self):
+        with tempfile.TemporaryDirectory() as d:
+            self._discovered(d, [{"repoRoot": "/repo/a", "branch": "main"}])
+            gaps = validate_contracts._repo_coverage_gaps(d)
+            self.assertTrue(any("repo-diffs.json" in g for g in gaps))
+
+    def test_unaccounted_repo_fails_collect_gaps(self):
+        with tempfile.TemporaryDirectory() as d:
+            _pack(d, analysis={"title": "t"})
+            self._discovered(d, [
+                {"repoRoot": "/repo/a", "branch": "main"},
+                {"repoRoot": "/repo/b", "branch": "feature-x"},
+            ])
+            self._diffs(d, repos=[{"repoRoot": "/repo/a"}])
+            gaps = validate_contracts.collect_gaps(d)
+            self.assertTrue(any("/repo/b" in g for g in gaps))
+
+
 class TestConfigReadGaps(unittest.TestCase):
     def test_malformed_config_is_a_gap(self):
         with tempfile.TemporaryDirectory() as d:

@@ -97,6 +97,43 @@ def _command_gaps(cfg, results):
     return gaps
 
 
+def _repo_coverage_gaps(pack_dir):
+    """Multi-repo coverage backstop.
+
+    discover_repos.py finds every repo/worktree a session touched; repo_diffs.py
+    records what the user chose to evaluate or skip. A repo that was touched but
+    left in neither bucket would let the evaluator silently score just one repo
+    of a multi-repo session (Sensor: the change surface's boundary must be
+    observable and complete, not assumed). This is opt-in: packs with no
+    discovered-repos.json (the multi-repo feature never engaged) are legacy and
+    conform trivially.
+    """
+    discovered = _read(pack_dir, "discovered-repos.json")
+    if discovered is None:
+        return []
+
+    diffs = _read(pack_dir, "repo-diffs.json")
+    if diffs is None:
+        return ["repos discovered but none evaluated — run repo_diffs.py (repo-diffs.json missing)"]
+
+    accounted = {r.get("repoRoot") for r in diffs.get("repos") or []}
+    accounted |= {s.get("repoRoot") for s in diffs.get("skipped") or []}
+
+    gaps = []
+    for repo in discovered:
+        root = repo.get("repoRoot")
+        if root not in accounted:
+            gaps.append(
+                "repo touched but neither evaluated nor skipped: {} (branch {}) — "
+                "resolve or skip it".format(root, repo.get("branch")))
+
+    for err in diffs.get("errors") or []:
+        gaps.append("repo diff failed for {}: {} — fix the base ref or skip the repo".format(
+            err.get("repoRoot"), err.get("error")))
+
+    return gaps
+
+
 def collect_gaps(pack_dir):
     """Return a list of human-readable contract violations; empty means conforming."""
     gaps = []
@@ -111,6 +148,7 @@ def collect_gaps(pack_dir):
         gaps.extend(_retrospective_gaps(cfg, analysis))
         gaps.extend(_rubric_gaps(cfg, analysis))
     gaps.extend(_command_gaps(cfg, results))
+    gaps.extend(_repo_coverage_gaps(pack_dir))
     return gaps
 
 

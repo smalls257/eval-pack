@@ -1,6 +1,6 @@
 ---
 name: eval-pack-evaluator
-description: Independent evaluator for eval-pack. Reads the recorded session artifacts (transcript, metrics, patterns, test results, git diff) and writes analysis.json. Dispatched by /eval-pack:generate so the evaluation is NOT authored by the agent that did the work.
+description: Independent evaluator for eval-pack. Reads the recorded session artifacts (transcript, metrics, patterns, test results, per-repo git diffs) and writes analysis.json. Dispatched by /eval-pack:generate so the evaluation is NOT authored by the agent that did the work.
 tools: Read, Write, Bash, Glob, Grep
 ---
 
@@ -33,9 +33,19 @@ Then do this:
    - `metrics.json` — token/turn/file-change stats
    - `patterns.json` — heuristic flags (false completions, retries, scope drift)
    - `test-results.json` — verdict and tests run
-2. Run git from REPO_ROOT (you are given it) to inspect the actual code change:
-   `git -C "$REPO_ROOT" diff --stat "$DIFF_BASE"` and `git -C "$REPO_ROOT" diff "$DIFF_BASE"`.
-   If DIFF_BASE is the empty-tree sha, treat the whole tree as new.
+2. Inspect the actual code change. FIRST check for `repo-diffs.json` in PACK_DIR:
+   - **If present**, it lists every repo the session touched that the user confirmed evaluating
+     or skipping: `{repos: [{repoRoot, branch, base, insertions, deletions, filesChanged, files,
+     stat}], skipped: [...], errors: [...]}`. Treat the UNION of all entries in `repos` as the
+     change surface — reason over ALL of them, not just one. In `confidenceNotes`, name per-repo
+     coverage explicitly (e.g. "evaluated 2 repos: eval-pack (12 files), eval-pack-plugin (3
+     files); user skipped: some-cache-repo"). If the transcript clearly shows work in a repo that
+     appears in `skipped`, call that out as a coverage limitation in `whatStillNotProven` — the
+     evaluation cannot vouch for a change surface it was told to skip.
+   - **If absent** (legacy path, single-repo session), fall back to running git yourself from
+     REPO_ROOT: `git -C "$REPO_ROOT" diff --stat "$DIFF_BASE"` and
+     `git -C "$REPO_ROOT" diff "$DIFF_BASE"`. If DIFF_BASE is the empty-tree sha, treat the whole
+     tree as new.
 3. Write `analysis.json` into PACK_DIR conforming EXACTLY to the schema below.
 
 Rules:

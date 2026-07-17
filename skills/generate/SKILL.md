@@ -83,6 +83,61 @@ If `${PACK_DIR}/transcript.jsonl` was written (`1` or more sessions), set
 2.5, the Step 4 analysis input, and Step 5 render) — this guarantees the evaluator has a transcript
 to read. Otherwise keep the original `TRANSCRIPT_PATH`.
 
+## Step 0.65: Discover Repos Touched (multi-repo coverage)
+
+Today's diff step (Step 0 / Step 4) only diffs the cwd's repo. If a sub-agent did real work in a
+different repo or worktree during this session, that change surface is invisible and the eval
+scores a partial diff without saying so. This step restores that visibility.
+
+Run the discovery script against the assembled transcript and save its stdout — a JSON array —
+verbatim:
+
+```bash
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/discover_repos.py" "${PACK_DIR}/transcript.jsonl" \
+  > "${PACK_DIR}/discovered-repos.json"
+```
+
+Partition the discovered repos:
+
+- **Auto-skip obvious non-project repos** — any `repoRoot` under `~/.claude/plugins`,
+  `site-packages`, `/tmp`, or another dependency/cache directory. These are tooling the session
+  incidentally touched, not session work; record them as `{"repoRoot": ..., "skip": true}` with
+  reason `"tooling/library, not session work"`. Do NOT prompt the user about these.
+- **Remaining project repos:**
+  - If there is exactly **one**, and it is the cwd repo, auto-select it with
+    `base = ${DIFF_BASE}` (the Step 0 value) — no prompt, same behavior as before this step
+    existed.
+  - If there is **more than one**, this is the multi-repo case — **stop and ask the user**. We do
+    NOT guess a base; the user chooses, every time. For each such repo, present its `repoRoot`,
+    `branch`, `touchCount`, and `signals`, then offer candidate bases:
+    - Run `git -C <repoRoot> branch --format='%(refname:short)'` and list the branches.
+    - Also offer "the empty-tree sha (everything new)" — `4b825dc642cb6eb9a060e54bf8d69288fbee4904`.
+    - Also offer "type a specific commit SHA".
+    - Also offer "skip this repo".
+
+    Collect the user's choice per repo.
+
+Write every discovered repo's disposition — auto-skipped, auto-selected, and user-chosen — to
+`${PACK_DIR}/repo-selection.json`:
+
+```json
+{"repos": [
+  {"repoRoot": "/path/to/repo", "base": "main"},
+  {"repoRoot": "/path/to/other-repo", "skip": true}
+]}
+```
+
+Then compute the diffs:
+
+```bash
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/repo_diffs.py" "${PACK_DIR}" \
+  --selection "${PACK_DIR}/repo-selection.json"
+```
+
+This writes `${PACK_DIR}/repo-diffs.json`. Coverage backstop: render refuses if a discovered repo
+is left neither diffed nor skipped (Step 4's contract gate and render both enforce it), so account
+for every one — don't leave a repo out of `repo-selection.json`.
+
 ## Step 0.7: Resolve Configuration
 
 Resolve the layered eval-pack config into the pack directory. This validates
