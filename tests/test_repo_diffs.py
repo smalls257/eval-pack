@@ -152,6 +152,81 @@ class RepoDiffsTests(unittest.TestCase):
             self.assertEqual(entry["filesChanged"], 1)
             self.assertIn("blob.bin", entry["files"])
 
+    def test_new_untracked_file_counted(self):
+        with tempfile.TemporaryDirectory() as d:
+            repo = _init_repo(Path(d) / "repo")
+            (repo / "a.py").write_text("x = 1\n", encoding="utf-8")
+            _commit_all(repo, "init")
+            base_sha = _rev_parse(repo, "HEAD")
+
+            # untracked new file the session created but never `git add`ed
+            (repo / "new.py").write_text("a = 1\nb = 2\nc = 3\n", encoding="utf-8")
+
+            selection = {"repos": [{"repoRoot": str(repo), "base": base_sha}]}
+            out = repo_diffs.compute(str(Path(d)), selection)
+
+            entry = out["repos"][0]
+            self.assertIn("new.py", entry["files"])
+            self.assertGreaterEqual(entry["filesChanged"], 1)
+            self.assertGreater(entry["insertions"], 0)
+            self.assertEqual(entry["insertions"], 3)
+
+    def test_ignored_file_excluded(self):
+        with tempfile.TemporaryDirectory() as d:
+            repo = _init_repo(Path(d) / "repo")
+            (repo / ".gitignore").write_text("ignored.txt\n", encoding="utf-8")
+            (repo / "a.py").write_text("x = 1\n", encoding="utf-8")
+            _commit_all(repo, "init")
+            base_sha = _rev_parse(repo, "HEAD")
+
+            (repo / "ignored.txt").write_text("secret\n", encoding="utf-8")
+
+            selection = {"repos": [{"repoRoot": str(repo), "base": base_sha}]}
+            out = repo_diffs.compute(str(Path(d)), selection)
+
+            entry = out["repos"][0]
+            self.assertNotIn("ignored.txt", entry["files"])
+
+    def test_rename_records_new_path(self):
+        with tempfile.TemporaryDirectory() as d:
+            repo = _init_repo(Path(d) / "repo")
+            (repo / "old_name.py").write_text("line1\nline2\nline3\nline4\nline5\n", encoding="utf-8")
+            _commit_all(repo, "init")
+            base_sha = _rev_parse(repo, "HEAD")
+
+            _run(["git", "mv", "old_name.py", "new_name.py"], cwd=str(repo))
+            _commit_all(repo, "rename")
+
+            selection = {"repos": [{"repoRoot": str(repo), "base": base_sha}]}
+            out = repo_diffs.compute(str(Path(d)), selection)
+
+            entry = out["repos"][0]
+            self.assertIn("new_name.py", entry["files"])
+            self.assertNotIn("old_name.py", entry["files"])
+            self.assertFalse(any("=>" in f for f in entry["files"]),
+                             "rename recorded as fake `{a => b}` path")
+
+    def test_path_with_space_and_tab(self):
+        with tempfile.TemporaryDirectory() as d:
+            repo = _init_repo(Path(d) / "repo")
+            (repo / "a.py").write_text("x = 1\n", encoding="utf-8")
+            _commit_all(repo, "init")
+            base_sha = _rev_parse(repo, "HEAD")
+
+            space_name = "with space.py"
+            tab_name = "with\ttab.py"
+            (repo / space_name).write_text("s = 1\ns = 2\n", encoding="utf-8")
+            (repo / tab_name).write_text("t = 1\n", encoding="utf-8")
+            _commit_all(repo, "weird names")
+
+            selection = {"repos": [{"repoRoot": str(repo), "base": base_sha}]}
+            out = repo_diffs.compute(str(Path(d)), selection)
+
+            entry = out["repos"][0]
+            self.assertIn(space_name, entry["files"])
+            self.assertIn(tab_name, entry["files"])
+            self.assertEqual(entry["insertions"], 3)  # 2 + 1
+
     def test_multiple_repos_one_selection(self):
         with tempfile.TemporaryDirectory() as d:
             repo_a = _init_repo(Path(d) / "repo_a")

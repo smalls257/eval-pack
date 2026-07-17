@@ -16,14 +16,83 @@ over it would re-open the exact RCE vector discover_repos.py closed. Import, don
 """
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))  # noqa: E402
-from discover_repos import _git  # noqa: E402
+from discover_repos import _git, _git_argv, _hardened_env, GIT_TIMEOUT_SECS  # noqa: E402
 
 STAT_LINE_LIMIT = 200
 EMPTY_TREE_SHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
+
+def _git_bytes(args, cwd):
+    """Hardened git that returns RAW stdout bytes (or None on failure).
+
+    Text `_git` decodes-and-strips, which corrupts a `--numstat -z` NUL stream
+    (it eats the trailing NUL and can mangle non-UTF-8 path bytes). We still route
+    through discover_repos's `_git_argv` + `_hardened_env` so the same config-driven
+    code-exec neutralization applies — only the decode step differs. Reinventing the
+    argv/env here would reopen the hole; borrowing them keeps one boundary.
+    """
+    try:
+        out = subprocess.run(
+            _git_argv(args, cwd),
+            capture_output=True, timeout=GIT_TIMEOUT_SECS, env=_hardened_env(),
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if out.returncode != 0:
+        return None
+    return out.stdout
+
+
+_C_ESCAPES = {
+    ord("t"): 0x09, ord("n"): 0x0A, ord("r"): 0x0D, ord("f"): 0x0C,
+    ord("b"): 0x08, ord("v"): 0x0B, ord("a"): 0x07,
+    ord("\\"): 0x5C, ord('"'): 0x22,
+}
+
+
+def _unquote_path_bytes(field):
+    """Decode git's C-style path escaping on RAW bytes, returning a str.
+
+    Under `-z` git omits wrapping quotes and leaves printable/unicode bytes raw, but
+    STILL backslash-escapes genuine control chars (tab \\t, newline \\n) and non-ASCII
+    via octal (\\NNN) unless core.quotePath is off. A field with no backslash is already
+    the real path. We unescape at the BYTE level — decoding with unicode_escape on a str
+    would misread multi-byte UTF-8 (café) as latin-1 — then decode UTF-8 once at the end.
+    Leaving this un-decoded would report a tab-bearing filename under a fake name: a Leaky
+    Narrative of the on-disk truth that risk analysis then can't map back to a real file.
+    """
+    if b"\\" not in field:
+        return field.decode("utf-8", "surrogateescape")
+    out = bytearray()
+    i = 0
+    n = len(field)
+    while i < n:
+        c = field[i]
+        if c != 0x5C or i + 1 >= n:  # not a backslash, or trailing backslash
+            out.append(c)
+            i += 1
+            continue
+        nxt = field[i + 1]
+        if 0x30 <= nxt <= 0x37:  # octal escape \NNN
+            j = i + 1
+            digits = []
+            while j < n and len(digits) < 3 and 0x30 <= field[j] <= 0x37:
+                digits.append(field[j])
+                j += 1
+            out.append(int(bytes(digits), 8) & 0xFF)
+            i = j
+        elif nxt in _C_ESCAPES:
+            out.append(_C_ESCAPES[nxt])
+            i += 2
+        else:  # unknown escape — keep the backslash literally
+            out.append(c)
+            i += 1
+    return out.decode("utf-8", "surrogateescape")
 
 
 def _resolve_base(repo_root, base):
@@ -39,30 +108,69 @@ def _resolve_base(repo_root, base):
     return _git(["rev-parse", "--verify", "{}^{{commit}}".format(base)], repo_root)
 
 
-def _parse_numstat(numstat_text):
-    """Parse `git diff --numstat` output into (insertions, deletions, files).
+def _parse_numstat_z(raw):
+    """Parse `git diff --numstat -M -z` RAW bytes into (insertions, deletions, files).
 
-    Binary files report `-\t-\t<path>` for both counts — git can't diffstat them
-    line-by-line. We still count the file as changed (Sensor: a binary asset changing
-    must be visible to risk analysis) but contribute 0 to the insertion/deletion totals,
-    since "-" has no numeric meaning to sum.
+    The `-z` stream is NUL-separated with two record shapes:
+      normal: one field "<add>\\t<del>\\t<path>"
+      rename: field "<add>\\t<del>\\t" (trailing tab, empty 3rd) THEN two more NUL-
+              terminated fields <oldpath>\\0<newpath>. We record the NEW path — a rename
+              is not a fabricated `{a => b}` path (that string is no file that exists).
+    Binary files report `-\t-` for both counts (git can't line-diff them); we still count
+    the file as changed (Sensor: a binary asset changing must be visible to risk analysis)
+    but add 0 lines, since "-" has no numeric meaning to sum.
     """
     insertions = 0
     deletions = 0
     files = []
-    for line in numstat_text.splitlines():
-        if not line.strip():
+    fields = raw.split(b"\0")
+    idx = 0
+    while idx < len(fields):
+        field = fields[idx]
+        if not field:  # trailing empty field after final NUL
+            idx += 1
             continue
-        parts = line.split("\t", 2)
+        parts = field.split(b"\t", 2)
         if len(parts) != 3:
+            idx += 1
             continue
         added, removed, path = parts
-        files.append(path)
-        if added != "-":
+        if path == b"":  # rename: next two fields are old, new
+            if idx + 2 < len(fields):
+                path = fields[idx + 2]  # NEW path
+                idx += 3
+            else:
+                idx += 1
+                continue
+        else:
+            idx += 1
+        files.append(_unquote_path_bytes(path))
+        if added != b"-":
             insertions += int(added)
-        if removed != "-":
+        if removed != b"-":
             deletions += int(removed)
     return insertions, deletions, files
+
+
+def _count_text_lines(repo_root, rel_path):
+    """Added-line count for an untracked file: NUL byte => binary (0), else line count.
+
+    Deterministic, no git, no index mutation. Binary files count as a changed file but
+    contribute 0 lines (same rule as numstat's `-\t-`). Line count = number of '\\n', plus
+    one if the file is non-empty and lacks a trailing newline (the last unterminated line).
+    """
+    try:
+        data = (Path(repo_root) / rel_path).read_bytes()
+    except OSError:
+        return 0
+    if b"\0" in data:
+        return 0
+    if not data:
+        return 0
+    lines = data.count(b"\n")
+    if not data.endswith(b"\n"):
+        lines += 1
+    return lines
 
 
 def _truncate_stat(stat_text):
@@ -75,7 +183,14 @@ def _truncate_stat(stat_text):
 
 
 def _diff_one(repo_root, base):
-    """Diff base -> working tree for one repo. Returns a repos-entry dict or raises ValueError."""
+    """Compute one repo's change surface. Returns a repos-entry dict or raises ValueError.
+
+    The change surface reported is: base -> working tree for TRACKED files (committed +
+    uncommitted, since the user's base is the "before"), PLUS untracked non-ignored files
+    counted as additions by line count. Ignored files are excluded. Renames report the NEW
+    path. The diff runs against the RESOLVED base SHA (not the raw ref string), so the
+    reported baseResolved is definitionally what was diffed.
+    """
     if _git(["rev-parse", "--show-toplevel"], repo_root) is None:
         raise ValueError("not a git repo: {}".format(repo_root))
 
@@ -83,12 +198,25 @@ def _diff_one(repo_root, base):
     if base_resolved is None:
         raise ValueError("base ref not found: {}".format(base))
 
-    numstat = _git(["diff", "--numstat", base], repo_root)
+    numstat = _git_bytes(["diff", "--numstat", "-M", "-z", base_resolved], repo_root)
     if numstat is None:
         raise ValueError("git diff --numstat failed against base: {}".format(base))
-    insertions, deletions, files = _parse_numstat(numstat)
+    insertions, deletions, files = _parse_numstat_z(numstat)
 
-    stat = _git(["diff", "--stat", base], repo_root) or ""
+    # Union in untracked (non-ignored) files — `git diff` is tracked-only, so a file the
+    # session created but never `git add`ed vanishes. `ls-files --others` is NON-mutating
+    # (it does NOT touch the user's index). Skip any path already counted as tracked so an
+    # intent-to-add / edited-then-listed path isn't double counted.
+    seen_files = set(files)
+    others = _git(["ls-files", "--others", "--exclude-standard", "-z"], repo_root) or ""
+    for path in (p for p in others.split("\0") if p):
+        if path in seen_files:
+            continue
+        files.append(path)
+        seen_files.add(path)
+        insertions += _count_text_lines(repo_root, path)
+
+    stat = _git(["diff", "--stat", base_resolved], repo_root) or ""
     branch = _git(["rev-parse", "--abbrev-ref", "HEAD"], repo_root) or ""
 
     return {
