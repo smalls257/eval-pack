@@ -168,6 +168,44 @@ class TestRepoCoverageContract(unittest.TestCase):
             gaps = validate_contracts._repo_coverage_gaps(d)
             self.assertTrue(any("repo-diffs.json" in g for g in gaps))
 
+    def test_symlink_var_path_variant_still_matches(self):
+        import os
+        with tempfile.TemporaryDirectory() as real_d:
+            link = Path(real_d) / "link"
+            target = Path(real_d) / "target"
+            target.mkdir()
+            os.symlink(target, link)
+            # discovered uses the canonical (symlink-resolved) path; the selection
+            # echoed the symlinked form — same repo, different string.
+            canonical = os.path.realpath(target)
+            symlinked = str(link)
+            self.assertNotEqual(canonical, symlinked)
+            with tempfile.TemporaryDirectory() as d:
+                self._discovered(d, [{"repoRoot": canonical, "branch": "main"}])
+                self._diffs(d, repos=[{"repoRoot": symlinked}])
+                self.assertEqual(validate_contracts._repo_coverage_gaps(d), [])
+
+    def test_trailing_slash_variant_matches(self):
+        with tempfile.TemporaryDirectory() as d:
+            self._discovered(d, [{"repoRoot": "/a/repo", "branch": "main"}])
+            self._diffs(d, repos=[{"repoRoot": "/a/repo/"}])
+            self.assertEqual(validate_contracts._repo_coverage_gaps(d), [])
+
+    def test_empty_discovered_list_is_noop(self):
+        with tempfile.TemporaryDirectory() as d:
+            self._discovered(d, [])
+            self.assertEqual(validate_contracts._repo_coverage_gaps(d), [])
+
+    def test_genuinely_unaccounted_still_gaps(self):
+        with tempfile.TemporaryDirectory() as d:
+            self._discovered(d, [
+                {"repoRoot": "/a/repo", "branch": "main"},
+                {"repoRoot": "/totally/different/repo", "branch": "feature-x"},
+            ])
+            self._diffs(d, repos=[{"repoRoot": "/a/repo"}])
+            gaps = validate_contracts._repo_coverage_gaps(d)
+            self.assertTrue(any("/totally/different/repo" in g for g in gaps))
+
     def test_unaccounted_repo_fails_collect_gaps(self):
         with tempfile.TemporaryDirectory() as d:
             _pack(d, analysis={"title": "t"})

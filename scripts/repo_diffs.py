@@ -16,6 +16,7 @@ over it would re-open the exact RCE vector discover_repos.py closed. Import, don
 """
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -191,8 +192,14 @@ def _diff_one(repo_root, base):
     path. The diff runs against the RESOLVED base SHA (not the raw ref string), so the
     reported baseResolved is definitionally what was diffed.
     """
-    if _git(["rev-parse", "--show-toplevel"], repo_root) is None:
+    toplevel = _git(["rev-parse", "--show-toplevel"], repo_root)
+    if toplevel is None:
         raise ValueError("not a git repo: {}".format(repo_root))
+    # Emit git's canonical (symlink-resolved) root, not whatever form the selection
+    # used. discovered-repos.json holds this same --show-toplevel value, so the coverage
+    # gate's set match is over one path form — a raw /var vs /private/var selection can't
+    # false-refuse a covered pack.
+    repo_root = toplevel
 
     base_resolved = _resolve_base(repo_root, base)
     if base_resolved is None:
@@ -238,7 +245,10 @@ def compute(pack_dir, selection):
     for entry in selection.get("repos") or []:
         repo_root = entry.get("repoRoot")
         if entry.get("skip"):
-            skipped.append({"repoRoot": repo_root, "reason": "user skipped"})
+            # Canonicalize skipped roots too (they never touch git, so there's no
+            # --show-toplevel to borrow) so a skipped repo also matches discovered.
+            canon = os.path.realpath(repo_root).rstrip("/") if repo_root else repo_root
+            skipped.append({"repoRoot": canon, "reason": "user skipped"})
             continue
         try:
             repos.append(_diff_one(repo_root, entry.get("base")))

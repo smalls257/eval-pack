@@ -39,7 +39,9 @@ Then do this:
      stat}], skipped: [...], errors: [...]}`. Treat the UNION of all entries in `repos` as the
      change surface — reason over ALL of them, not just one. In `confidenceNotes`, name per-repo
      coverage explicitly (e.g. "evaluated 2 repos: eval-pack (12 files), eval-pack-plugin (3
-     files); user skipped: some-cache-repo"). If the transcript clearly shows work in a repo that
+     files); user skipped: some-cache-repo"). Weigh each repo's insertions/deletions MAGNITUDE
+     (not just file counts) when assessing change size and risk — a repo with +9000/-100 is a
+     larger surface than one with +12 across more files. If the transcript clearly shows work in a repo that
      appears in `skipped`, call that out as a coverage limitation in `whatStillNotProven` — the
      evaluation cannot vouch for a change surface it was told to skip.
    - **If absent** (legacy path, single-repo session), fall back to running git yourself from

@@ -9,6 +9,7 @@ render_html refuses to render a non-conforming pack as the code-level backstop.
 """
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -97,6 +98,20 @@ def _command_gaps(cfg, results):
     return gaps
 
 
+def _canon_root(p):
+    """Canonicalize a repo root for comparison: resolve symlinks, drop trailing slash.
+
+    The two sides of the coverage match normalize differently — discovered-repos.json
+    holds git's `--show-toplevel` (symlink-resolved, canonical) while a naive selection
+    could echo a raw string (e.g. /var/... vs /private/var/... on macOS, or a trailing
+    slash). Comparing raw strings would report a genuinely-covered repo as unaccounted
+    and refuse a CORRECT pack — a Silent Fallback where a path-form artifact masquerades
+    as missing coverage. Canonicalizing both sides makes the match reflect repo identity,
+    not string form. realpath still normalizes lexically for a nonexistent path.
+    """
+    return os.path.realpath(p).rstrip("/") if p else p
+
+
 def _repo_coverage_gaps(pack_dir):
     """Multi-repo coverage backstop.
 
@@ -105,24 +120,24 @@ def _repo_coverage_gaps(pack_dir):
     left in neither bucket would let the evaluator silently score just one repo
     of a multi-repo session (Sensor: the change surface's boundary must be
     observable and complete, not assumed). This is opt-in: packs with no
-    discovered-repos.json (the multi-repo feature never engaged) are legacy and
-    conform trivially.
+    discovered-repos.json — or an empty discovery (a non-git session, or the
+    feature engaged but found nothing) — are legacy and conform trivially.
     """
     discovered = _read(pack_dir, "discovered-repos.json")
-    if discovered is None:
+    if not discovered:
         return []
 
     diffs = _read(pack_dir, "repo-diffs.json")
     if diffs is None:
         return ["repos discovered but none evaluated — run repo_diffs.py (repo-diffs.json missing)"]
 
-    accounted = {r.get("repoRoot") for r in diffs.get("repos") or []}
-    accounted |= {s.get("repoRoot") for s in diffs.get("skipped") or []}
+    accounted = {_canon_root(r.get("repoRoot")) for r in diffs.get("repos") or []}
+    accounted |= {_canon_root(s.get("repoRoot")) for s in diffs.get("skipped") or []}
 
     gaps = []
     for repo in discovered:
         root = repo.get("repoRoot")
-        if root not in accounted:
+        if _canon_root(root) not in accounted:
             gaps.append(
                 "repo touched but neither evaluated nor skipped: {} (branch {}) — "
                 "resolve or skip it".format(root, repo.get("branch")))

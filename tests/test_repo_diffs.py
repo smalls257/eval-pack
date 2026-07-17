@@ -1,9 +1,21 @@
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+
+def _canon(p):
+    """The canonical (symlink-resolved, no trailing slash) form repo_diffs emits.
+
+    On macOS a tmpdir under /var is really /private/var, so str(repo) differs from
+    git's --show-toplevel. repo_diffs.json intentionally carries the canonical root
+    (so the coverage gate can set-match it against discovered-repos.json); assertions
+    compare against that same canonical form, not the raw selection string.
+    """
+    return os.path.realpath(str(p)).rstrip("/")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import repo_diffs  # noqa: E402
@@ -115,7 +127,7 @@ class RepoDiffsTests(unittest.TestCase):
             out = repo_diffs.compute(str(Path(d)), selection)
 
             self.assertEqual(len(out["repos"]), 1)
-            self.assertEqual(out["repos"][0]["repoRoot"], str(repo_a))
+            self.assertEqual(out["repos"][0]["repoRoot"], _canon(repo_a))
             self.assertEqual(len(out["errors"]), 1)
             err = out["errors"][0]
             self.assertEqual(err["repoRoot"], str(repo_b))
@@ -132,7 +144,7 @@ class RepoDiffsTests(unittest.TestCase):
 
             self.assertEqual(out["repos"], [])
             self.assertEqual(len(out["skipped"]), 1)
-            self.assertEqual(out["skipped"][0]["repoRoot"], str(repo))
+            self.assertEqual(out["skipped"][0]["repoRoot"], _canon(repo))
             self.assertEqual(out["errors"], [])
 
     def test_binary_file_handled(self):
@@ -251,7 +263,29 @@ class RepoDiffsTests(unittest.TestCase):
 
             self.assertEqual(len(out["repos"]), 2)
             roots = {r["repoRoot"] for r in out["repos"]}
-            self.assertEqual(roots, {str(repo_a), str(repo_b)})
+            self.assertEqual(roots, {_canon(repo_a), _canon(repo_b)})
+
+    def test_emits_canonical_root_for_noncanonical_selection(self):
+        """A selection using a non-canonical path form still yields the canonical root,
+        so discovered-repos.json (which holds --show-toplevel) set-matches it."""
+        with tempfile.TemporaryDirectory() as d:
+            repo = _init_repo(Path(d) / "repo")
+            (repo / "a.py").write_text("x = 1\n", encoding="utf-8")
+            _commit_all(repo, "init")
+            base_sha = _rev_parse(repo, "HEAD")
+            (repo / "a.py").write_text("x = 2\n", encoding="utf-8")
+            _commit_all(repo, "edit")
+
+            # selection echoes a trailing-slash variant of the root
+            selection = {"repos": [{"repoRoot": str(repo) + "/", "base": base_sha}]}
+            out = repo_diffs.compute(str(Path(d)), selection)
+
+            self.assertEqual(out["repos"][0]["repoRoot"], _canon(repo))
+
+            # a skipped entry with the same noncanonical form is canonicalized too
+            skip_sel = {"repos": [{"repoRoot": str(repo) + "/", "skip": True}]}
+            skip_out = repo_diffs.compute(str(Path(d)), skip_sel)
+            self.assertEqual(skip_out["skipped"][0]["repoRoot"], _canon(repo))
 
     def test_uses_hardened_git(self):
         """A hostile fsmonitor hook must NOT execute during our diff run."""

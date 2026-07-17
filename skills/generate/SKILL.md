@@ -118,7 +118,9 @@ Partition the discovered repos:
     Collect the user's choice per repo.
 
 Write every discovered repo's disposition — auto-skipped, auto-selected, and user-chosen — to
-`${PACK_DIR}/repo-selection.json`:
+`${PACK_DIR}/repo-selection.json`. When writing it, copy each `repoRoot` BYTE-FOR-BYTE from
+discovered-repos.json — do not retype, expand, or add a trailing slash. (The coverage gate
+canonicalizes paths, but a verbatim copy avoids any ambiguity.)
 
 ```json
 {"repos": [
