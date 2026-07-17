@@ -13,6 +13,7 @@ and distinct diffs even when they share one underlying repo.
 """
 import json
 import re
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -20,10 +21,23 @@ from pathlib import Path
 FILE_TOOLS = {"Edit", "Write", "Read", "MultiEdit", "NotebookEdit"}
 GIT_TIMEOUT_SECS = 10
 
+# Prepended to EVERY git invocation. See _git for the WHY. core.fsmonitor=
+# disarms the fsmonitor hook, core.pager=cat disarms the pager, and
+# --no-optional-locks stops index refreshes from firing config-driven code.
+_GIT_HARDENING_FLAGS = [
+    "-c", "core.fsmonitor=",
+    "-c", "core.pager=cat",
+    "--no-optional-locks",
+]
+
 # First `cd <absolute-path>` argument in a shell command. Deliberately
 # excludes `cd -`, `cd ~...`, and relative paths — those don't identify a
 # repo without shell state we don't have, and a wrong guess here would be a
 # Silent Fallback (a fabricated repo location presented as a real signal).
+# Known limitation: quoted/spaced paths (`cd "/a b"`) are not captured — this
+# errs toward under-reporting, never fabrication; and `cd` inside a quoted
+# string can yield a bogus token, but the is_dir() guard in discover() drops
+# it before any git call, so a fabricated path never reaches subprocess.
 _CD_PATTERN = re.compile(r"(?:^|[;&|]|&&|\|\|)\s*cd\s+(/[^\s;&|]+)")
 
 
@@ -80,11 +94,39 @@ def _candidate_dirs(entries):
     return hits
 
 
+def _git_argv(args, cwd):
+    """Construct the hardened argv for a git call — the single source of truth
+    so tests and the sibling repo_diffs.py can assert the boundary is present."""
+    return ["git"] + _GIT_HARDENING_FLAGS + ["-C", str(cwd)] + list(args)
+
+
+def _hardened_env():
+    """Env that neutralizes attacker-controlled global/system git config while
+    keeping the repo-local config these read-only queries legitimately need."""
+    env = os.environ.copy()
+    env["GIT_OPTIONAL_LOCKS"] = "0"
+    env["GIT_CONFIG_GLOBAL"] = "/dev/null"
+    env["GIT_CONFIG_SYSTEM"] = "/dev/null"
+    return env
+
+
 def _git(args, cwd):
+    """The SINGLE chokepoint every git call in this module goes through.
+
+    Hardened because the dirs come from a (path-uncontrolled) transcript; git
+    reads each dir's .git/config, and index-refreshing/paging subcommands
+    (diff/status/log — used by the sibling repo-diff step) execute
+    config-driven code (core.fsmonitor/pager/etc). The prepended flags plus
+    the hardened env neutralize that vector regardless of subcommand, so the
+    coming repo_diffs.py inherits a safe boundary by routing through here.
+    rev-parse (used today) doesn't trip it, but diff/status/log do — harden
+    now so the diff step can't reopen the hole.
+    """
     try:
         out = subprocess.run(
-            ["git", "-C", str(cwd)] + args,
+            _git_argv(args, cwd),
             capture_output=True, text=True, timeout=GIT_TIMEOUT_SECS,
+            env=_hardened_env(),
         )
     except (OSError, subprocess.TimeoutExpired):
         return None

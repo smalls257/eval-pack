@@ -160,6 +160,45 @@ class DiscoverReposTests(unittest.TestCase):
             self.assertEqual(Path(got[0]["repoRoot"]).resolve(), repo_a.resolve())
             self.assertGreater(got[0]["touchCount"], got[1]["touchCount"])
 
+    def test_cd_false_positive_rejected_by_isdir(self):
+        # `cd` inside a quoted echo yields a bogus token (`/definitely/not/real"`)
+        # that the is_dir() guard must reject before any git call runs.
+        with tempfile.TemporaryDirectory() as d:
+            t = Path(d) / "transcript.jsonl"
+            _write_transcript(t, [
+                {
+                    "type": "assistant",
+                    "cwd": str(Path(d)),  # a non-git tempdir; itself not a repo
+                    "message": {
+                        "content": [
+                            {
+                                "type": "tool_use",
+                                "name": "Bash",
+                                "input": {"command": 'echo "x; cd /definitely/not/real"'},
+                            }
+                        ]
+                    },
+                },
+            ])
+            got = discover_repos.discover(str(t))
+            self.assertEqual(got, [])
+
+    def test_git_argv_carries_hardening_flags(self):
+        argv = discover_repos._git_argv(["rev-parse", "--show-toplevel"], "/some/dir")
+        self.assertEqual(argv[0], "git")
+        # Hardening flags precede -C so they apply to the top-level git process.
+        self.assertIn("core.fsmonitor=", argv)
+        self.assertIn("core.pager=cat", argv)
+        self.assertIn("--no-optional-locks", argv)
+        self.assertLess(argv.index("--no-optional-locks"), argv.index("-C"))
+        self.assertEqual(argv[-2:], ["rev-parse", "--show-toplevel"])
+
+    def test_hardened_env_neutralizes_external_config(self):
+        env = discover_repos._hardened_env()
+        self.assertEqual(env["GIT_OPTIONAL_LOCKS"], "0")
+        self.assertEqual(env["GIT_CONFIG_GLOBAL"], "/dev/null")
+        self.assertEqual(env["GIT_CONFIG_SYSTEM"], "/dev/null")
+
     def test_cli_prints_json_array(self):
         with tempfile.TemporaryDirectory() as d:
             repo = _init_repo(Path(d) / "repo")
