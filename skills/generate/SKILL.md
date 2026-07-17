@@ -88,9 +88,11 @@ to read. Otherwise keep the original `TRANSCRIPT_PATH`.
 Today's diff step (Step 0 / Step 4) only diffs the cwd's repo. If a sub-agent did real work in a
 different repo or worktree during this session, that change surface is invisible and the eval
 scores a partial diff without saying so. This step restores that visibility. This step is also
-ENFORCED deterministically: render re-derives which repos the session wrote to from the transcript
-and REFUSES to render if a session that touched ≥2 repos didn't account for them all — so you
-cannot skip discovery on a multi-repo session.
+ENFORCED deterministically: render re-derives which repos the session edited (via
+Edit/Write/MultiEdit/NotebookEdit) from the transcript and REFUSES to render if ≥2 such repos
+aren't all accounted. Limitation: a second repo modified ONLY through Bash file writes (e.g.
+`cat >`, `sed -i`, `git commit` — not the edit tools) has no write signal and is not detected —
+prefer the edit tools, or explicitly cover such repos in the selection.
 
 Run the discovery script against the assembled transcript and save its stdout — a JSON array —
 verbatim:

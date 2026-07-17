@@ -241,6 +241,86 @@ class DiscoverReposTests(unittest.TestCase):
         self.assertEqual(env["GIT_CONFIG_GLOBAL"], "/dev/null")
         self.assertEqual(env["GIT_CONFIG_SYSTEM"], "/dev/null")
 
+    def test_discover_write_repos_only_resolves_write_dirs(self):
+        # Edit under repo A (write signal) + Read under repo B (read signal only).
+        # discover_write_repos must return ONLY A, and must never git-resolve B's dir.
+        with tempfile.TemporaryDirectory() as d:
+            repo_a = _init_repo(Path(d) / "repo_a")
+            repo_b = _init_repo(Path(d) / "repo_b")
+            (repo_a / "a.py").write_text("x = 1\n", encoding="utf-8")
+            (repo_b / "b.py").write_text("y = 2\n", encoding="utf-8")
+            t = Path(d) / "transcript.jsonl"
+            _write_transcript(t, [
+                {
+                    "type": "assistant",
+                    "cwd": str(repo_a),
+                    "message": {"content": [
+                        {"type": "tool_use", "name": "Edit",
+                         "input": {"file_path": str(repo_a / "a.py")}},
+                    ]},
+                },
+                {
+                    "type": "assistant",
+                    "cwd": str(repo_a),
+                    "message": {"content": [
+                        {"type": "tool_use", "name": "Read",
+                         "input": {"file_path": str(repo_b / "b.py")}},
+                    ]},
+                },
+            ])
+
+            # Spy on the resolver to prove B's dir is never git-resolved.
+            resolved_dirs = []
+            real_resolve = discover_repos._resolve_repo
+
+            def spy(dir_path):
+                resolved_dirs.append(str(Path(dir_path).resolve()))
+                return real_resolve(dir_path)
+
+            discover_repos._resolve_repo = spy
+            try:
+                got = discover_repos.discover_write_repos(str(t))
+            finally:
+                discover_repos._resolve_repo = real_resolve
+
+            roots = {Path(e["repoRoot"]).resolve() for e in got}
+            self.assertEqual(roots, {repo_a.resolve()})
+            entry = got[0]
+            self.assertEqual(entry["signals"], ["write"])
+            self.assertTrue(entry["branch"])
+            self.assertTrue(entry["head"])
+            self.assertIn("gitCommonDir", entry)
+            # B's dir must never have reached the git resolver.
+            self.assertNotIn(str(repo_b.resolve()), resolved_dirs)
+
+    def test_discover_write_repos_dedups_and_counts(self):
+        # Multiple Edit file_paths under the SAME repo (different subdirs/files)
+        # collapse to one entry with touchCount == number of write file_paths.
+        with tempfile.TemporaryDirectory() as d:
+            repo = _init_repo(Path(d) / "repo")
+            (repo / "sub").mkdir()
+            paths = [repo / "a.py", repo / "b.py", repo / "sub" / "c.py"]
+            for p in paths:
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_text("x = 1\n", encoding="utf-8")
+            t = Path(d) / "transcript.jsonl"
+            _write_transcript(t, [
+                {
+                    "type": "assistant",
+                    "cwd": str(repo),
+                    "message": {"content": [
+                        {"type": "tool_use", "name": "Edit",
+                         "input": {"file_path": str(p)}},
+                    ]},
+                }
+                for p in paths
+            ])
+            got = discover_repos.discover_write_repos(str(t))
+            self.assertEqual(len(got), 1)
+            self.assertEqual(Path(got[0]["repoRoot"]).resolve(), repo.resolve())
+            self.assertEqual(got[0]["touchCount"], len(paths))
+            self.assertEqual(got[0]["signals"], ["write"])
+
     def test_cli_prints_json_array(self):
         with tempfile.TemporaryDirectory() as d:
             repo = _init_repo(Path(d) / "repo")

@@ -15,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))  # noqa: E402
 import config  # noqa: E402
-from discover_repos import discover  # noqa: E402
+from discover_repos import discover_write_repos  # noqa: E402
 
 
 def _read(pack, name):
@@ -130,8 +130,12 @@ def _repo_coverage_gaps(pack_dir):
     if not tpath.is_file():
         return []   # no transcript to derive from (should not happen at real render)
 
-    discovered = discover(str(tpath))
-    write_repos = [r for r in discovered if "write" in (r.get("signals") or [])]
+    # Resolve git for ONLY the write-touched dirs — the gate consults nothing else, and
+    # full discover() would shell ~4 git calls per DISTINCT dir referenced anywhere in the
+    # transcript (read/cwd/cd included), thousands on a big session (Engine: don't pay for
+    # resolution the gate never reads). Behavior is identical to the old discover()+"write"
+    # filter for the write-repo subset — same repoRoot/branch/signals keys.
+    write_repos = discover_write_repos(str(tpath))
     if len(write_repos) < 2:
         return []   # single/zero write-touched repo: legacy single-diff flow covers it
 

@@ -62,6 +62,27 @@ def _cd_targets(command):
     return _CD_PATTERN.findall(command or "")
 
 
+def _tool_uses(entry):
+    """Yield (tool_name, input_dict) for every tool_use block in one entry.
+
+    The SINGLE parser for a transcript entry's tool calls, so discover() and
+    discover_write_repos() iterate tool_use blocks identically (Shield: one
+    parser, not two divergent ones). Malformed blocks / non-dict inputs are
+    skipped silently — the transcript is untrusted input.
+    """
+    message = entry.get("message")
+    content = message.get("content") if isinstance(message, dict) else None
+    if not isinstance(content, list):
+        return
+    for block in content:
+        if not isinstance(block, dict) or block.get("type") != "tool_use":
+            continue
+        inp = block.get("input") or {}
+        if not isinstance(inp, dict):
+            continue
+        yield block.get("name"), inp
+
+
 def _candidate_dirs(entries):
     """Multiset of candidate directories -> list of signal names per hit.
 
@@ -75,17 +96,7 @@ def _candidate_dirs(entries):
         if isinstance(cwd, str) and cwd.startswith("/"):
             hits.append((cwd, "cwd"))
 
-        message = entry.get("message")
-        content = message.get("content") if isinstance(message, dict) else None
-        if not isinstance(content, list):
-            continue
-        for block in content:
-            if not isinstance(block, dict) or block.get("type") != "tool_use":
-                continue
-            name = block.get("name")
-            inp = block.get("input") or {}
-            if not isinstance(inp, dict):
-                continue
+        for name, inp in _tool_uses(entry):
             if name in FILE_TOOLS:
                 file_path = inp.get("file_path")
                 if isinstance(file_path, str) and file_path.startswith("/"):
@@ -198,6 +209,41 @@ def discover(transcript_path):
     ]
     results.sort(key=lambda r: (-r["touchCount"], r["repoRoot"]))
     return results
+
+
+def discover_write_repos(transcript_path):
+    """Repos the session WROTE to (Edit/Write/MultiEdit/NotebookEdit file_paths only).
+
+    Resolves git for ONLY the write-signal dirs — far cheaper than full discover()
+    on the render hot path, where the coverage gate needs nothing else. Same
+    {repoRoot, gitCommonDir, branch, head, signals:['write'], touchCount} shape as
+    discover() produces for the write-touched subset, so the coverage gate that reads
+    repoRoot/branch/signals keeps working (Engine: full discover() shells ~4 git calls
+    per DISTINCT dir referenced anywhere in the transcript — read, cwd, cd included —
+    which on a big session is thousands of subprocesses the gate never consults).
+    """
+    entries = _iter_entries(transcript_path)   # the module's transcript loader
+    write_dirs = {}                            # dir -> touchCount, WRITE_TOOLS file_paths only
+    for entry in entries:
+        for name, inp in _tool_uses(entry):    # the shared tool_use iterator
+            if name in WRITE_TOOLS:
+                file_path = inp.get("file_path")
+                if isinstance(file_path, str) and file_path.startswith("/"):
+                    d = str(Path(file_path).parent)
+                    write_dirs[d] = write_dirs.get(d, 0) + 1
+
+    repos = {}
+    for d, n in write_dirs.items():
+        if not Path(d).is_dir():
+            continue
+        info = _resolve_repo(d)                 # the existing hardened resolver
+        if not info:
+            continue
+        root = info["repoRoot"]
+        if root not in repos:
+            repos[root] = {**info, "signals": ["write"], "touchCount": 0}
+        repos[root]["touchCount"] += n
+    return sorted(repos.values(), key=lambda r: (-r["touchCount"], r["repoRoot"]))
 
 
 def main():
