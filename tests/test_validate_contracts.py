@@ -17,16 +17,16 @@ from discover_repos import canon_root  # noqa: E402
 
 
 def _norm_slashes(s):
-    """Fold path separators/case for substring comparison against a gap message.
+    """Fold path separators + case so a canonicalized path matches inside a gap message.
 
-    Gap messages embed git's RAW --show-toplevel output (never realpath'd or
-    normcase'd — that's intentional, the message is for human debugging, not
-    identity comparison). A literal `os.path.realpath(repo_a) in message` check
-    is wrong on two counts: realpath resolves symlinks the raw message text
-    never had reason to, AND on Windows the message uses forward slashes while
-    a Path-derived string uses back slashes. This is a pure lexical fold (no
-    filesystem access, unlike realpath) so it's safe to apply to an arbitrary
-    sentence, not just a path.
+    Gap messages embed git's --show-toplevel output verbatim; on Windows that's
+    the LONG name with FORWARD slashes, whereas canon_root() (which the expected
+    side is passed through, to resolve the 8.3 short/long mismatch) emits native
+    BACK slashes. This is a pure lexical fold — separators to '/', case-folded —
+    with NO filesystem access, so it's safe to apply to an arbitrary sentence
+    (the whole message), not just a path. The expected side is canon_root()'d
+    FIRST (short->long + realpath) and then folded here; the message side is only
+    folded here, because it already carries git's canonical long form.
     """
     return s.replace("\\", "/").casefold()
 
@@ -218,13 +218,14 @@ class TestRepoCoverageContract(unittest.TestCase):
             self.assertTrue(gaps)
             joined = " ".join(gaps)
             self.assertIn("repo-diffs.json", joined)
-            # The gap message embeds git's raw (uncanonicalized) --show-toplevel
-            # output — on Windows that's forward-slashed and may differ in case
-            # from the Path object's own str(), so compare via _norm_slashes
-            # (separator/case folding only, no filesystem realpath) rather than
-            # a literal substring match.
-            self.assertIn(_norm_slashes(str(repo_a)), _norm_slashes(joined))
-            self.assertIn(_norm_slashes(str(repo_b)), _norm_slashes(joined))
+            # The gap message embeds git's raw --show-toplevel output, which on
+            # Windows is the LONG name with forward slashes. str(repo_a) can be
+            # the 8.3 SHORT name (RUNNER~1 on CI), so canon_root() it first to
+            # expand short->long, then _norm_slashes() both sides to fold the
+            # slash/case difference. On POSIX canon_root is just realpath and
+            # _norm_slashes a lowercase, so this stays a plain match there.
+            self.assertIn(_norm_slashes(canon_root(str(repo_a))), _norm_slashes(joined))
+            self.assertIn(_norm_slashes(canon_root(str(repo_b))), _norm_slashes(joined))
 
     def test_two_write_repos_all_accounted_no_gap(self):
         with tempfile.TemporaryDirectory() as d:
@@ -251,8 +252,10 @@ class TestRepoCoverageContract(unittest.TestCase):
             self._diffs(d, repos=[{"repoRoot": canon_root(str(repo_a))}])
             gaps = validate_contracts._repo_coverage_gaps(d)
             joined_norm = _norm_slashes(" ".join(gaps))
-            self.assertTrue(_norm_slashes(str(repo_b)) in joined_norm)
-            self.assertFalse(_norm_slashes(str(repo_a)) in joined_norm)
+            # canon_root() the expected paths to the long form before folding, so
+            # a Windows 8.3 short tmpdir name matches the long name in the message.
+            self.assertTrue(_norm_slashes(canon_root(str(repo_b))) in joined_norm)
+            self.assertFalse(_norm_slashes(canon_root(str(repo_a))) in joined_norm)
 
     def test_read_only_repo_not_gated(self):
         with tempfile.TemporaryDirectory() as d:
@@ -277,7 +280,8 @@ class TestRepoCoverageContract(unittest.TestCase):
                         errors=[{"repoRoot": canon_root(str(repo_a)), "error": "base ref not found"}])
             gaps = validate_contracts._repo_coverage_gaps(d)
             self.assertTrue(any(
-                _norm_slashes(str(repo_a)) in _norm_slashes(g) and "base ref not found" in g
+                _norm_slashes(canon_root(str(repo_a))) in _norm_slashes(g)
+                and "base ref not found" in g
                 for g in gaps))
 
     def test_no_transcript_no_gap(self):
@@ -294,8 +298,8 @@ class TestRepoCoverageContract(unittest.TestCase):
             _write_transcript(d, [_edit_entry(repo_a, "a.py"), _edit_entry(repo_b, "b.py")])
             gaps = validate_contracts.collect_gaps(d)
             self.assertTrue(any(
-                _norm_slashes(str(repo_a)) in _norm_slashes(g)
-                or _norm_slashes(str(repo_b)) in _norm_slashes(g)
+                _norm_slashes(canon_root(str(repo_a))) in _norm_slashes(g)
+                or _norm_slashes(canon_root(str(repo_b))) in _norm_slashes(g)
                 for g in gaps))
 
 

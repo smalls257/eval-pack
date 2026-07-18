@@ -32,6 +32,14 @@ def _init_repo(path):
     _run(["git", "init", "-q"], cwd=str(path))
     _run(["git", "config", "user.email", "t@example.com"], cwd=str(path))
     _run(["git", "config", "user.name", "T"], cwd=str(path))
+    # Pin line-ending handling so `git diff --numstat` counts are identical on
+    # every platform. Windows git's default core.autocrlf converts the \n these
+    # fixtures write into \r\n in the index, which shifts numstat's insertion
+    # counts vs macOS/Linux (a Black Box: the same test asserting 2 insertions
+    # would silently see 3 only on Windows). autocrlf=false + eol=lf makes the
+    # bytes git records exactly the bytes the fixture wrote, on all three OSes.
+    _run(["git", "config", "core.autocrlf", "false"], cwd=str(path))
+    _run(["git", "config", "core.eol", "lf"], cwd=str(path))
     return path
 
 

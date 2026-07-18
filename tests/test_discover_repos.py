@@ -7,6 +7,20 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import discover_repos  # noqa: E402
+from discover_repos import canon_root  # noqa: E402
+
+
+def _cr(p):
+    """Compare repo roots via the SAME canonicalization production uses.
+
+    A raw `Path(x).resolve()` comparison is wrong on Windows CI: one side comes
+    from git's `--show-toplevel` (long name) and the other from a tmpdir whose
+    realpath can be the 8.3 SHORT name (RUNNER~1), so the two Path objects for
+    the SAME directory compare unequal. canon_root folds short->long + case +
+    separators, matching what discover()/repo_diffs.py emit. On POSIX it's just
+    realpath, so these assertions are unchanged on macOS/Linux.
+    """
+    return canon_root(str(p))
 
 
 def _run(cmd, cwd=None):
@@ -45,7 +59,7 @@ class DiscoverReposTests(unittest.TestCase):
             got = discover_repos.discover(str(t))
             self.assertEqual(len(got), 1)
             entry = got[0]
-            self.assertEqual(Path(entry["repoRoot"]).resolve(), repo.resolve())
+            self.assertEqual(_cr(entry["repoRoot"]), _cr(repo))
             self.assertTrue(entry["branch"])
             self.assertTrue(entry["head"])
             self.assertIn("cwd", entry["signals"])
@@ -73,9 +87,9 @@ class DiscoverReposTests(unittest.TestCase):
                 },
             ])
             got = discover_repos.discover(str(t))
-            roots = {Path(e["repoRoot"]).resolve() for e in got}
-            self.assertEqual(roots, {repo_a.resolve(), repo_b.resolve()})
-            entry_b = next(e for e in got if Path(e["repoRoot"]).resolve() == repo_b.resolve())
+            roots = {_cr(e["repoRoot"]) for e in got}
+            self.assertEqual(roots, {_cr(repo_a), _cr(repo_b)})
+            entry_b = next(e for e in got if _cr(e["repoRoot"]) == _cr(repo_b))
             self.assertIn("write", entry_b["signals"])
 
     def test_write_vs_read_signal_split(self):
@@ -114,8 +128,8 @@ class DiscoverReposTests(unittest.TestCase):
                 },
             ])
             got = discover_repos.discover(str(t))
-            entry_a = next(e for e in got if Path(e["repoRoot"]).resolve() == repo_a.resolve())
-            entry_b = next(e for e in got if Path(e["repoRoot"]).resolve() == repo_b.resolve())
+            entry_a = next(e for e in got if _cr(e["repoRoot"]) == _cr(repo_a))
+            entry_b = next(e for e in got if _cr(e["repoRoot"]) == _cr(repo_b))
             self.assertIn("write", entry_a["signals"])
             self.assertIn("read", entry_b["signals"])
             self.assertNotIn("write", entry_b["signals"])
@@ -142,9 +156,9 @@ class DiscoverReposTests(unittest.TestCase):
                 },
             ])
             got = discover_repos.discover(str(t))
-            roots = {Path(e["repoRoot"]).resolve() for e in got}
-            self.assertIn(repo.resolve(), roots)
-            entry = next(e for e in got if Path(e["repoRoot"]).resolve() == repo.resolve())
+            roots = {_cr(e["repoRoot"]) for e in got}
+            self.assertIn(_cr(repo), roots)
+            entry = next(e for e in got if _cr(e["repoRoot"]) == _cr(repo))
             self.assertIn("cd", entry["signals"])
 
     def test_two_worktrees_same_repo_are_separate(self):
@@ -159,8 +173,8 @@ class DiscoverReposTests(unittest.TestCase):
                 {"type": "user", "cwd": str(wt), "gitBranch": "feat"},
             ])
             got = discover_repos.discover(str(t))
-            roots = {Path(e["repoRoot"]).resolve() for e in got}
-            self.assertEqual(roots, {repo.resolve(), wt.resolve()})
+            roots = {_cr(e["repoRoot"]) for e in got}
+            self.assertEqual(roots, {_cr(repo), _cr(wt)})
             branches = {e["branch"] for e in got}
             self.assertEqual(branches, {"main", "feat"})
             common_dirs = {e["gitCommonDir"] for e in got}
@@ -203,7 +217,7 @@ class DiscoverReposTests(unittest.TestCase):
                 entries.append({"type": "user", "cwd": str(repo_a), "gitBranch": "main"})
             _write_transcript(t, entries)
             got = discover_repos.discover(str(t))
-            self.assertEqual(Path(got[0]["repoRoot"]).resolve(), repo_a.resolve())
+            self.assertEqual(_cr(got[0]["repoRoot"]), _cr(repo_a))
             self.assertGreater(got[0]["touchCount"], got[1]["touchCount"])
 
     def test_cd_false_positive_rejected_by_isdir(self):
@@ -278,7 +292,7 @@ class DiscoverReposTests(unittest.TestCase):
             real_resolve = discover_repos._resolve_repo
 
             def spy(dir_path):
-                resolved_dirs.append(str(Path(dir_path).resolve()))
+                resolved_dirs.append(_cr(dir_path))
                 return real_resolve(dir_path)
 
             discover_repos._resolve_repo = spy
@@ -287,15 +301,15 @@ class DiscoverReposTests(unittest.TestCase):
             finally:
                 discover_repos._resolve_repo = real_resolve
 
-            roots = {Path(e["repoRoot"]).resolve() for e in got}
-            self.assertEqual(roots, {repo_a.resolve()})
+            roots = {_cr(e["repoRoot"]) for e in got}
+            self.assertEqual(roots, {_cr(repo_a)})
             entry = got[0]
             self.assertEqual(entry["signals"], ["write"])
             self.assertTrue(entry["branch"])
             self.assertTrue(entry["head"])
             self.assertIn("gitCommonDir", entry)
             # B's dir must never have reached the git resolver.
-            self.assertNotIn(str(repo_b.resolve()), resolved_dirs)
+            self.assertNotIn(_cr(repo_b), resolved_dirs)
 
     def test_discover_write_repos_dedups_and_counts(self):
         # Multiple Edit file_paths under the SAME repo (different subdirs/files)
@@ -321,7 +335,7 @@ class DiscoverReposTests(unittest.TestCase):
             ])
             got = discover_repos.discover_write_repos(str(t))
             self.assertEqual(len(got), 1)
-            self.assertEqual(Path(got[0]["repoRoot"]).resolve(), repo.resolve())
+            self.assertEqual(_cr(got[0]["repoRoot"]), _cr(repo))
             self.assertEqual(got[0]["touchCount"], len(paths))
             self.assertEqual(got[0]["signals"], ["write"])
 

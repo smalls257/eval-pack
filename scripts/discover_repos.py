@@ -153,6 +153,43 @@ def _git(args, cwd):
     return out.stdout.strip()
 
 
+def _expand_long_path(path):
+    """Expand a Windows 8.3 SHORT path component (RUNNER~1) to its LONG form.
+
+    No-op on POSIX (there is no short-name concept), and a no-op on Windows for
+    any path that doesn't exist on disk — `GetLongPathNameW` can only expand a
+    real filesystem entry. This is NOT a Silent Fallback: returning the input
+    unchanged when expansion is impossible is the ONLY correct behavior (there
+    is no long form to discover for a path that isn't there), and every caller
+    routes BOTH sides of a comparison through this same function, so an
+    unexpandable path degrades identically on both sides and still matches.
+
+    Why it's needed: on Windows, `os.path.realpath` of a temp dir can return the
+    8.3 short form (`C:\\Users\\RUNNER~1\\...`) while git's `--show-toplevel`
+    returns the long form (`C:\\Users\\runneradmin\\...`). Without expanding to a
+    single canonical (long) form, canon_root would yield different strings for
+    the same directory depending on whether its input came from realpath or git.
+    """
+    if os.name != "nt":
+        return path
+    import ctypes
+    from ctypes import wintypes
+
+    get_long = ctypes.windll.kernel32.GetLongPathNameW
+    get_long.argtypes = [wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD]
+    get_long.restype = wintypes.DWORD
+
+    buf = ctypes.create_unicode_buffer(len(path) + 260)
+    needed = get_long(path, buf, len(buf))
+    if needed == 0:
+        return path              # path doesn't exist / API failed: leave as-is
+    if needed > len(buf):
+        buf = ctypes.create_unicode_buffer(needed)
+        if get_long(path, buf, len(buf)) == 0:
+            return path
+    return buf.value
+
+
 def canon_root(p):
     """Canonicalize a repo root so it compares equal across producers/platforms.
 
@@ -164,21 +201,23 @@ def canon_root(p):
     Two sources produce repoRoot strings that must compare equal even though
     they take different lexical forms:
       - git's `--show-toplevel` (used here and in repo_diffs.py), which on
-        Windows prints forward slashes (`C:/Users/...`).
+        Windows prints forward slashes (`C:/Users/...`) and the LONG name.
       - Python's realpath/str(Path) (used by callers building a root from a
         user selection or a tempdir), which on Windows prints backslashes
-        (`C:\\Users\\...`).
-    `os.path.realpath` alone fixes the separator mismatch (it normalizes
-    slashes lexically even for a nonexistent path — no filesystem access
-    required) but Windows filesystems are case-insensitive, so two spellings
-    of the same path that differ only in case must also match; `normcase`
-    lowercases (and fixes separators again, redundantly but harmlessly) on
-    Windows and is a documented no-op on POSIX, so this function changes
-    nothing about macOS/Linux behavior.
+        (`C:\\Users\\...`) and can print the 8.3 SHORT name (`RUNNER~1`).
+    The pipeline resolves all three mismatches into one identity:
+      1. `realpath` fixes the separator mismatch (it normalizes slashes
+         lexically even for a nonexistent path — no filesystem access needed).
+      2. `_expand_long_path` folds an 8.3 short component to its long form so
+         a realpath-sourced and a git-sourced path for the same real dir agree.
+      3. `normcase` folds case for Windows' case-insensitive filesystem (and
+         re-normalizes separators, harmlessly redundant).
+    normcase and _expand_long_path are both documented no-ops on POSIX, so this
+    function changes nothing about macOS/Linux behavior.
     """
     if not p:
         return p
-    return os.path.normcase(os.path.realpath(p)).rstrip("/\\")
+    return os.path.normcase(_expand_long_path(os.path.realpath(p))).rstrip("/\\")
 
 
 def _resolve_repo(dir_path):
