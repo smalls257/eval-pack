@@ -76,7 +76,7 @@ def extract_subagent_tokens(entries, token_field_re=DEFAULT_TOKEN_FIELD_RE):
                 else:
                     print(
                         f"Warning: could not parse subagent token usage from Agent tool_result "
-                        f"(tool_use_id={tid!r}); subagent cost for this call will be 0",
+                        f"(tool_use_id={tid!r}); subagent token usage for this call will be 0",
                         file=sys.stderr,
                     )
 
