@@ -22,6 +22,10 @@ def _init_repo(path):
     _run(["git", "config", "user.email", "t@example.com"], cwd=str(path))
     _run(["git", "config", "user.name", "T"], cwd=str(path))
     _run(["git", "commit", "--allow-empty", "-q", "-m", "init"], cwd=str(path))
+    # Force a deterministic default branch: `git init`'s default is version/config
+    # dependent (main on newer/Apple git, master on stock git < 3.0), so tests that
+    # assert the branch name must not inherit it.
+    _run(["git", "branch", "-M", "main"], cwd=str(path))
     return path
 
 
