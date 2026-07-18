@@ -16,13 +16,12 @@ over it would re-open the exact RCE vector discover_repos.py closed. Import, don
 """
 import argparse
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))  # noqa: E402
-from discover_repos import _git, _git_argv, _hardened_env, GIT_TIMEOUT_SECS  # noqa: E402
+from discover_repos import _git, _git_argv, _hardened_env, GIT_TIMEOUT_SECS, canon_root  # noqa: E402
 
 STAT_LINE_LIMIT = 200
 EMPTY_TREE_SHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
@@ -195,11 +194,12 @@ def _diff_one(repo_root, base):
     toplevel = _git(["rev-parse", "--show-toplevel"], repo_root)
     if toplevel is None:
         raise ValueError("not a git repo: {}".format(repo_root))
-    # Emit git's canonical (symlink-resolved) root, not whatever form the selection
-    # used. discovered-repos.json holds this same --show-toplevel value, so the coverage
-    # gate's set match is over one path form — a raw /var vs /private/var selection can't
-    # false-refuse a covered pack.
-    repo_root = toplevel
+    # Emit the canonicalized form of git's toplevel, not whatever form the selection
+    # used and not git's raw separator/case spelling. discovered-repos.json's coverage
+    # gate compares roots through the same canon_root() helper, so the set match is
+    # over one path identity — a raw /var vs /private/var selection (or, on Windows,
+    # a C:/ vs C:\ or case difference) can't false-refuse a covered pack.
+    repo_root = canon_root(toplevel)
 
     base_resolved = _resolve_base(repo_root, base)
     if base_resolved is None:
@@ -247,8 +247,7 @@ def compute(pack_dir, selection):
         if entry.get("skip"):
             # Canonicalize skipped roots too (they never touch git, so there's no
             # --show-toplevel to borrow) so a skipped repo also matches discovered.
-            canon = os.path.realpath(repo_root).rstrip("/") if repo_root else repo_root
-            skipped.append({"repoRoot": canon, "reason": "user skipped"})
+            skipped.append({"repoRoot": canon_root(repo_root), "reason": "user skipped"})
             continue
         try:
             repos.append(_diff_one(repo_root, entry.get("base")))

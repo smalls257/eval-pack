@@ -9,13 +9,12 @@ render_html refuses to render a non-conforming pack as the code-level backstop.
 """
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))  # noqa: E402
 import config  # noqa: E402
-from discover_repos import discover_write_repos  # noqa: E402
+from discover_repos import canon_root, discover_write_repos  # noqa: E402
 
 
 def _read(pack, name):
@@ -105,12 +104,14 @@ def _canon_root(p):
     The two sides of the coverage match normalize differently — discovered-repos.json
     holds git's `--show-toplevel` (symlink-resolved, canonical) while a naive selection
     could echo a raw string (e.g. /var/... vs /private/var/... on macOS, or a trailing
-    slash). Comparing raw strings would report a genuinely-covered repo as unaccounted
-    and refuse a CORRECT pack — a Silent Fallback where a path-form artifact masquerades
-    as missing coverage. Canonicalizing both sides makes the match reflect repo identity,
-    not string form. realpath still normalizes lexically for a nonexistent path.
+    slash; on Windows, forward vs back slashes or a case difference — Windows filesystems
+    are case-insensitive). Comparing raw strings would report a genuinely-covered repo as
+    unaccounted and refuse a CORRECT pack — a Silent Fallback where a path-form artifact
+    masquerades as missing coverage. Delegates to discover_repos.canon_root — THE single
+    canonicalization chokepoint — so this module's notion of "same repo" never drifts
+    from repo_diffs.py's.
     """
-    return os.path.realpath(p).rstrip("/") if p else p
+    return canon_root(p)
 
 
 def _repo_coverage_gaps(pack_dir):

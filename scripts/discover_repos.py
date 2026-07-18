@@ -36,11 +36,15 @@ _GIT_HARDENING_FLAGS = [
 # excludes `cd -`, `cd ~...`, and relative paths — those don't identify a
 # repo without shell state we don't have, and a wrong guess here would be a
 # Silent Fallback (a fabricated repo location presented as a real signal).
-# Known limitation: quoted/spaced paths (`cd "/a b"`) are not captured — this
-# errs toward under-reporting, never fabrication; and `cd` inside a quoted
-# string can yield a bogus token, but the is_dir() guard in discover() drops
-# it before any git call, so a fabricated path never reaches subprocess.
-_CD_PATTERN = re.compile(r"(?:^|[;&|]|&&|\|\|)\s*cd\s+(/[^\s;&|]+)")
+# Matches POSIX absolute paths (`/foo`) and Windows drive-absolute paths
+# (`C:\foo`, `C:/foo`) since a Windows session's transcript carries the
+# latter — a POSIX-only pattern would silently under-report every `cd` on
+# that platform. Known limitation: quoted/spaced paths (`cd "/a b"`) are not
+# captured — this errs toward under-reporting, never fabrication; and `cd`
+# inside a quoted string can yield a bogus token, but the is_dir() guard in
+# discover() drops it before any git call, so a fabricated path never
+# reaches subprocess.
+_CD_PATTERN = re.compile(r"(?:^|[;&|]|&&|\|\|)\s*cd\s+((?:/|[A-Za-z]:[\\/])[^\s;&|]+)")
 
 
 def _iter_entries(transcript_path):
@@ -93,13 +97,13 @@ def _candidate_dirs(entries):
     hits = []
     for entry in entries:
         cwd = entry.get("cwd")
-        if isinstance(cwd, str) and cwd.startswith("/"):
+        if isinstance(cwd, str) and os.path.isabs(cwd):
             hits.append((cwd, "cwd"))
 
         for name, inp in _tool_uses(entry):
             if name in FILE_TOOLS:
                 file_path = inp.get("file_path")
-                if isinstance(file_path, str) and file_path.startswith("/"):
+                if isinstance(file_path, str) and os.path.isabs(file_path):
                     signal = "write" if name in WRITE_TOOLS else "read"
                     hits.append((str(Path(file_path).parent), signal))
             elif name == "Bash":
@@ -149,6 +153,34 @@ def _git(args, cwd):
     return out.stdout.strip()
 
 
+def canon_root(p):
+    """Canonicalize a repo root so it compares equal across producers/platforms.
+
+    THE single canonicalization chokepoint for repo-root identity — repo_diffs.py
+    and validate_contracts.py both import this instead of reimplementing it, so
+    "same repo" always means the same thing (Shield: one normalization, not
+    divergent copies that silently drift).
+
+    Two sources produce repoRoot strings that must compare equal even though
+    they take different lexical forms:
+      - git's `--show-toplevel` (used here and in repo_diffs.py), which on
+        Windows prints forward slashes (`C:/Users/...`).
+      - Python's realpath/str(Path) (used by callers building a root from a
+        user selection or a tempdir), which on Windows prints backslashes
+        (`C:\\Users\\...`).
+    `os.path.realpath` alone fixes the separator mismatch (it normalizes
+    slashes lexically even for a nonexistent path — no filesystem access
+    required) but Windows filesystems are case-insensitive, so two spellings
+    of the same path that differ only in case must also match; `normcase`
+    lowercases (and fixes separators again, redundantly but harmlessly) on
+    Windows and is a documented no-op on POSIX, so this function changes
+    nothing about macOS/Linux behavior.
+    """
+    if not p:
+        return p
+    return os.path.normcase(os.path.realpath(p)).rstrip("/\\")
+
+
 def _resolve_repo(dir_path):
     """Resolve a directory to its repo identity, or None if not a git repo.
 
@@ -160,7 +192,7 @@ def _resolve_repo(dir_path):
     if not root:
         return None
     common_dir = _git(["rev-parse", "--git-common-dir"], dir_path) or ""
-    if common_dir and not common_dir.startswith("/"):
+    if common_dir and not os.path.isabs(common_dir):
         common_dir = str((Path(dir_path) / common_dir).resolve())
     branch = _git(["rev-parse", "--abbrev-ref", "HEAD"], dir_path) or ""
     head = _git(["rev-parse", "HEAD"], dir_path) or ""
@@ -228,7 +260,7 @@ def discover_write_repos(transcript_path):
         for name, inp in _tool_uses(entry):    # the shared tool_use iterator
             if name in WRITE_TOOLS:
                 file_path = inp.get("file_path")
-                if isinstance(file_path, str) and file_path.startswith("/"):
+                if isinstance(file_path, str) and os.path.isabs(file_path):
                     d = str(Path(file_path).parent)
                     write_dirs[d] = write_dirs.get(d, 0) + 1
 

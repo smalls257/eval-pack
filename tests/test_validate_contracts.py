@@ -1,6 +1,5 @@
 # tests/test_validate_contracts.py
 import json
-import os
 import subprocess
 import sys
 import tempfile
@@ -11,6 +10,25 @@ SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 import validate_contracts  # noqa: E402
 import config  # noqa: E402
+from discover_repos import canon_root  # noqa: E402
+# canon_root: the SAME canonicalization validate_contracts._canon_root delegates
+# to, so assertions detect a Windows-only (separator/case) mismatch that a raw
+# os.path.realpath() comparison here would paper over.
+
+
+def _norm_slashes(s):
+    """Fold path separators/case for substring comparison against a gap message.
+
+    Gap messages embed git's RAW --show-toplevel output (never realpath'd or
+    normcase'd — that's intentional, the message is for human debugging, not
+    identity comparison). A literal `os.path.realpath(repo_a) in message` check
+    is wrong on two counts: realpath resolves symlinks the raw message text
+    never had reason to, AND on Windows the message uses forward slashes while
+    a Path-derived string uses back slashes. This is a pure lexical fold (no
+    filesystem access, unlike realpath) so it's safe to apply to an arbitrary
+    sentence, not just a path.
+    """
+    return s.replace("\\", "/").casefold()
 
 
 def _run(cmd, cwd=None):
@@ -200,8 +218,13 @@ class TestRepoCoverageContract(unittest.TestCase):
             self.assertTrue(gaps)
             joined = " ".join(gaps)
             self.assertIn("repo-diffs.json", joined)
-            self.assertIn(os.path.realpath(repo_a), joined)
-            self.assertIn(os.path.realpath(repo_b), joined)
+            # The gap message embeds git's raw (uncanonicalized) --show-toplevel
+            # output — on Windows that's forward-slashed and may differ in case
+            # from the Path object's own str(), so compare via _norm_slashes
+            # (separator/case folding only, no filesystem realpath) rather than
+            # a literal substring match.
+            self.assertIn(_norm_slashes(str(repo_a)), _norm_slashes(joined))
+            self.assertIn(_norm_slashes(str(repo_b)), _norm_slashes(joined))
 
     def test_two_write_repos_all_accounted_no_gap(self):
         with tempfile.TemporaryDirectory() as d:
@@ -210,8 +233,12 @@ class TestRepoCoverageContract(unittest.TestCase):
             (repo_a / "a.py").write_text("x = 1\n", encoding="utf-8")
             (repo_b / "b.py").write_text("y = 2\n", encoding="utf-8")
             _write_transcript(d, [_edit_entry(repo_a, "a.py"), _edit_entry(repo_b, "b.py")])
-            self._diffs(d, repos=[{"repoRoot": os.path.realpath(repo_a)}],
-                        skipped=[{"repoRoot": os.path.realpath(repo_b)}])
+            # canon_root(str(repo)), not os.path.realpath: this simulates what
+            # repo_diffs.py itself now writes into repo-diffs.json (see its
+            # canon_root() call on git's --show-toplevel), so the fixture stays
+            # faithful to production on every platform, not just POSIX.
+            self._diffs(d, repos=[{"repoRoot": canon_root(str(repo_a))}],
+                        skipped=[{"repoRoot": canon_root(str(repo_b))}])
             self.assertEqual(validate_contracts._repo_coverage_gaps(d), [])
 
     def test_two_write_repos_one_unaccounted_is_gap(self):
@@ -221,10 +248,11 @@ class TestRepoCoverageContract(unittest.TestCase):
             (repo_a / "a.py").write_text("x = 1\n", encoding="utf-8")
             (repo_b / "b.py").write_text("y = 2\n", encoding="utf-8")
             _write_transcript(d, [_edit_entry(repo_a, "a.py"), _edit_entry(repo_b, "b.py")])
-            self._diffs(d, repos=[{"repoRoot": os.path.realpath(repo_a)}])
+            self._diffs(d, repos=[{"repoRoot": canon_root(str(repo_a))}])
             gaps = validate_contracts._repo_coverage_gaps(d)
-            self.assertTrue(any(os.path.realpath(repo_b) in g for g in gaps))
-            self.assertFalse(any(os.path.realpath(repo_a) in g for g in gaps))
+            joined_norm = _norm_slashes(" ".join(gaps))
+            self.assertTrue(_norm_slashes(str(repo_b)) in joined_norm)
+            self.assertFalse(_norm_slashes(str(repo_a)) in joined_norm)
 
     def test_read_only_repo_not_gated(self):
         with tempfile.TemporaryDirectory() as d:
@@ -244,12 +272,13 @@ class TestRepoCoverageContract(unittest.TestCase):
             (repo_a / "a.py").write_text("x = 1\n", encoding="utf-8")
             (repo_b / "b.py").write_text("y = 2\n", encoding="utf-8")
             _write_transcript(d, [_edit_entry(repo_a, "a.py"), _edit_entry(repo_b, "b.py")])
-            self._diffs(d, repos=[{"repoRoot": os.path.realpath(repo_a)}],
-                        skipped=[{"repoRoot": os.path.realpath(repo_b)}],
-                        errors=[{"repoRoot": os.path.realpath(repo_a), "error": "base ref not found"}])
+            self._diffs(d, repos=[{"repoRoot": canon_root(str(repo_a))}],
+                        skipped=[{"repoRoot": canon_root(str(repo_b))}],
+                        errors=[{"repoRoot": canon_root(str(repo_a)), "error": "base ref not found"}])
             gaps = validate_contracts._repo_coverage_gaps(d)
-            self.assertTrue(any(os.path.realpath(repo_a) in g and "base ref not found" in g
-                                 for g in gaps))
+            self.assertTrue(any(
+                _norm_slashes(str(repo_a)) in _norm_slashes(g) and "base ref not found" in g
+                for g in gaps))
 
     def test_no_transcript_no_gap(self):
         with tempfile.TemporaryDirectory() as d:
@@ -264,8 +293,10 @@ class TestRepoCoverageContract(unittest.TestCase):
             (repo_b / "b.py").write_text("y = 2\n", encoding="utf-8")
             _write_transcript(d, [_edit_entry(repo_a, "a.py"), _edit_entry(repo_b, "b.py")])
             gaps = validate_contracts.collect_gaps(d)
-            self.assertTrue(any(os.path.realpath(repo_a) in g or os.path.realpath(repo_b) in g
-                                 for g in gaps))
+            self.assertTrue(any(
+                _norm_slashes(str(repo_a)) in _norm_slashes(g)
+                or _norm_slashes(str(repo_b)) in _norm_slashes(g)
+                for g in gaps))
 
 
 class TestConfigReadGaps(unittest.TestCase):
