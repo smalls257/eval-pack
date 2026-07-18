@@ -83,10 +83,6 @@ class TestFlagSeverities(unittest.TestCase):
         out = self._run({}, verdict="banana")
         self.assertTrue(any(f["id"] == "unknownVerdict" and f["level"] == "amber" for f in out["flags"]))
 
-    def test_cost_budget_flag(self):
-        out = self._run({"costBudgetTokens": 100}, metrics={"totalTokens": 500, "filesChanged": 0})
-        self.assertTrue(any(f["id"] == "overBudget" for f in out["flags"]))
-
 
 if __name__ == "__main__":
     unittest.main()

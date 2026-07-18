@@ -6,7 +6,7 @@ A Claude Code plugin that generates eval packs — polished HTML reports capturi
 
 ![Eval Pack — header, completion status, verdict, and session metrics](docs/screenshots/hero.png)
 
-![Session metrics — per-model token breakdown, cost, and session stats](docs/screenshots/metrics.png)
+![Session metrics — per-model token breakdown and session stats](docs/screenshots/metrics.png)
 
 ![Tools tab — tool usage bar chart and subagents dispatched](docs/screenshots/tools.png)
 
@@ -14,7 +14,7 @@ A Claude Code plugin that generates eval packs — polished HTML reports capturi
 
 - **Verdict banner** — pass/fail based on agent-driven test results
 - **Visual evidence** — screenshots from Playwright or browser verification
-- **Session metrics** — per-model token breakdown (controller + subagents), API cost estimate, turns, files changed
+- **Session metrics** — per-model token breakdown (controller + subagents), turns, files changed
 - **Session timeline** — human-readable narrative of what happened during the session
 - **Heuristic flags** — false completions, retries, scope drift, test failures
 - **Claude analysis** — retrospective, repo friction report, prompt quality assessment
@@ -104,7 +104,6 @@ a precise error. Run `/eval-pack:setup` for a guided start.
   "retrospectiveQuestions": ["What slowed the session down the most?"],
   "redaction": ["sk-[A-Za-z0-9]+"],
   "flagSeverities": {"scopeDrift": "off"},
-  "costBudgetTokens": 50000000,
   "brandName": "Acme Eval", "subjectNoun": "service", "defaultTheme": "light",
   "templateDir": "eval-theme",
   "analysisLenses": [{"skill": "acme-security-lens", "role": "scorer"}],
@@ -130,7 +129,7 @@ Key groups (full key list + types: `schema/eval-pack.schema.json`):
   `scripts/validate_contracts.py`, not by prose: a violation halts the pipeline before render.
 - **Heuristics** — `detectionPatterns` (a dict of regex lists — providing it replaces the WHOLE
   dict, so supply every group you want: done/correction/retry), `falseCompletionWindow`, `scopeDriftFileThreshold`,
-  `retryAmberThreshold`, `flagSeverities` (retune or `"off"` any flag by id), `costBudgetTokens`,
+  `retryAmberThreshold`, `flagSeverities` (retune or `"off"` any flag by id),
   `customDetectors` and `detectorScripts` (your own deterministic policy checks — see below).
 - **Tests & tickets** — `testCommands` (run verbatim; real exit codes drive the verdict, enforced
   by a validator), `ticketPattern`, `ticketBaseUrl`.

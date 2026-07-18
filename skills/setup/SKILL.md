@@ -126,7 +126,7 @@ Tell the user:
 - They can now use `/eval-pack:generate` and `/eval-pack:review`; re-run `/eval-pack:setup` any
   time to adjust the configuration.
 - The full customization surface, grouped: prompts (stance/rubric/retrospectiveQuestions/
-  evaluatorPromptFile), heuristics (detectionPatterns/flagSeverities/thresholds/costBudgetTokens/
+  evaluatorPromptFile), heuristics (detectionPatterns/flagSeverities/thresholds/
   customDetectors/detectorScripts for your own deterministic policy checks), tests & tickets
   (testCommands/ticketPattern), security (redaction/publishOpenable), report
   (branding/templateDir/sections), and extension lenses (analysisLenses + verdictAggregation) —

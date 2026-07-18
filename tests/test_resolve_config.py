@@ -137,7 +137,7 @@ class TestCanNeverFailWarning(unittest.TestCase):
             (Path(root) / ".eval-pack.json").write_text(json.dumps({
                 "flagSeverities": {k: "off" for k in
                     ["testsFailing", "testsPassing", "falseCompletions", "highRetry",
-                     "scopeDrift", "partialSession", "unknownVerdict", "overBudget"]}
+                     "scopeDrift", "partialSession", "unknownVerdict"]}
             }), encoding="utf-8")
             r = _run([root, pack])
             self.assertEqual(r.returncode, 0)          # warn, don't block
@@ -146,7 +146,7 @@ class TestCanNeverFailWarning(unittest.TestCase):
 
 class TestCanNeverFailGuardCoversFailureSet(unittest.TestCase):
     def test_only_failure_flags_off_still_warns(self):
-        # the N1 bypass: turning off exactly the 7 failure-capable flags (no green ids)
+        # the N1 bypass: turning off exactly the failure-capable flags (no green ids)
         import sys as _sys
         _sys.path.insert(0, str(SCRIPTS))
         import config as _config

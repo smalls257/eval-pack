@@ -38,60 +38,6 @@ function renderMarkdown(text) {
     .replace(/\n/g, '<br>');
 }
 
-const COST_RATES_DATE = '2026-05-11';
-
-function modelRates(model) {
-  const m = (model || '').toLowerCase();
-  if (m.includes('opus'))  return { inRate: 15,   outRate: 75 };
-  if (m.includes('haiku')) return { inRate: 0.80, outRate: 4  };
-  return                          { inRate: 3,    outRate: 15 }; // sonnet
-}
-
-// Cache pricing (Anthropic, 5-minute ephemeral): cache WRITE = 1.25x base input,
-// cache READ = 0.10x base input. Agentic sessions are cache-read dominated, so
-// omitting these (as the old formula did) undercounts controller cost massively.
-function estimateCost(model, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens) {
-  const r = modelRates(model);
-  const cost = (
-    (inputTokens      || 0) * r.inRate +
-    (outputTokens     || 0) * r.outRate +
-    (cacheWriteTokens || 0) * r.inRate * 1.25 +
-    (cacheReadTokens  || 0) * r.inRate * 0.10
-  ) / 1_000_000;
-  return cost > 0 ? cost : null;
-}
-
-// Subagent usage tags only report total_tokens with no cache breakdown.
-// Assume 90% input / 10% output — agentic workloads are input-heavy.
-function estimateSubagentCost(model, totalTokens) {
-  if (!totalTokens) return null;
-  const r = modelRates(model);
-  const blended = r.inRate * 0.9 + r.outRate * 0.1;
-  return (totalTokens * blended) / 1_000_000;
-}
-
-// Total cost = the sum of the per-model rows actually shown. Computing it as a
-// single lastModel-on-aggregate estimate diverges from the displayed rows when
-// models differ (e.g. a cheap lastModel makes Total < the sum above it).
-function sumReportedCost(tokensByModel, subagentTokensByModel, fallbackCtrl, fallbackAgent) {
-  let total = null;
-  const add = (v) => { if (v != null) total = (total || 0) + v; };
-  if (tokensByModel.length > 0) {
-    for (const r of tokensByModel) {
-      add(estimateCost(r.model, r.inputTokens, r.outputTokens, r.cacheReadTokens, r.cacheWriteTokens));
-    }
-  } else { add(fallbackCtrl); }
-  if (subagentTokensByModel.length > 0) {
-    for (const r of subagentTokensByModel) add(estimateSubagentCost(r.model, r.totalTokens));
-  } else { add(fallbackAgent); }
-  return total;
-}
-
-function formatCost(n) {
-  if (n == null || n <= 0) return '—';
-  return (n >= 0.01 ? '$' + n.toFixed(2) : '$' + n.toFixed(4)) + '*';
-}
-
 function shortModelName(model) {
   if (!model) return 'unknown';
   const m = model.toLowerCase();
@@ -301,8 +247,6 @@ function renderStats(data) {
   const m = data.metrics || {};
   const statsRow = document.getElementById('stats-row');
   if (!statsRow) return;
-  const ctrlCost = estimateCost(m.lastModel, m.inputTokens, m.outputTokens, m.cacheReadTokens, m.cacheWriteTokens);
-  const agentCost = estimateSubagentCost(m.lastModel, m.subagentTotalTokens);
 
   const tokensByModel = Array.isArray(m.tokensByModel) ? m.tokensByModel : [];
   const tokenItems = tokensByModel.length > 0
@@ -319,25 +263,9 @@ function renderStats(data) {
     ? subagentTokensByModel.map(r => ({ label: shortModelName(r.model), value: formatNumber(r.totalTokens) }))
     : [{ label: 'Total', value: formatNumber(m.subagentTotalTokens) }];
 
-  const ctrlCostItems = tokensByModel.length > 0
-    ? tokensByModel.map(r => ({
-        label: shortModelName(r.model),
-        value: formatCost(estimateCost(r.model, r.inputTokens, r.outputTokens, r.cacheReadTokens, r.cacheWriteTokens))
-      }))
-    : [{ label: 'Controller', value: formatCost(ctrlCost) }];
-  const subagentCostItems = subagentTokensByModel.length > 0
-    ? subagentTokensByModel.map(r => ({
-        label: shortModelName(r.model),
-        value: '~' + formatCost(estimateSubagentCost(r.model, r.totalTokens))
-      }))
-    : [{ label: 'Subagents', value: '~' + formatCost(agentCost) }];
-  const totalCost = sumReportedCost(tokensByModel, subagentTokensByModel, ctrlCost, agentCost);
-  const costItems = [...ctrlCostItems, ...subagentCostItems, { label: 'Total *', value: formatCost(totalCost) }];
-
   const groups = [
     { heading: 'Controller tokens', items: tokenItems },
     { heading: 'Subagent tokens',   items: subagentItems },
-    { heading: 'Cost',              items: costItems },
     {
       heading: 'Session',
       items: [
@@ -356,17 +284,6 @@ function renderStats(data) {
       ).join(''))}</div>
     </div>`
   ).join('');
-
-  const card = document.getElementById('stats-card');
-  if (card) {
-    let note = card.querySelector('.cost-note');
-    if (!note) {
-      note = document.createElement('p');
-      note.className = 'cost-note';
-      card.appendChild(note);
-    }
-    note.textContent = `* Claude API rates as of ${COST_RATES_DATE}. Controller cost includes input, output, and cache (write 1.25x, read 0.10x of base input). Subagent cost (~) assumes a 90/10 input/output split — only subagent_tokens is reported.`;
-  }
 }
 
 function renderTimeline(analysis) {
@@ -1369,5 +1286,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, estimateCost, modelRates, estimateSubagentCost, sumReportedCost, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText };
 }

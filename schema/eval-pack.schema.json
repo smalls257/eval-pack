@@ -229,27 +229,6 @@
       "default": {},
       "description": "Per-flag severity overrides: {flagId: red|amber|green|off}."
     },
-    "tokenFieldNames": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "default": [
-        "subagent_tokens",
-        "total_tokens"
-      ],
-      "description": "Accepted subagent token field names. File-layer lists ADD to defaults; start the list with \"!replace\" to replace instead."
-    },
-    "tokenWeights": {
-      "type": "object",
-      "default": {},
-      "description": "Optional weights for the total-token sum; empty = plain sum."
-    },
-    "costBudgetTokens": {
-      "type": "integer",
-      "default": 0,
-      "description": "Amber-flag when totalTokens exceeds this; 0 disables."
-    },
     "outputDir": {
       "type": "string",
       "default": ".eval-packs",

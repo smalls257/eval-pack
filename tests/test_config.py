@@ -358,9 +358,6 @@ class TestDetectionCostKeys(unittest.TestCase):
             self.assertEqual(cfg["falseCompletionWindow"], 1)
             self.assertEqual(cfg["claimTruncLen"], 120)
             self.assertEqual(cfg["flagSeverities"], {})
-            self.assertEqual(cfg["tokenFieldNames"], ["subagent_tokens", "total_tokens"])
-            self.assertEqual(cfg["tokenWeights"], {})
-            self.assertEqual(cfg["costBudgetTokens"], 0)
             self.assertIn("done", cfg["detectionPatterns"])
             self.assertIn("correction", cfg["detectionPatterns"])
             self.assertIn("retry", cfg["detectionPatterns"])
@@ -373,17 +370,6 @@ class TestDetectionCostKeys(unittest.TestCase):
         self.assertEqual(config.validate({"flagSeverities": {"highRetry": "red"}}), [])
         errs = config.validate({"flagSeverities": {"highRetry": "purple"}})
         self.assertTrue(any("flagSeverities" in e for e in errs))
-
-    def test_token_weights_numeric(self):
-        self.assertEqual(config.validate({"tokenWeights": {"input": 2}}), [])
-        errs = config.validate({"tokenWeights": {"input": "two"}})
-        self.assertTrue(any("tokenWeights" in e for e in errs))
-
-
-class TestTokenFieldNamesGuard(unittest.TestCase):
-    def test_empty_list_rejected(self):
-        errs = config.validate({"tokenFieldNames": []})
-        self.assertTrue(any("tokenFieldNames" in e for e in errs))
 
 
 class TestListReplaceSentinel(unittest.TestCase):

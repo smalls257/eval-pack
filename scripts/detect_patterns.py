@@ -159,13 +159,6 @@ def read_test_verdict(output_dir):
     return data.get("verdict")
 
 
-def read_json_safe(path):
-    try:
-        return json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-
-
 def check_scope_drift(output_dir, threshold):
     metrics_path = Path(output_dir) / "metrics.json"
     if not metrics_path.is_file():
@@ -323,20 +316,6 @@ def main():
         add_flag("scopeDrift", "amber", "Scope drift — many files changed")
     if partial_session:
         add_flag("partialSession", "amber", "Partial session — earlier turns may be missing")
-    budget = cfg.get("costBudgetTokens") or 0
-    if budget > 0:
-        metrics = read_json_safe(output_dir / "metrics.json")
-        if not metrics:
-            # Sensor: a configured budget must not silently no-op on missing metrics.
-            print(
-                "Warning: metrics.json missing or unreadable — token budget check skipped",
-                file=sys.stderr,
-            )
-        total = (metrics or {}).get("totalTokens") or 0
-        if total > budget:
-            # "incl. cache" disambiguates from the report header's cache-exclusive token stat.
-            add_flag("overBudget", "amber",
-                     f"Over token budget ({total:,} incl. cache > {budget:,})")
     custom = cfg.get("customDetectors") or []
     if custom:
         scope_strings = collect_scope_strings(entries)

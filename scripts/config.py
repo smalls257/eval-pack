@@ -75,13 +75,6 @@ DEFAULTS = {
     "claimTruncLen": 120,
     # Per-flag severity overrides: {flagId: "red"|"amber"|"green"|"off"}. Empty = built-in levels.
     "flagSeverities": {},
-    # Field names accepted when parsing subagent token usage from Agent tool results.
-    "tokenFieldNames": ["subagent_tokens", "total_tokens"],
-    # Optional weights for the total-token sum: {"input","output","cacheRead","cacheWrite"}.
-    # Empty = plain unweighted sum (today's behavior).
-    "tokenWeights": {},
-    # Amber-flag the session when totalTokens exceeds this budget; 0 disables.
-    "costBudgetTokens": 0,
     # Pipeline options, unified from the legacy pluginConfigs home. The
     # CLAUDE_PLUGIN_OPTION_* env layer keeps old plugin-option settings working.
     "outputDir": ".eval-packs",
@@ -129,9 +122,6 @@ _TYPES = {
     "falseCompletionWindow": int,
     "claimTruncLen": int,
     "flagSeverities": dict,
-    "tokenFieldNames": list,
-    "tokenWeights": dict,
-    "costBudgetTokens": int,
     "outputDir": str,
     "analysis": bool,
     "includeTranscript": bool,
@@ -163,7 +153,7 @@ DETECTOR_SCOPES = ("bash", "files", "text", "user")
 # (testsPassing, cleanPass) are excluded — keep in sync with detect_patterns.main.
 FAILURE_FLAG_IDS = (
     "testsFailing", "unknownVerdict", "falseCompletions",
-    "highRetry", "scopeDrift", "partialSession", "overBudget",
+    "highRetry", "scopeDrift", "partialSession",
 )
 
 # Every flag id the built-in pipeline can emit (collision guard for customDetectors).
@@ -398,14 +388,6 @@ def validate(cfg):
         for fid, level in sevs.items():
             if level not in FLAG_LEVELS:
                 errors.append("flagSeverities.{}: {!r} is not one of {}".format(fid, level, list(FLAG_LEVELS)))
-    weights = cfg.get("tokenWeights")
-    if isinstance(weights, dict):
-        for k, v in weights.items():
-            if isinstance(v, bool) or not isinstance(v, (int, float)):
-                errors.append("tokenWeights.{}: expected a number, got {}".format(k, type(v).__name__))
-    # An empty field-name list would compile to a match-anything token regex — refuse it.
-    if cfg.get("tokenFieldNames") == []:
-        errors.append("tokenFieldNames: must not be empty")
     # The merge sentinel is consumed by _overlay/_coerce; a literal survivor means a
     # misplaced sentinel (not first element) or an unforeseen path — never legal data.
     for k, typ in _TYPES.items():

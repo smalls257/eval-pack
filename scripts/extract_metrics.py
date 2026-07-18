@@ -6,12 +6,8 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))  # noqa: E402
-from config import read_config  # noqa: E402
-
 # Agent results report usage as `subagent_tokens: N`; older/other formats may
-# use `total_tokens: N`. Accept either by default; `tokenFieldNames` in config
-# swaps in custom field names.
+# use `total_tokens: N`. Accept either.
 DEFAULT_TOKEN_FIELD_RE = re.compile(r"(?:subagent_tokens|total_tokens):\s*(\d+)")
 
 
@@ -100,10 +96,12 @@ def main():
         "--changed-files", default="[]", dest="changed_files_json",
         help="JSON array of changed file paths",
     )
-    parser.add_argument("--config", default=None, help="Path to resolved eval-config.json")
+    parser.add_argument(
+        "--config", default=None,
+        help="Path to resolved eval-config.json (accepted for CLI/pipeline "
+             "compatibility; extraction no longer reads config-driven options)",
+    )
     args = parser.parse_args()
-
-    cfg = read_config(args.config)
 
     transcript_file = args.transcript_file
     output_dir = args.output_dir
@@ -139,13 +137,7 @@ def main():
     output_tokens = sum((get_usage(e).get("output_tokens") or 0) for e in assistant_entries)
     cache_read_tokens = sum((get_usage(e).get("cache_read_input_tokens") or 0) for e in assistant_entries)
     cache_write_tokens = sum((get_usage(e).get("cache_creation_input_tokens") or 0) for e in assistant_entries)
-    w = cfg.get("tokenWeights") or {}
-    total_tokens = (
-        input_tokens * w.get("input", 1)
-        + output_tokens * w.get("output", 1)
-        + cache_read_tokens * w.get("cacheRead", 1)
-        + cache_write_tokens * w.get("cacheWrite", 1)
-    )
+    total_tokens = input_tokens + output_tokens + cache_read_tokens + cache_write_tokens
 
     timestamps = [e.get("timestamp") for e in entries if e.get("timestamp")]
     first_ts = timestamps[0] if timestamps else None
@@ -166,11 +158,7 @@ def main():
         model_map[m]["cacheWriteTokens"] += u.get("cache_creation_input_tokens") or 0
     token_by_model = [{"model": k, **v} for k, v in sorted(model_map.items())]
 
-    # Compile once from config so every Agent result is parsed with the same pattern.
-    token_field_re = re.compile(
-        r"(?:{}):\s*(\d+)".format("|".join(re.escape(n) for n in cfg["tokenFieldNames"]))
-    )
-    subagent_total_tokens, subagent_tokens_by_model = extract_subagent_tokens(entries, token_field_re)
+    subagent_total_tokens, subagent_tokens_by_model = extract_subagent_tokens(entries)
 
     files_changed = args.files_changed
     insertions = args.insertions
