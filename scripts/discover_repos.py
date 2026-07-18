@@ -231,8 +231,13 @@ def _resolve_repo(dir_path):
     if not root:
         return None
     common_dir = _git(["rev-parse", "--git-common-dir"], dir_path) or ""
-    if common_dir and not os.path.isabs(common_dir):
-        common_dir = str((Path(dir_path) / common_dir).resolve())
+    if common_dir:
+        if not os.path.isabs(common_dir):
+            common_dir = str((Path(dir_path) / common_dir).resolve())
+        # Canonicalize like repoRoot: two worktrees of one repo must yield an IDENTICAL
+        # gitCommonDir so a consumer can recognize them as the same underlying repo. On
+        # Windows the raw form can differ (8.3 short vs long name) — canon_root folds it.
+        common_dir = canon_root(common_dir)
     branch = _git(["rev-parse", "--abbrev-ref", "HEAD"], dir_path) or ""
     head = _git(["rev-parse", "HEAD"], dir_path) or ""
     return {
