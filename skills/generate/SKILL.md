@@ -321,20 +321,24 @@ fails again, stop and tell the user the analysis step failed. Do NOT write the
 analysis yourself as a fallback — that reintroduces the bias this step exists to remove.
 
 Then run the deterministic contract gate — it checks the analysis and test results against the
-resolved config (friction taxonomy, retrospective answers, rubric band, test-command proof):
+resolved config (retrospective answers, rubric band, test-command proof). The friction taxonomy
+gate lives here too, but at this point in the pipeline `lenses/friction.json` does not exist yet
+(Step 4.7 hasn't run), so it is silently a no-op now and re-checked for real at render time —
+this is expected, not a bug:
 
 ```bash
 "$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/validate_contracts.py" "${ABS_PACK_DIR}"
 ```
 
 If it exits non-zero, route each `CONTRACT:` line to its owner:
-- **Analysis violations** (frictionLog / retrospectiveAnswers / rubricApplied): re-dispatch the
-  evaluator ONCE, passing those lines as corrections.
+- **Analysis violations** (retrospectiveAnswers / rubricApplied): re-dispatch the evaluator ONCE,
+  passing those lines as corrections.
 - **Test violations** (test-results.commands / verdict): the evaluator cannot fix these — redo
   Step 3 so `test-results.json` records every configured command with its real exit code and a
   verdict consistent with them.
 Re-run the gate. If it still fails, STOP and show the user the violations — do not render.
-(render_html enforces the same gate; skipping this step cannot ship a non-conforming pack.)
+(render_html enforces the same gate, including the friction taxonomy check against
+`lenses/friction.json`, once lenses have run; skipping this step cannot ship a non-conforming pack.)
 
 **If analysis is disabled** (`analysis` option is false):
 
@@ -374,9 +378,13 @@ never your own reasoning.
   most-severe-first. Default-on in `analysisLenses` (see the config defaults).
 - `business-risk` (contributor) — business/stakeholder risk of the delivered work: level,
   mitigation steps, and the biggest remaining uncertainty. Default-on in `analysisLenses`.
+- `friction` (contributor) — developer-experience friction encountered during the session,
+  classified into the configured `frictionCategories`. Default-on in `analysisLenses`. A
+  deterministic gate (`validate_contracts.py`, run again at render time) rejects any entry whose
+  `type` is not in `frictionCategories`.
 
-> More first-party lenses (`friction`) are planned; dispatch any lens present in
-> `analysisLenses` the same way, using its `skill` as the `subagent_type` suffix.
+> Dispatch any other lens present in `analysisLenses` the same way, using its `skill` as the
+> `subagent_type` suffix.
 
 > Run the `<skill>` lens. PACK_DIR is `${ABS_PACK_DIR}`. REPO_ROOT is `${REPO_ROOT}`. DIFF_BASE is
 > `${DIFF_BASE}`. Read the artifacts, then write your result to

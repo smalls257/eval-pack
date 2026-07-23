@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 global.window = { __EVAL_PACK_TEST__: true };
 const { effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText,
-  reviewFindingsFrom, businessRiskFrom } = require('../templates/html/scripts.js');
+  reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom } = require('../templates/html/scripts.js');
 
 test('effectiveConfidence uses finalScore when a non-core rule ran scorers', () => {
   const analysis = { highlights: { confidencePercent: 90 } };
@@ -103,4 +103,24 @@ test('businessRiskFrom degrades to null when the lens is absent (Airplane Test)'
   assert.strictEqual(businessRiskFrom(null), null);
   assert.strictEqual(businessRiskFrom({ contributors: [] }), null);
   assert.strictEqual(businessRiskFrom({ contributors: [{ skill: 'other' }] }), null);
+});
+
+test('frictionEntriesFrom reads entries from the friction contributor', () => {
+  const lenses = {
+    contributors: [
+      { skill: 'other', role: 'contributor', title: 'Other', entries: [{ x: 1 }] },
+      { skill: 'friction', role: 'contributor', title: 'Friction Log', entries: [
+        { friction: 'CI flaked twice', impact: 'wasted 20 minutes', type: 'tooling' },
+      ] },
+    ],
+  };
+  assert.deepStrictEqual(frictionEntriesFrom(lenses), [
+    { friction: 'CI flaked twice', impact: 'wasted 20 minutes', type: 'tooling' },
+  ]);
+});
+
+test('frictionEntriesFrom degrades to empty list when the lens is absent (Airplane Test)', () => {
+  assert.deepStrictEqual(frictionEntriesFrom(null), []);
+  assert.deepStrictEqual(frictionEntriesFrom({ contributors: [] }), []);
+  assert.deepStrictEqual(frictionEntriesFrom({ contributors: [{ skill: 'other', entries: [{ x: 1 }] }] }), []);
 });

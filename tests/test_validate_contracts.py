@@ -91,19 +91,51 @@ def _pack(d, cfg_over=None, analysis=None, test_results=None):
     return pack
 
 
+def _write_friction_lens(pack_dir, entries):
+    lens_dir = Path(pack_dir) / "lenses"
+    lens_dir.mkdir(parents=True, exist_ok=True)
+    (lens_dir / "friction.json").write_text(json.dumps({
+        "skill": "friction", "role": "contributor", "title": "Friction Log",
+        "entries": entries,
+    }), encoding="utf-8")
+
+
 class TestFrictionContract(unittest.TestCase):
+    """The friction taxonomy gate reads lenses/friction.json (the friction lens's own
+    output), NOT analysis.json — the dimension was extracted into a default-on
+    contributor lens (lens-decomposition Task 3); the deterministic gate moved with it."""
+
     def test_offlist_friction_type_is_gap(self):
         with tempfile.TemporaryDirectory() as d:
-            _pack(d, {"frictionCategories": ["tooling", "docs"]},
-                  analysis={"title": "t", "frictionLog": [{"friction": "x", "type": "vibes"}]})
+            _pack(d, {"frictionCategories": ["tooling", "docs"]}, analysis={"title": "t"})
+            _write_friction_lens(d, [{"friction": "x", "impact": "y", "type": "vibes"}])
             gaps = validate_contracts.collect_gaps(d)
-            self.assertTrue(any("frictionLog" in g and "vibes" in g for g in gaps))
+            self.assertTrue(any("friction entry type" in g and "vibes" in g for g in gaps))
 
     def test_onlist_type_ok(self):
         with tempfile.TemporaryDirectory() as d:
-            _pack(d, {"frictionCategories": ["tooling", "docs"]},
-                  analysis={"title": "t", "frictionLog": [{"friction": "x", "type": "docs"}]})
+            _pack(d, {"frictionCategories": ["tooling", "docs"]}, analysis={"title": "t"})
+            _write_friction_lens(d, [{"friction": "x", "impact": "y", "type": "docs"}])
             self.assertEqual(validate_contracts.collect_gaps(d), [])
+
+    def test_absent_friction_lens_is_not_a_gap(self):
+        """No lenses/friction.json (e.g. the lens is disabled, or Step 4's gate run happens
+        before Step 4.7 assembles lenses) must NOT be gated here — a configured-but-missing
+        lens is already the non-suppressible 'lensFailed' red flag from assemble_lenses.py;
+        double-gating the same absence would be a confusing duplicate signal."""
+        with tempfile.TemporaryDirectory() as d:
+            _pack(d, {"frictionCategories": ["tooling", "docs"]}, analysis={"title": "t"})
+            self.assertEqual(validate_contracts.collect_gaps(d), [])
+
+    def test_render_time_gate_refuses_offlist_type(self):
+        """Proof the relocated gate still deterministically blocks a bad friction type at the
+        render-time collect_gaps call (render_html enforces this same call after lenses run)."""
+        with tempfile.TemporaryDirectory() as d:
+            _pack(d, {"frictionCategories": ["tooling", "docs"]}, analysis={"title": "t"})
+            _write_friction_lens(d, [{"friction": "x", "impact": "y", "type": "not-a-real-category"}])
+            gaps = validate_contracts.collect_gaps(d)
+            self.assertTrue(gaps, "expected the render-time gate to refuse an off-taxonomy type")
+            self.assertTrue(any("not-a-real-category" in g for g in gaps))
 
 
 class TestRetrospectiveContract(unittest.TestCase):
@@ -313,8 +345,8 @@ class TestConfigReadGaps(unittest.TestCase):
     def test_missing_config_defaults_keep_friction_live(self):
         with tempfile.TemporaryDirectory() as d:
             (Path(d) / "analysis.json").write_text(
-                json.dumps({"title": "t", "frictionLog": [{"friction": "x", "type": "vibes"}]}),
-                encoding="utf-8")
+                json.dumps({"title": "t"}), encoding="utf-8")
+            _write_friction_lens(d, [{"friction": "x", "impact": "y", "type": "vibes"}])
             gaps = validate_contracts.collect_gaps(d)
             self.assertTrue(any("vibes" in g for g in gaps))
 

@@ -14,7 +14,6 @@ You will be given an absolute PACK_DIR path, a REPO_ROOT path, and a DIFF_BASE g
 First, read `eval-config.json` in PACK_DIR if it is present — it carries your configuration:
 - `analysisStanceText`: the review posture to adopt. Let it govern your tone and skepticism.
   If the file or field is absent, default to a skeptical, evidence-first reviewer.
-- `frictionCategories`: the allowed values for each `frictionLog[].type`. Use only these.
 - `retrospectiveQuestions`: if non-empty, you MUST answer every question. Emit
   `retrospectiveAnswers`: an array of `{"question": "<the question, verbatim>", "answer": "..."}`
   covering each configured question. A validator checks this mechanically; an unanswered
@@ -100,9 +99,6 @@ Schema for `analysis.json`:
     "narrative": "Paragraph describing any new tests added.",
     "newTests": ["test name or description", "..."]
   },
-  "frictionLog": [
-    {"friction": "what slowed things down", "evidence": "specific transcript moment or pattern", "type": "MUST be one of eval-config.json frictionCategories — a validator rejects anything else", "resolution": "how it was resolved or what the impact was"}
-  ],
   "retrospectiveAnswers": [
     {"question": "Configured question, verbatim", "answer": "Your answer."}
   ],

@@ -39,16 +39,29 @@ def _read_config(pack_dir):
         return config.read_config(), "eval-config.json present but unparseable ({})".format(exc)
 
 
-def _friction_gaps(cfg, analysis):
+def _friction_gaps(cfg, pack_dir):
+    """Check the friction LENS output (lenses/friction.json), not analysis.json.
+
+    The friction dimension was extracted from the evaluator into a default-on
+    'friction' contributor lens (lens-decomposition Task 3); its data now lives under
+    PACK_DIR/lenses/, assembled AFTER the evaluator runs. An absent lens file is NOT a
+    taxonomy gap here — a configured-but-missing lens is already a non-suppressible
+    'lensFailed' red flag from assemble_lenses.py, so gating it again here would be a
+    duplicate, confusing signal for the same root cause (Silent Fallback in reverse:
+    don't manufacture a second failure mode for one absence).
+    """
     gaps = []
     cats = set(cfg.get("frictionCategories") or [])
     if not cats:
         return gaps
-    for i, item in enumerate(analysis.get("frictionLog") or []):
+    friction = _read(pack_dir, "lenses/friction.json")
+    if friction is None:
+        return gaps
+    for item in friction.get("entries") or []:
         t = item.get("type")
         if t not in cats:
-            gaps.append("frictionLog[{}].type {!r} is not in frictionCategories {}".format(
-                i, t, sorted(cats)))
+            gaps.append("friction entry type {!r} not in frictionCategories {}".format(
+                t, sorted(cats)))
     return gaps
 
 
@@ -170,7 +183,7 @@ def collect_gaps(pack_dir):
     results = _read(pack_dir, "test-results.json") or {}
 
     if not analysis.get("disabled"):
-        gaps.extend(_friction_gaps(cfg, analysis))
+        gaps.extend(_friction_gaps(cfg, pack_dir))
         gaps.extend(_retrospective_gaps(cfg, analysis))
         gaps.extend(_rubric_gaps(cfg, analysis))
     gaps.extend(_command_gaps(cfg, results))

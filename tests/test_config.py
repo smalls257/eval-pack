@@ -186,6 +186,7 @@ class TestLensKeys(unittest.TestCase):
             lenses = {lens["skill"]: lens for lens in cfg["analysisLenses"]}
             self.assertEqual(lenses["review"], {"skill": "review", "role": "contributor"})
             self.assertEqual(lenses["business-risk"], {"skill": "business-risk", "role": "contributor"})
+            self.assertEqual(lenses["friction"], {"skill": "friction", "role": "contributor"})
             self.assertEqual(cfg["verdictAggregation"], "core")
 
     def test_unknown_aggregation_rejected(self):

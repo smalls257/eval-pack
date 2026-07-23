@@ -750,20 +750,29 @@ function renderReviewFindings(data) {
   }).join('');
 }
 
-function renderFriction(analysis) {
+// Pure lookup: the friction lens is a contributor named "friction" in
+// data.lenses.contributors. Kept separate from the DOM-touching renderer so it is
+// unit-testable without a document shim (Airplane Test: an absent lens must yield an
+// empty list, not throw — the friction table then degrades to its empty-state).
+function frictionEntriesFrom(lenses) {
+  const contributors = (lenses && lenses.contributors) || [];
+  const friction = contributors.find(c => c.skill === 'friction');
+  return (friction && friction.entries) || [];
+}
+
+function renderFriction(data) {
   const tbody = document.getElementById('friction-tbody');
   if (!tbody) return;
-  const rows = analysis.frictionLog || [];
+  const rows = frictionEntriesFrom(data && data.lenses);
   if (rows.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No friction recorded.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No friction recorded.</td></tr>';
     return;
   }
   tbody.innerHTML = rows.map(r =>
     html`<tr>
       <td>${safe(renderMarkdown(r.friction))}</td>
-      <td>${safe(renderMarkdown(r.evidence))}</td>
+      <td>${safe(renderMarkdown(r.impact))}</td>
       <td><span class="friction-type friction-${r.type || ''}">${r.type || '—'}</span></td>
-      <td>${safe(renderMarkdown(r.resolution))}</td>
     </tr>`
   ).join('');
 }
@@ -1161,7 +1170,7 @@ function renderLensTemplate(tpl, data) {
 
 // Contributors that render in their own dedicated tab/table — excluded from the generic
 // Lenses list to avoid double-rendering. Grows as dimensions are extracted into lenses.
-const DEDICATED_CONTRIBUTORS = new Set(['review', 'business-risk']);
+const DEDICATED_CONTRIBUTORS = new Set(['review', 'business-risk', 'friction']);
 
 function renderLenses(data) {
   const lenses = data.lenses;
@@ -1232,7 +1241,7 @@ function renderSession(data) {
   renderTestsExisting(analysis);
   renderTestsNew(analysis);
   renderReviewFindings(data);
-  renderFriction(analysis);
+  renderFriction(data);
   renderDiff(analysis);
   renderTools(data.tools);
   renderImprovements(analysis);
@@ -1310,5 +1319,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, businessRiskFrom };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom };
 }

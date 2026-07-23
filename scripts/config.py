@@ -49,6 +49,7 @@ DEFAULTS = {
     "analysisLenses": [
         {"skill": "review", "role": "contributor"},
         {"skill": "business-risk", "role": "contributor"},
+        {"skill": "friction", "role": "contributor"},
     ],
     # How scorer-lens scores combine with the core verdict (see AGGREGATION_RULES).
     "verdictAggregation": "core",

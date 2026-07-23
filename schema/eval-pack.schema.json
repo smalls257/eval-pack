@@ -131,6 +131,10 @@
         {
           "skill": "business-risk",
           "role": "contributor"
+        },
+        {
+          "skill": "friction",
+          "role": "contributor"
         }
       ],
       "description": "Extension lenses that contribute analysis or feed the verdict."

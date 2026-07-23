@@ -124,7 +124,7 @@ Key groups (full key list + types: `schema/eval-pack.schema.json`):
   compliance-auditor; or your own at `.eval-pack/stances/<name>.md`), `rubric` (band → criteria;
   the evaluator must name the band it applied, and a validator rejects unknown bands),
   `retrospectiveQuestions` (each must be answered — validated), `frictionCategories` (the
-  taxonomy `frictionLog` entries must draw from — validated), `evaluatorPromptFile` (extra
+  taxonomy the `friction` lens's entries must draw from — validated), `evaluatorPromptFile` (extra
   grading guidance from a file in your repo). These gates are enforced by
   `scripts/validate_contracts.py`, not by prose: a violation halts the pipeline before render.
 - **Heuristics** — `detectionPatterns` (a dict of regex lists — providing it replaces the WHOLE
