@@ -579,47 +579,18 @@ main.container {
   background: var(--bg-card-hover);
 }
 
-/* ===== Excerpt List ===== */
-.excerpt-list {
-  list-style: none;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.excerpt-list li {
-  font-size: 13px;
-  font-family: var(--font-mono);
-  background: var(--bg-code);
-  border-left: 3px solid var(--accent);
+/* ===== Tests tab: deterministic verdict ===== */
+.tests-verdict {
+  font-size: 14px;
   padding: 10px 14px;
-  border-radius: 0 4px 4px 0;
-  color: var(--text);
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
+  border-radius: var(--radius);
+  border-left: 4px solid var(--border);
+  margin-bottom: 16px;
 }
 
-/* ===== Two-column grid (tests covered / not covered) ===== */
-.two-col-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  margin-top: 20px;
-}
-
-.two-col-heading {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  margin-bottom: 10px;
-}
-
-.covered-heading { color: var(--green); }
-.gap-heading { color: var(--amber); }
+.tests-verdict-green { border-left-color: var(--green); }
+.tests-verdict-red { border-left-color: var(--red); }
+.tests-verdict-amber { border-left-color: var(--amber); }
 
 /* ===== Narrative ===== */
 .narrative {
@@ -1146,7 +1117,6 @@ details[open] .collapsible-trigger::before { content: '▾ '; }
   .stats-row { grid-template-columns: repeat(2, 1fr); }
   .verdict-banner { flex-wrap: wrap; }
   .verdict-detail { margin-left: 0; width: 100%; }
-  .two-col-grid { grid-template-columns: 1fr; }
   .header-stats { grid-template-columns: repeat(2, 1fr); }
   .tab-nav-wrapper { margin: 0 -12px; padding: 0 12px; }
 }

@@ -5,7 +5,8 @@ const require = createRequire(import.meta.url);
 global.window = { __EVAL_PACK_TEST__: true };
 const { effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText,
   reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom,
-  deliveredFrom, unmetFrom, provenFrom, unprovenFrom } = require('../templates/html/scripts.js');
+  deliveredFrom, unmetFrom, provenFrom, unprovenFrom,
+  testResultsSummary } = require('../templates/html/scripts.js');
 
 test('effectiveConfidence uses finalScore when a non-core rule ran scorers', () => {
   const analysis = { highlights: { confidencePercent: 90 } };
@@ -167,4 +168,31 @@ test('provenFrom/unprovenFrom degrade to empty list when the lens is absent (Air
   assert.deepStrictEqual(unprovenFrom(null), []);
   assert.deepStrictEqual(unprovenFrom({ scorers: [] }), []);
   assert.deepStrictEqual(unprovenFrom({ scorers: [{ skill: 'other', unproven: ['x'] }] }), []);
+});
+
+test('testResultsSummary reads verdict/summary/testsRun from the deterministic test-results.json', () => {
+  const testResults = {
+    verdict: 'pass',
+    summary: '8 tests passed',
+    testsRun: [{ name: 'auth.test.ts', passed: true, output: '8 passed' }],
+  };
+  assert.deepStrictEqual(testResultsSummary(testResults), {
+    verdict: 'pass',
+    summary: '8 tests passed',
+    testsRun: [{ name: 'auth.test.ts', passed: true, output: '8 passed' }],
+  });
+});
+
+test('testResultsSummary degrades to null when test-results.json is absent/empty (Airplane Test)', () => {
+  assert.strictEqual(testResultsSummary(null), null);
+  assert.strictEqual(testResultsSummary(undefined), null);
+  assert.strictEqual(testResultsSummary({}), null);
+});
+
+test('testResultsSummary tolerates a verdict with no per-test records (no crash, no evidence-cluster fields)', () => {
+  assert.deepStrictEqual(testResultsSummary({ verdict: 'none' }), {
+    verdict: 'none',
+    summary: '',
+    testsRun: [],
+  });
 });

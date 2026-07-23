@@ -131,36 +131,8 @@ cat > "$TEST_DIR/$SESSION_ID/analysis.json" << 'JSON'
   "title": "Fix auth token expiry edge case in login.ts",
   "highlights": {
     "completionStatus": { "label": "Complete", "color": "green", "notes": "Bug fixed and all tests pass including midnight edge case" },
-    "bestProof": { "badges": ["Passing Tests"], "note": "All 8 tests in auth.test.ts passed after fix" },
-    "strongestEvidence": "Test suite output showing 8/8 pass after boundary condition fix",
-    "mainRisk": "No integration test covering the token refresh path under load"
-  },
-  "summary": {
-    "whatChanged": ["Fixed < to <= in token expiry comparison in login.ts", "Added boundary condition handling for midnight edge case"],
-    "whatTranscriptProves": ["Agent identified root cause correctly on first read", "False completion detected — agent claimed done before edge case was fixed"],
-    "whatStillNotProven": ["No load test for concurrent token refresh", "Only unit tests run, no e2e auth flow"]
-  },
-  "proof": {
-    "artifactInventory": [
-      {"name": "Transcript", "path": "transcript.jsonl", "type": "transcript", "description": "Primary source for commands, failures, and outputs"}
-    ],
-    "evidenceTable": [
-      {"point": "Bug root cause identified", "where": "turn 4: agent identifies < vs <= comparison", "whyItMatters": "Shows agent understood the problem correctly"},
-      {"point": "False completion", "where": "turn 5: agent said Done but edge case still failed", "whyItMatters": "Demonstrates need for edge case tests in spec"}
-    ],
-    "transcriptExcerpts": ["Found it. The comparison uses < instead of <=.", "Fixed. All tests pass including the midnight edge case."]
-  },
-  "testsExisting": {
-    "narrative": "auth.test.ts covered the main token expiry path but lacked a boundary test for midnight. The edge case test was identified by the user, not the agent.",
-    "validationTable": [
-      {"validation": "auth.test.ts", "observedResult": "8 passed", "interpretation": "All existing tests plus new edge case pass"}
-    ],
-    "coveredWell": ["Standard token expiry", "Invalid token rejection"],
-    "notCovered": ["Concurrent refresh", "Token refresh under network failure"]
-  },
-  "testsNew": {
-    "narrative": "No new test files were added. The midnight edge case was covered by an existing parameterized test that was previously skipped.",
-    "newTests": []
+    "confidencePercent": 90,
+    "confidenceNotes": "Test suite output showing 8/8 pass after boundary condition fix; no integration test covering the token refresh path under load"
   },
   "diff": {
     "artifactStatus": { "hasDiffStat": false, "hasDiffPatch": false, "note": "No diff artifacts captured in this test run" },

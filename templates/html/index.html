@@ -119,8 +119,7 @@
       <nav class="tab-nav" id="tab-nav" role="tablist">
         <button class="tab-btn active" data-panel="summary" role="tab" aria-selected="true">Summary</button>
         <button class="tab-btn" data-panel="proof" role="tab" aria-selected="false">Proof</button>
-        <button class="tab-btn" data-panel="tests-existing" role="tab" aria-selected="false">Tests: Existing</button>
-        <button class="tab-btn" data-panel="tests-new" role="tab" aria-selected="false">Tests: New</button>
+        <button class="tab-btn" data-panel="tests" role="tab" aria-selected="false">Tests</button>
         <button class="tab-btn" data-panel="friction" role="tab" aria-selected="false">Friction</button>
         <button class="tab-btn" data-panel="review-findings" role="tab" aria-selected="false">Review Findings</button>
         <button class="tab-btn" data-panel="diff" role="tab" aria-selected="false">Diff</button>
@@ -155,29 +154,15 @@
       </div>
     </section>
 
-    <!-- Proof: left content + right sidebar artifact inventory -->
+    <!-- Proof: artifact inventory (deterministic). Detailed evidence assessment now
+         lives in the verification-rigor lens — see Summary tab. -->
     <section class="tab-panel card" id="panel-proof" role="tabpanel" style="display:none;">
       <div class="proof-layout">
         <div class="proof-main">
           <!-- Screenshots / video artifacts in proof context -->
           <div id="proof-screenshots-area"></div>
-
-          <!-- Evidence table -->
-          <h3 class="section-subheading">Evidence</h3>
-          <table class="data-table" id="proof-evidence-table">
-            <thead>
-              <tr>
-                <th>Evidence Point</th>
-                <th>Where It Appeared</th>
-                <th>Why It Matters</th>
-              </tr>
-            </thead>
-            <tbody id="proof-evidence-tbody"></tbody>
-          </table>
-
-          <!-- High-signal transcript excerpts -->
-          <h3 class="section-subheading">High-Signal Transcript Excerpts</h3>
-          <ul class="excerpt-list" id="proof-excerpts"></ul>
+          <p class="empty-state">Detailed evidence assessment (what's proven / not proven)
+            lives in the verification-rigor lens — see the Summary tab.</p>
         </div>
         <aside class="proof-sidebar">
           <h3 class="sidebar-heading">Artifact Inventory</h3>
@@ -186,38 +171,9 @@
       </div>
     </section>
 
-    <!-- Tests: Existing -->
-    <section class="tab-panel card" id="panel-tests-existing" role="tabpanel" style="display:none;">
-      <p class="narrative" id="tests-existing-narrative"></p>
-
-      <h3 class="section-subheading">Validation</h3>
-      <table class="data-table" id="tests-existing-table">
-        <thead>
-          <tr>
-            <th>Validation</th>
-            <th>Observed Result</th>
-            <th>Interpretation</th>
-          </tr>
-        </thead>
-        <tbody id="tests-existing-tbody"></tbody>
-      </table>
-
-      <div class="two-col-grid">
-        <div class="two-col-item">
-          <h3 class="two-col-heading covered-heading">What covered well</h3>
-          <ul class="bullet-list" id="tests-covered-well"></ul>
-        </div>
-        <div class="two-col-item">
-          <h3 class="two-col-heading gap-heading">What not covered</h3>
-          <ul class="bullet-list" id="tests-not-covered"></ul>
-        </div>
-      </div>
-    </section>
-
-    <!-- Tests: New -->
-    <section class="tab-panel card" id="panel-tests-new" role="tabpanel" style="display:none;">
-      <p class="narrative" id="tests-new-narrative"></p>
-      <ul class="bullet-list" id="tests-new-list"></ul>
+    <!-- Tests: deterministic verdict + per-test results from test-results.json -->
+    <section class="tab-panel card" id="panel-tests" role="tabpanel" style="display:none;">
+      <div id="tests-body"></div>
     </section>
 
     <!-- Review Findings -->

@@ -243,7 +243,7 @@ function renderVerdict(data) {
   const h = (data.analysis || {}).highlights || {};
   const biz = businessRiskFrom(data.lenses);
   const highlightParts = [
-    h.strongestEvidence,
+    h.confidenceNotes,
     biz && biz.mainRisk ? 'Risk: ' + biz.mainRisk : null
   ].filter(Boolean);
   if (detail && highlightParts.length > 0) {
@@ -661,11 +661,10 @@ function renderSummary(data) {
 }
 
 function renderProof(data) {
-  const analysis = data.analysis || {};
-  const proof = analysis.proof || {};
-
   // Artifact inventory — deterministic (built by render_html.py from the pack's actual
-  // files, not the evaluator), so index.html reads it off data.artifactInventory.
+  // files, not the evaluator), so index.html reads it off data.artifactInventory. The
+  // detailed evidence assessment (evidence table / excerpts / proven vs unproven) now
+  // lives in the verification-rigor lens — see the Summary tab.
   const invEl = document.getElementById('artifact-inventory');
   if (invEl) {
     const items = data.artifactInventory || [];
@@ -683,75 +682,41 @@ function renderProof(data) {
       ).join('');
     }
   }
-
-  // Evidence table
-  const tbody = document.getElementById('proof-evidence-tbody');
-  if (tbody) {
-    const rows = proof.evidenceTable || [];
-    if (rows.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No evidence recorded.</td></tr>';
-    } else {
-      tbody.innerHTML = rows.map(r =>
-        html`<tr><td>${safe(renderMarkdown(r.point))}</td><td>${safe(renderMarkdown(r.where))}</td><td>${safe(renderMarkdown(r.whyItMatters))}</td></tr>`
-      ).join('');
-    }
-  }
-
-  // High-signal excerpts — index.html has <ul id="proof-excerpts">
-  const excerpts = document.getElementById('proof-excerpts');
-  if (excerpts) {
-    const items = proof.transcriptExcerpts || [];
-    if (items.length === 0) {
-      excerpts.innerHTML = '<li class="empty-state">No excerpts recorded.</li>';
-    } else {
-      excerpts.innerHTML = items.map(ex =>
-        html`<li>${safe(renderMarkdown(ex))}</li>`
-      ).join('');
-    }
-  }
 }
 
-function renderTestsExisting(analysis) {
-  const t = analysis.testsExisting || {};
-  const narr = document.getElementById('tests-existing-narrative');
-  if (narr) narr.innerHTML = html`${safe(renderMarkdown(t.narrative || ''))}`;
-
-  const tbody = document.getElementById('tests-existing-tbody');
-  if (tbody) {
-    const rows = t.validationTable || [];
-    if (rows.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No validation data.</td></tr>';
-    } else {
-      tbody.innerHTML = rows.map(r =>
-        html`<tr><td>${safe(renderMarkdown(r.validation))}</td><td>${safe(renderMarkdown(r.observedResult))}</td><td>${safe(renderMarkdown(r.interpretation))}</td></tr>`
-      ).join('');
-    }
-  }
-
-  const coveredWell = document.getElementById('tests-covered-well');
-  const notCovered = document.getElementById('tests-not-covered');
-  const makeList = arr => (arr && arr.length > 0)
-    ? '<ul>' + arr.map(item => html`<li>${safe(renderMarkdown(item))}</li>`).join('') + '</ul>'
-    : '<p class="empty-state">Nothing recorded.</p>';
-
-  if (coveredWell) coveredWell.innerHTML = makeList(t.coveredWell);
-  if (notCovered) notCovered.innerHTML = makeList(t.notCovered);
+// Pure lookup: the deterministic test verdict + commands recorded in test-results.json
+// (data.testResults) — not LLM-authored. Returns null when the file is absent/empty so
+// the caller can render an empty-state instead of throwing (Airplane Test).
+function testResultsSummary(testResults) {
+  const t = testResults || {};
+  if (!t.verdict && !t.summary && !(t.testsRun || []).length) return null;
+  return {
+    verdict: t.verdict || 'none',
+    summary: t.summary || '',
+    testsRun: t.testsRun || [],
+  };
 }
 
-function renderTestsNew(analysis) {
-  const t = analysis.testsNew || {};
-  const narr = document.getElementById('tests-new-narrative');
-  if (narr) narr.innerHTML = html`${safe(renderMarkdown(t.narrative || ''))}`;
-
-  const list = document.getElementById('tests-new-list');
-  if (list) {
-    const items = t.newTests || [];
-    if (items.length === 0) {
-      list.innerHTML = '<li class="empty-state">No new tests recorded.</li>';
-    } else {
-      list.innerHTML = items.map(item => html`<li>${safe(renderMarkdown(item))}</li>`).join('');
-    }
+function renderTests(data) {
+  const container = document.getElementById('tests-body');
+  if (!container) return;
+  const t = testResultsSummary(data.testResults);
+  if (!t) {
+    container.innerHTML = '<p class="empty-state">No test results recorded.</p>';
+    return;
   }
+  const verdictCls = t.verdict === 'pass' ? 'green' : t.verdict === 'fail' ? 'red' : 'amber';
+  const rows = t.testsRun.map(r =>
+    html`<tr><td>${safe(renderMarkdown(r.name || ''))}</td><td>${r.passed ? '✓ pass' : '✗ fail'}</td><td>${safe(renderMarkdown(r.output || ''))}</td></tr>`
+  ).join('');
+  container.innerHTML = html`
+    <p class="tests-verdict tests-verdict-${verdictCls}">Verdict: <strong>${t.verdict}</strong>${safe(t.summary ? ' — ' + renderMarkdown(t.summary) : '')}</p>
+    ${safe(t.testsRun.length > 0
+      ? html`<table class="data-table" id="tests-run-table">
+          <thead><tr><th>Test</th><th>Result</th><th>Output</th></tr></thead>
+          <tbody>${safe(rows)}</tbody>
+        </table>`
+      : '<p class="empty-state">No individual test records.</p>')}`;
 }
 
 // Pure lookup: the review lens is a contributor named "review" in data.lenses.contributors.
@@ -1270,8 +1235,7 @@ function renderSession(data) {
   renderFlags(data);
   renderSummary(data);
   renderProof(data);
-  renderTestsExisting(analysis);
-  renderTestsNew(analysis);
+  renderTests(data);
   renderReviewFindings(data);
   renderFriction(data);
   renderDiff(analysis);
@@ -1351,5 +1315,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary };
 }
