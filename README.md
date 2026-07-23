@@ -12,12 +12,22 @@ A Claude Code plugin that generates eval packs — polished HTML reports capturi
 
 ## What's in an Eval Pack?
 
-- **Verdict banner** — pass/fail based on agent-driven test results
+- **Verdict banner** — pass/fail based on agent-driven test results, plus a synthesized
+  completion/confidence verdict informed by the judgment lenses below
 - **Visual evidence** — screenshots from Playwright or browser verification
 - **Session metrics** — per-model token breakdown (controller + subagents), turns, files changed
 - **Session timeline** — human-readable narrative of what happened during the session
 - **Heuristic flags** — false completions, retries, scope drift, test failures
-- **Claude analysis** — retrospective, repo friction report, prompt quality assessment
+- **Judgment lenses** — five toggleable dimensions, each its own agent, each default-on:
+  requirement-drift (did delivery match the ask?), verification-rigor (were claims backed by
+  evidence?), review (adversarial findings), business-risk (stakeholder risk + mitigation), and
+  friction (dev-experience friction, classified). Every dimension is tunable per-repo via
+  `analysisLenses` — see [Extension lenses](#extension-lenses--your-own-analyses-and-scores).
+- **Tests tab** — deterministic, generated straight from `test-results.json`/`testCommands` exit
+  codes, not LLM narrative. Note: this replaced the older LLM-authored `testsExisting` tab, which
+  also called out coverage gaps (which areas were well-covered vs. not) — that narrative framing
+  was dropped in the switch to deterministic facts; `verification-rigor`'s `unproven` array is the
+  closest current equivalent for naming what wasn't demonstrated.
 - **Tools tab** — tool usage bar chart, subagents dispatched with model tags, skills leveraged
 - **Full transcript** — collapsible conversation history with syntax highlighting
 - **Iteration rounds** — compare multiple runs side by side
@@ -137,7 +147,7 @@ Key groups (full key list + types: `schema/eval-pack.schema.json`):
   escaping), `publishOpenable`, `openableDir`.
 - **Report** — `brandName`, `reportTitle`, `footerText`, `subjectNoun`, `defaultTheme`,
   `sections`, `messages`, `templateDir` (project dir overriding index.html/styles.css/scripts.js
-  per-file), `zipNameTemplate`, `commitUrlTemplate`, `repoBaseUrl`.
+  per-file), `zipNameTemplate`, `repoBaseUrl`.
 - **Pipeline** — `outputDir`, `analysis`, `includeTranscript`.
 
 `pythonExecutable` stays a plugin option in `.claude/settings.json` (`pluginConfigs.eval-pack.options`)
@@ -235,9 +245,22 @@ a nonzero exit — becomes that same red flag; it can't vanish silently.
 1. Dev (or agent) runs `/eval-pack:generate`
 2. Scripts extract metrics and detect heuristic patterns from the transcript
 3. Claude runs appropriate tests, captures screenshots and logs
-4. Claude analyzes the session — retrospective, repo friction, prompt quality
-5. HTML report is rendered with all data, zipped to `.eval-packs/<session-id>.zip`
-6. `/eval-pack:review` commits the zip to the branch and creates a PR
+4. The configured judgment lenses run (default: requirement-drift, verification-rigor, review,
+   business-risk, friction) — each an independent agent, each writing its own finding to
+   `lenses/<skill>.json`
+5. The evaluator synthesizes a single completion/confidence verdict from the lens findings and
+   heuristic flags — it does not re-judge a dimension a lens already owns
+6. HTML report is rendered with all data, zipped to `.eval-packs/<session-id>.zip`
+7. `/eval-pack:review` commits the zip to the branch and creates a PR
+
+### Lenses are default-on, and default-on means mandatory
+
+All five bundled lenses ship enabled in `analysisLenses` — that is the "preserve today's
+behavior" baseline, not a suggestion. **Enabling a lens makes its execution mandatory**: once a
+skill is listed in `analysisLenses`, a run where that lens produces no output is not a silent
+gap — it surfaces as a non-suppressible red `lensFailed` flag. To turn a judgment dimension off,
+remove its entry from `analysisLenses` (at any config layer); there is no "best effort" middle
+ground where a configured lens is allowed to just not show up.
 7. Reviewer downloads zip from the branch, extracts, opens `index.html`
 
 ## Output

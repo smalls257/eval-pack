@@ -210,7 +210,7 @@ def _is_within(child, parent):
 # EVAL_CONFIG / pathLink / applySections reads in scripts.js.
 _REPORT_CONFIG_KEYS = (
     "brandName", "reportTitle", "footerText", "subjectNoun", "defaultTheme", "messages",
-    "commitUrlTemplate", "repoBaseUrl", "sections",
+    "repoBaseUrl", "sections",
 )
 
 

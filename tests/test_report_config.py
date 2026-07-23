@@ -14,7 +14,7 @@ class TestReportConfig(unittest.TestCase):
     # one, the knob validates + resolves but silently does nothing — a dead knob.
     TEMPLATE_KEYS = {
         "brandName", "reportTitle", "footerText", "subjectNoun", "defaultTheme", "messages",
-        "commitUrlTemplate", "repoBaseUrl", "sections",
+        "repoBaseUrl", "sections",
     }
 
     def test_surfaces_all_template_consumed_keys(self):

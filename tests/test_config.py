@@ -226,7 +226,6 @@ class TestCosmeticKeys(unittest.TestCase):
             self.assertEqual(cfg["defaultTheme"], "dark")
             self.assertEqual(cfg["sections"], [])
             self.assertEqual(cfg["zipNameTemplate"], "")
-            self.assertEqual(cfg["commitUrlTemplate"], "")
             self.assertEqual(cfg["repoBaseUrl"], "")
             self.assertEqual(cfg["messages"], {})
 

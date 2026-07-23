@@ -826,8 +826,12 @@ PY
 
 **Goal:** With the analysis option **false** and a non-empty `analysisLenses`, the lens/aggregation step must not blow up on the missing `highlights.confidencePercent` (the disabled path writes only `{title, disabled}`).
 **Setup:** `uat_reset`; run generate with analysis disabled AND `{ "analysisLenses": [{"skill":"some-skill","role":"scorer"}], "verdictAggregation":"min" }`.
-**Expected:** the lens step **skips cleanly or degrades to a noted failure** — it must not error on an undefined CORE. Run completes; `$ZIP` produced; Step 4.7 does not crash.
-**Pass/Fail:** PASS iff the run completes and Step 4.7 does not crash on missing `confidencePercent`. A traceback = FAIL (Silent-assumption defect at `skills/generate/SKILL.md` Step 4.7).
+**Expected:** the lens step **skips cleanly or degrades to a noted failure** — it must not error on an undefined CORE. Run completes; `$ZIP` produced; Step 4 (lenses) does not crash.
+**Pass/Fail:** PASS iff the run completes and Step 4 does not crash on missing `confidencePercent`. A traceback = FAIL (Silent-assumption defect at `skills/generate/SKILL.md` Step 4).
+
+> Note: pre-2026-07-23 this scenario referenced "Step 4.7" — the lens-decomposition pipeline
+> reorder (lenses now run BEFORE the evaluator, so its "read lenses" instruction is fulfillable)
+> renumbered lens dispatch to Step 4 and the evaluator to Step 4.5. Same behavior, new numbers.
 
 ### SC-PRS-05 — Deferred keys have no false effect (P2)
 
@@ -982,17 +986,22 @@ grep -oE 'data-tab="[^"]+"' "$OPENDIR/index.html"
 - (d) `defaultTheme:"dark"` **but** `localStorage['eval-pack-theme']='light'` → **light wins** (a saved user choice overrides config). Reload with the key set; confirm the applied `data-theme`.
 Precedence rule under test: **saved localStorage theme > config `defaultTheme` > built-in dark default.** Verify each by reading the effective `document.documentElement.dataset.theme` (or the applied CSS) after load.
 
-**URL templates (P2, security hardening):** `uat_reset`; `{ "commitUrlTemplate":"javascript:alert(1)//{sha}" }` and separately a `repoBaseUrl` with a `javascript:`/`data:` scheme.
+**URL templates (P2, security hardening):** `uat_reset`; a `repoBaseUrl` with a `javascript:`/`data:` scheme.
 ```bash
 grep -oE 'href="[^"]*"' "$OPENDIR/index.html" | grep -i 'javascript:\|data:' && echo ">>> LIVE DANGEROUS SCHEME <<<"
 ```
-**Expected/Known:** hrefs are escaped against attribute breakout but the **scheme is not validated** — a `javascript:` template may yield a clickable script URL. If a live `javascript:`/`data:` href appears, file as a hardening defect (author-controlled config, low severity). Also confirm commit SHAs render correctly (watch for `$`-sequence surprises in `String.replace` — e.g. a template containing `$&`).
+**Expected/Known:** hrefs are escaped against attribute breakout but the **scheme is not validated** — a `javascript:` value may yield a clickable script URL. If a live `javascript:`/`data:` href appears, file as a hardening defect (author-controlled config, low severity).
 **Pass/Fail:** Theme PASS iff all four cases (a–d) apply the expected theme AND the localStorage-over-config precedence in (d) holds. URL PASS iff dangerous schemes are rendered inert OR the risk is explicitly accepted and logged.
 
-### SC-TPL-04 — commit & path linkification (P1)
+### SC-TPL-04 — path linkification (P1)
+
+> Note (2026-07-23): this scenario previously also covered `commitUrlTemplate` (commit-cell
+> linkification). That key was removed end-to-end (lens-decomposition Task 7) — its only renderer
+> consumer was removed in Task 1, leaving it a passthrough fossil with no template reader. Scenario
+> narrowed to the surviving `repoBaseUrl` behavior.
 
 **Setup:** `uat_reset`.
-**Steps:** With `commitUrlTemplate` set, commit cells become links to the resolved SHA URL; with `repoBaseUrl` set, diff file paths become repo-relative links; without them they render as plain code (baseline). Confirm resolved hrefs point at the expected SHA/path.
+**Steps:** With `repoBaseUrl` set, diff file paths become repo-relative links; without it they render as plain code (baseline). Confirm resolved hrefs point at the expected path.
 **Pass/Fail:** PASS iff links appear only when configured and resolve correctly.
 
 ### SC-TPL-05 — Section list edge already covered; theme covered — reserved. (No-op placeholder to preserve numbering.)

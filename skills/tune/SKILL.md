@@ -45,22 +45,28 @@ Non-zero exit: STOP and show stderr verbatim.
 "$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/detect_patterns.py" "${PACK_DIR}/transcript.jsonl" "${PACK_DIR}" --config "${PACK_DIR}/eval-config.json"
 ```
 
-Then, if `analysis` is true in the resolved config: dispatch the independent evaluator and run the
-contract gate EXACTLY as `skills/generate/SKILL.md` Step 4 specifies — same agent, same prompt
-(PACK_DIR resolved to an absolute path, REPO_ROOT, DIFF_BASE), same
-`validate_contracts.py` gate immediately afterward with the same re-dispatch-once-on-violation
-rule, so the new analysis reflects the tuned stance/rubric/questions.
-
-If `analysis` is false in the resolved config: when the unpacked `analysis.json` is already a
-disabled stub, leave it; when you are SWITCHING analysis from true to false, WRITE the disabled
-stub exactly as generate Step 4's disabled path specifies (do not keep the old full analysis —
-it may disagree with the tuned config and the render gate would refuse).
-
-Then run the lens step EXACTLY as generate Step 4.7 specifies (dispatch configured lenses, then):
+First run the lens step EXACTLY as `skills/generate/SKILL.md` Step 4 specifies — dispatch every
+lens configured in `analysisLenses` (or skip cleanly if empty), then:
 
 ```bash
 "$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/assemble_lenses.py" "${PACK_DIR}"
 ```
+
+The evaluator is a synthesizer that reads lens findings, so lenses must be re-run before it —
+tuning a lens-affecting knob (e.g. `analysisLenses`, `frictionCategories`, `verdictAggregation`)
+without re-running this step would leave the evaluator reading stale lens output.
+
+Then, if `analysis` is true in the resolved config: dispatch the independent evaluator and run the
+contract gate EXACTLY as `skills/generate/SKILL.md` Step 4.5 specifies — same agent, same prompt
+(PACK_DIR resolved to an absolute path, REPO_ROOT, DIFF_BASE, reading `lenses.json` and
+`lenses/*.json`), same `validate_contracts.py` gate immediately afterward with the same
+re-dispatch-once-on-violation rule, so the new analysis reflects the tuned stance/rubric/questions
+AND the freshly re-run lens findings.
+
+If `analysis` is false in the resolved config: when the unpacked `analysis.json` is already a
+disabled stub, leave it; when you are SWITCHING analysis from true to false, WRITE the disabled
+stub exactly as generate Step 4.5's disabled path specifies (do not keep the old full analysis —
+it may disagree with the tuned config and the render gate would refuse).
 
 ## Step 4: Re-render (appends a new round to the same zip)
 

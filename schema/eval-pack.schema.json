@@ -200,11 +200,6 @@
       "default": "",
       "description": "Template for the zip filename."
     },
-    "commitUrlTemplate": {
-      "type": "string",
-      "default": "",
-      "description": "Template turning a commit SHA into a link."
-    },
     "repoBaseUrl": {
       "type": "string",
       "default": "",

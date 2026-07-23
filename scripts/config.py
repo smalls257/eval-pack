@@ -63,7 +63,6 @@ DEFAULTS = {
     "defaultTheme": "dark",
     "sections": [],
     "zipNameTemplate": "",
-    "commitUrlTemplate": "",
     "repoBaseUrl": "",
     "messages": {},
     # Project-relative dir holding report template overrides (index.html/styles.css/scripts.js);
@@ -120,7 +119,6 @@ _TYPES = {
     "defaultTheme": str,
     "sections": list,
     "zipNameTemplate": str,
-    "commitUrlTemplate": str,
     "repoBaseUrl": str,
     "messages": dict,
     "templateDir": str,

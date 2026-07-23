@@ -44,8 +44,11 @@ def _friction_gaps(cfg, pack_dir):
 
     The friction dimension was extracted from the evaluator into a default-on
     'friction' contributor lens (lens-decomposition Task 3); its data now lives under
-    PACK_DIR/lenses/, assembled AFTER the evaluator runs. An absent lens file is NOT a
-    taxonomy gap here — a configured-but-missing lens is already a non-suppressible
+    PACK_DIR/lenses/, assembled by the lens step that runs BEFORE the evaluator (so the
+    evaluator can ingest lens findings — the pipeline order is lenses -> evaluator ->
+    this gate -> render). This function reads whatever is on disk at gate time and
+    doesn't care which step wrote it or when; an absent lens file is NOT a taxonomy gap
+    here regardless — a configured-but-missing lens is already a non-suppressible
     'lensFailed' red flag from assemble_lenses.py, so gating it again here would be a
     duplicate, confusing signal for the same root cause (Silent Fallback in reverse:
     don't manufacture a second failure mode for one absence).

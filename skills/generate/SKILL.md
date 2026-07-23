@@ -70,7 +70,7 @@ This prints a JSON array; each item has `sessionId`, `transcriptPath`, `source`
 Assemble the merged transcript (current + confirmed selections + their sub-agent transcripts):
 
 Write it to `${PACK_DIR}/transcript.jsonl` — the canonical name every later step reads (extraction,
-the Step 4 evaluator, and Step 5 render):
+the lenses, the Step 4.5 evaluator, and Step 5 render):
 
 ```bash
 mkdir -p "${PACK_DIR}"
@@ -80,12 +80,12 @@ mkdir -p "${PACK_DIR}"
 
 If `${PACK_DIR}/transcript.jsonl` was written (`1` or more sessions), set
 `TRANSCRIPT_PATH="${PACK_DIR}/transcript.jsonl"` and use it for every remaining step (Steps 1, 2,
-2.5, the Step 4 analysis input, and Step 5 render) — this guarantees the evaluator has a transcript
-to read. Otherwise keep the original `TRANSCRIPT_PATH`.
+2.5, the lens dispatches, the Step 4.5 analysis input, and Step 5 render) — this guarantees the
+evaluator has a transcript to read. Otherwise keep the original `TRANSCRIPT_PATH`.
 
 ## Step 0.65: Discover Repos Touched (multi-repo coverage)
 
-Today's diff step (Step 0 / Step 4) only diffs the cwd's repo. If a sub-agent did real work in a
+Today's diff step (Step 0 / Step 4.5) only diffs the cwd's repo. If a sub-agent did real work in a
 different repo or worktree during this session, that change surface is invisible and the eval
 scores a partial diff without saying so. This step restores that visibility. This step is also
 ENFORCED deterministically: render re-derives which repos the session edited (via
@@ -142,8 +142,8 @@ Then compute the diffs:
 ```
 
 This writes `${PACK_DIR}/repo-diffs.json`. Coverage backstop: render refuses if a discovered repo
-is left neither diffed nor skipped (Step 4's contract gate and render both enforce it), so account
-for every one — don't leave a repo out of `repo-selection.json`.
+is left neither diffed nor skipped (Step 4.5's contract gate and render both enforce it), so
+account for every one — don't leave a repo out of `repo-selection.json`.
 
 ## Step 0.7: Resolve Configuration
 
@@ -287,82 +287,23 @@ Identify and run appropriate tests for the changes made in this session:
 }
 ```
 
-## Step 4: Analyze (independent evaluator)
+## Step 4: Extension Lenses (optional)
 
-The analysis must NOT be written by you — you did the work, and a self-graded
-evaluation is not trustworthy evidence. Dispatch an independent evaluator instead.
-
-First compute the diff base (same logic as Step 0):
-
-- If `HEAD~1` exists, `DIFF_BASE=HEAD~1`; otherwise `DIFF_BASE=4b825dc642cb6eb9a060e54bf8d69288fbee4904` (empty tree).
-
-**If analysis is enabled** (`analysis` in the resolved `eval-config.json`, default true):
-
-Resolve `PACK_DIR` to an absolute path and capture the repo root before dispatching, so
-the sub-agent (which may run from a different working directory) resolves files and git
-correctly:
-
-- `ABS_PACK_DIR=$(cd "${PACK_DIR}" && pwd)`
-- `REPO_ROOT=$(git rev-parse --show-toplevel)`
-
-Dispatch the `eval-pack-evaluator` agent with the `Agent` tool, `subagent_type:
-eval-pack-evaluator`. Pass it only the artifact location — not your own reasoning:
-
-> Write the eval-pack analysis. PACK_DIR is `${ABS_PACK_DIR}` (absolute). REPO_ROOT is
-> `${REPO_ROOT}`. DIFF_BASE is `${DIFF_BASE}`.
-> Read eval-config.json (your configuration), transcript.jsonl, metrics.json, patterns.json,
-> and test-results.json from PACK_DIR,
-> run git from REPO_ROOT to inspect the diff against DIFF_BASE, and write
-> `${ABS_PACK_DIR}/analysis.json` per your schema.
-
-Wait for the agent to finish. Confirm `${ABS_PACK_DIR}/analysis.json` exists and has a
-`title`. If it is missing or empty, the evaluator failed — re-dispatch once; if it
-fails again, stop and tell the user the analysis step failed. Do NOT write the
-analysis yourself as a fallback — that reintroduces the bias this step exists to remove.
-
-Then run the deterministic contract gate — it checks the analysis and test results against the
-resolved config (retrospective answers, rubric band, test-command proof). The friction taxonomy
-gate lives here too, but at this point in the pipeline `lenses/friction.json` does not exist yet
-(Step 4.7 hasn't run), so it is silently a no-op now and re-checked for real at render time —
-this is expected, not a bug:
-
-```bash
-"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/validate_contracts.py" "${ABS_PACK_DIR}"
-```
-
-If it exits non-zero, route each `CONTRACT:` line to its owner:
-- **Analysis violations** (retrospectiveAnswers / rubricApplied): re-dispatch the evaluator ONCE,
-  passing those lines as corrections.
-- **Test violations** (test-results.commands / verdict): the evaluator cannot fix these — redo
-  Step 3 so `test-results.json` records every configured command with its real exit code and a
-  verdict consistent with them.
-Re-run the gate. If it still fails, STOP and show the user the violations — do not render.
-(render_html enforces the same gate, including the friction taxonomy check against
-`lenses/friction.json`, once lenses have run; skipping this step cannot ship a non-conforming pack.)
-
-**If analysis is disabled** (`analysis` option is false):
-
-Do not dispatch the evaluator. Write a minimal, honest stub so the dashboard shows a
-clear "analysis disabled" banner rather than a fabricated score:
-
-```bash
-"$PYTHON" - "${PACK_DIR}" << 'PY'
-import json, sys, pathlib
-pack = pathlib.Path(sys.argv[1])
-pack.mkdir(parents=True, exist_ok=True)
-(pack / "analysis.json").write_text(json.dumps({
-    "title": "Analysis disabled — heuristic flags only",
-    "disabled": True,
-}), encoding="utf-8")
-PY
-```
-
-## Step 4.7: Extension Lenses (optional)
+The evaluator (Step 4.5) is a synthesizer — it reads lens findings rather than re-deriving them.
+That only works if the lenses have already run, so this step comes BEFORE the evaluator dispatch.
 
 Read `analysisLenses` from `${PACK_DIR}/eval-config.json`. If it is empty, SKIP this entire
 step — the core eval never depends on a lens being present (the Airplane Test). The
 configuration was validated at resolve time, so every lens already has a `skill` and a valid
 `role`.
+
+Resolve `PACK_DIR` to an absolute path and capture the repo root before dispatching, so
+sub-agents (which may run from a different working directory) resolve files and git correctly.
+Compute the diff base the same way as Step 0:
+
+- `ABS_PACK_DIR=$(cd "${PACK_DIR}" && pwd)`
+- `REPO_ROOT=$(git rev-parse --show-toplevel)`
+- If `HEAD~1` exists, `DIFF_BASE=HEAD~1`; otherwise `DIFF_BASE=4b825dc642cb6eb9a060e54bf8d69288fbee4904` (empty tree).
 
 Create the lens output dir: `mkdir -p "${PACK_DIR}/lenses"`. Then for each lens `{skill, role}`,
 dispatch it as a SEPARATE subagent over the read-only artifacts. Each lens WRITES its result to
@@ -409,12 +350,82 @@ not done by hand — that keeps the verdict auditable):
 ```
 
 This writes `${PACK_DIR}/lenses.json` — contributors, scorers, failures, `coreScore`, and the
-aggregated `finalScore` — which the report's Lenses tab renders.
+aggregated `finalScore` — the evaluator (next step) reads this to synthesize confidence, and
+the report's Lenses tab renders it.
 
 Guards: rules come from config set before the run sees results (G1, pre-committed); every result is
 attributed and the aggregation math is written to lenses.json (G2, transparent); the rule was
 bounded to a known, can-still-fail rule at resolve time (G3); lenses are config-listed only,
 failures degrade to quarantined notes, and the core ran without them (G4, isolated).
+
+## Step 4.5: Analyze (independent evaluator synthesizes lens findings)
+
+The analysis must NOT be written by you — you did the work, and a self-graded
+evaluation is not trustworthy evidence. Dispatch an independent evaluator instead.
+
+By this point Step 4 has already run: `${PACK_DIR}/lenses.json` and `${PACK_DIR}/lenses/*.json`
+exist (or `analysisLenses` was empty and neither exists — the Airplane Test). The evaluator is a
+SYNTHESIZER: it does not re-derive a verdict a lens already owns (requirement drift, verification
+rigor, review findings, business risk, friction) — it reads those findings plus `patterns.json`
+flags and synthesizes `completionStatus` / `confidencePercent` / `confidenceNotes` from them.
+
+**If analysis is enabled** (`analysis` in the resolved `eval-config.json`, default true):
+
+Resolve `PACK_DIR` to an absolute path and capture the repo root before dispatching (reuse
+`ABS_PACK_DIR`, `REPO_ROOT`, `DIFF_BASE` from Step 4 if this is the same run).
+
+Dispatch the `eval-pack-evaluator` agent with the `Agent` tool, `subagent_type:
+eval-pack-evaluator`. Pass it only the artifact location — not your own reasoning:
+
+> Write the eval-pack analysis. PACK_DIR is `${ABS_PACK_DIR}` (absolute). REPO_ROOT is
+> `${REPO_ROOT}`. DIFF_BASE is `${DIFF_BASE}`.
+> Read eval-config.json (your configuration), transcript.jsonl, metrics.json, patterns.json,
+> test-results.json, `lenses.json`, and `lenses/*.json` from PACK_DIR — the lens findings are
+> already computed; ingest them, do not re-derive their verdicts — run git from REPO_ROOT to
+> inspect the diff against DIFF_BASE, and write `${ABS_PACK_DIR}/analysis.json` per your schema.
+
+Wait for the agent to finish. Confirm `${ABS_PACK_DIR}/analysis.json` exists and has a
+`title`. If it is missing or empty, the evaluator failed — re-dispatch once; if it
+fails again, stop and tell the user the analysis step failed. Do NOT write the
+analysis yourself as a fallback — that reintroduces the bias this step exists to remove.
+
+Then run the deterministic contract gate — it checks the analysis and test results against the
+resolved config (retrospective answers, rubric band, test-command proof, and — now that lenses
+have already run — the friction taxonomy check against `lenses/friction.json`):
+
+```bash
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/validate_contracts.py" "${ABS_PACK_DIR}"
+```
+
+If it exits non-zero, route each `CONTRACT:` line to its owner:
+- **Analysis violations** (retrospectiveAnswers / rubricApplied): re-dispatch the evaluator ONCE,
+  passing those lines as corrections.
+- **Test violations** (test-results.commands / verdict): the evaluator cannot fix these — redo
+  Step 3 so `test-results.json` records every configured command with its real exit code and a
+  verdict consistent with them.
+- **Friction taxonomy violations** (`lenses/friction.json` entry type not in `frictionCategories`):
+  re-dispatch the `friction` lens ONCE, passing the violation as a correction, then re-run
+  `assemble_lenses.py`.
+Re-run the gate. If it still fails, STOP and show the user the violations — do not render.
+(render_html enforces the same gate again as the code-level backstop; skipping this step cannot
+ship a non-conforming pack.)
+
+**If analysis is disabled** (`analysis` option is false):
+
+Do not dispatch the evaluator. Write a minimal, honest stub so the dashboard shows a
+clear "analysis disabled" banner rather than a fabricated score:
+
+```bash
+"$PYTHON" - "${PACK_DIR}" << 'PY'
+import json, sys, pathlib
+pack = pathlib.Path(sys.argv[1])
+pack.mkdir(parents=True, exist_ok=True)
+(pack / "analysis.json").write_text(json.dumps({
+    "title": "Analysis disabled — heuristic flags only",
+    "disabled": True,
+}), encoding="utf-8")
+PY
+```
 
 ## Step 5: Render HTML
 
