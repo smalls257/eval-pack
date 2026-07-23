@@ -373,7 +373,11 @@ never your own reasoning.
 `subagent_type`, passing `PACK_DIR` (absolute), `REPO_ROOT`, and `DIFF_BASE`:
 
 - `requirement-drift` (scorer) — did the delivered work match what the user originally asked?
+  Default-on in `analysisLenses`. Its `delivered`/`unmet` arrays feed the Summary tab's
+  "What changed" / "not proven" columns.
 - `verification-rigor` (scorer) — were success claims backed by observed evidence?
+  Default-on in `analysisLenses`. Its `proven`/`unproven` arrays feed the Summary tab's
+  "What the transcript proves" / "not proven" columns.
 - `review` (contributor) — adversarial review findings: bugs/risks in the delivered work,
   most-severe-first. Default-on in `analysisLenses` (see the config defaults).
 - `business-risk` (contributor) — business/stakeholder risk of the delivered work: level,

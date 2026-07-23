@@ -135,6 +135,14 @@
         {
           "skill": "friction",
           "role": "contributor"
+        },
+        {
+          "skill": "requirement-drift",
+          "role": "scorer"
+        },
+        {
+          "skill": "verification-rigor",
+          "role": "scorer"
         }
       ],
       "description": "Extension lenses that contribute analysis or feed the verdict."

@@ -613,8 +613,38 @@ function renderFlags(data) {
   }).join('');
 }
 
-function renderSummary(analysis) {
-  const s = analysis.summary || {};
+// Pure lookups: the Summary tab's 3-column narrative is sourced from the two SCORER lenses
+// that already judge these dimensions (requirement-drift, verification-rigor), not from
+// analysis.summary — the evaluator no longer emits that field. Scorers live in
+// data.lenses.scorers (not contributors). Kept separate from the DOM-touching renderer so
+// each is unit-testable without a document shim (Airplane Test: an absent lens must yield an
+// empty list, not throw — the Summary column then degrades to its empty-state).
+function deliveredFrom(lenses) {
+  const scorers = (lenses && lenses.scorers) || [];
+  const drift = scorers.find(s => s.skill === 'requirement-drift');
+  return (drift && drift.delivered) || [];
+}
+
+function unmetFrom(lenses) {
+  const scorers = (lenses && lenses.scorers) || [];
+  const drift = scorers.find(s => s.skill === 'requirement-drift');
+  return (drift && drift.unmet) || [];
+}
+
+function provenFrom(lenses) {
+  const scorers = (lenses && lenses.scorers) || [];
+  const rigor = scorers.find(s => s.skill === 'verification-rigor');
+  return (rigor && rigor.proven) || [];
+}
+
+function unprovenFrom(lenses) {
+  const scorers = (lenses && lenses.scorers) || [];
+  const rigor = scorers.find(s => s.skill === 'verification-rigor');
+  return (rigor && rigor.unproven) || [];
+}
+
+function renderSummary(data) {
+  const lenses = data && data.lenses;
 
   const whatChanged = document.getElementById('summary-what-changed');
   // index.html uses id="summary-what-proves" (not "summary-proves")
@@ -625,9 +655,9 @@ function renderSummary(analysis) {
     ? '<ul>' + arr.map(item => html`<li>${safe(renderMarkdown(item))}</li>`).join('') + '</ul>'
     : '<p class="empty-state">Nothing recorded.</p>';
 
-  if (whatChanged) whatChanged.innerHTML = makeList(s.whatChanged);
-  if (proves) proves.innerHTML = makeList(s.whatTranscriptProves);
-  if (notProven) notProven.innerHTML = makeList(s.whatStillNotProven);
+  if (whatChanged) whatChanged.innerHTML = makeList(deliveredFrom(lenses));
+  if (proves) proves.innerHTML = makeList(provenFrom(lenses));
+  if (notProven) notProven.innerHTML = makeList([...unprovenFrom(lenses), ...unmetFrom(lenses)]);
 }
 
 function renderProof(data) {
@@ -1238,7 +1268,7 @@ function renderSession(data) {
   renderVerdict(data);
   renderStats(data);
   renderFlags(data);
-  renderSummary(analysis);
+  renderSummary(data);
   renderProof(data);
   renderTestsExisting(analysis);
   renderTestsNew(analysis);
@@ -1321,5 +1351,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom };
 }

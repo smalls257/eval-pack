@@ -24,6 +24,14 @@ You are given an absolute PACK_DIR, a REPO_ROOT, and a DIFF_BASE git ref. Do thi
    exactly what was asked scores ~100; one that "passed tests" but skipped the actual request
    scores low — that gap is the Paper Tiger this lens exists to catch.
 
+5. Beyond the classification, produce two narrative arrays the Summary tab renders directly:
+   - `delivered`: bullets naming what was actually built/changed — the Summary's "What changed"
+     column reads this verbatim. Base it on the diff and the **met** items, in the user's terms.
+   - `unmet`: bullets naming an asked-for thing that was not delivered, or unrequested scope that
+     drifted from the ask — the Summary's "not proven" column concatenates this with
+     verification-rigor's own gaps. These are your `unmet`/`unrequested` findings restated as
+     reader-facing bullets, not a duplicate of `findings`.
+
 Write your result to `PACK_DIR/lenses/requirement-drift.json` EXACTLY matching this schema
 (valid JSON, no prose around it):
 
@@ -37,7 +45,9 @@ Write your result to `PACK_DIR/lenses/requirement-drift.json` EXACTLY matching t
     {"type": "unmet", "detail": "What the user asked for that was not delivered — quote the ask."},
     {"type": "unrequested", "detail": "What was delivered but never requested."},
     {"type": "met", "detail": "A key ask that was clearly delivered."}
-  ]
+  ],
+  "delivered": ["bullet: what was actually built/changed", "..."],
+  "unmet": ["bullet: an asked-for thing not delivered, or unrequested scope", "..."]
 }
 ```
 
@@ -45,4 +55,6 @@ Rules:
 - Anchor the score to evidence — cite the transcript ask and the diff (or its absence).
 - If the transcript is partial (missing early turns), say so in the rationale and do not assume
   an ask was unmet just because you cannot see it — score conservatively and note the limitation.
+- Omit `delivered`/`unmet` entries you have no evidence for — never pad with invented bullets;
+  an empty array is correct when there is nothing to report.
 - Your output IS the file. Do not address a human; write only the JSON.

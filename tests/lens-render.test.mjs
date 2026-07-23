@@ -4,7 +4,8 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 global.window = { __EVAL_PACK_TEST__: true };
 const { effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText,
-  reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom } = require('../templates/html/scripts.js');
+  reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom,
+  deliveredFrom, unmetFrom, provenFrom, unprovenFrom } = require('../templates/html/scripts.js');
 
 test('effectiveConfidence uses finalScore when a non-core rule ran scorers', () => {
   const analysis = { highlights: { confidencePercent: 90 } };
@@ -123,4 +124,47 @@ test('frictionEntriesFrom degrades to empty list when the lens is absent (Airpla
   assert.deepStrictEqual(frictionEntriesFrom(null), []);
   assert.deepStrictEqual(frictionEntriesFrom({ contributors: [] }), []);
   assert.deepStrictEqual(frictionEntriesFrom({ contributors: [{ skill: 'other', entries: [{ x: 1 }] }] }), []);
+});
+
+test('deliveredFrom/unmetFrom read the requirement-drift SCORER lens (not a contributor)', () => {
+  const lenses = {
+    scorers: [
+      { skill: 'other', role: 'scorer', score: 50 },
+      { skill: 'requirement-drift', role: 'scorer', score: 72,
+        delivered: ['Added the login form'], unmet: ['Password reset was never wired up'] },
+    ],
+  };
+  assert.deepStrictEqual(deliveredFrom(lenses), ['Added the login form']);
+  assert.deepStrictEqual(unmetFrom(lenses), ['Password reset was never wired up']);
+});
+
+test('deliveredFrom/unmetFrom degrade to empty list when the lens is absent (Airplane Test)', () => {
+  assert.deepStrictEqual(deliveredFrom(null), []);
+  assert.deepStrictEqual(deliveredFrom({ scorers: [] }), []);
+  assert.deepStrictEqual(deliveredFrom({ scorers: [{ skill: 'other', delivered: ['x'] }] }), []);
+  assert.deepStrictEqual(unmetFrom(null), []);
+  assert.deepStrictEqual(unmetFrom({ scorers: [] }), []);
+  assert.deepStrictEqual(unmetFrom({ scorers: [{ skill: 'other', unmet: ['x'] }] }), []);
+});
+
+test('provenFrom/unprovenFrom read the verification-rigor SCORER lens (not a contributor)', () => {
+  const lenses = {
+    scorers: [
+      { skill: 'other', role: 'scorer', score: 50 },
+      { skill: 'verification-rigor', role: 'scorer', score: 84,
+        proven: ['Test suite ran green (293 py + 26 node)'],
+        unproven: ['Claimed the UI "looks right" with no screenshot'] },
+    ],
+  };
+  assert.deepStrictEqual(provenFrom(lenses), ['Test suite ran green (293 py + 26 node)']);
+  assert.deepStrictEqual(unprovenFrom(lenses), ['Claimed the UI "looks right" with no screenshot']);
+});
+
+test('provenFrom/unprovenFrom degrade to empty list when the lens is absent (Airplane Test)', () => {
+  assert.deepStrictEqual(provenFrom(null), []);
+  assert.deepStrictEqual(provenFrom({ scorers: [] }), []);
+  assert.deepStrictEqual(provenFrom({ scorers: [{ skill: 'other', proven: ['x'] }] }), []);
+  assert.deepStrictEqual(unprovenFrom(null), []);
+  assert.deepStrictEqual(unprovenFrom({ scorers: [] }), []);
+  assert.deepStrictEqual(unprovenFrom({ scorers: [{ skill: 'other', unproven: ['x'] }] }), []);
 });

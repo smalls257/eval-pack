@@ -24,6 +24,14 @@ You are given an absolute PACK_DIR, a REPO_ROOT, and a DIFF_BASE git ref. Do thi
    command output scores low. (This is stricter and deeper than the false-completion heuristic in
    patterns.json, which only pattern-matches adjacent lines.)
 
+5. Beyond the backed/unbacked classification, produce two narrative arrays the Summary tab
+   renders directly:
+   - `proven`: bullets naming a success claim the transcript actually demonstrates — the
+     Summary's "What the transcript proves" column reads this verbatim. Base it on your
+     **backed** claims, restated in the reader's terms (not a duplicate of `findings`).
+   - `unproven`: bullets naming a claim asserted without shown evidence, or a verification gap —
+     the Summary's "not proven" column concatenates this with requirement-drift's own `unmet`.
+
 Write your result to `PACK_DIR/lenses/verification-rigor.json` EXACTLY matching this schema
 (valid JSON, no prose around it):
 
@@ -36,11 +44,15 @@ Write your result to `PACK_DIR/lenses/verification-rigor.json` EXACTLY matching 
   "findings": [
     {"claim": "Quote the success claim.", "backed": true, "evidence": "The command/output that proves it, or 'none'."},
     {"claim": "Quote an unbacked claim.", "backed": false, "evidence": "none — asserted without running anything."}
-  ]
+  ],
+  "proven": ["bullet: a success claim the transcript actually demonstrates", "..."],
+  "unproven": ["bullet: a claim asserted without shown evidence / a gap", "..."]
 }
 ```
 
 Rules:
 - Anchor the score to specific transcript moments; quote the claim and the (missing) evidence.
 - If the transcript is partial, note it and score conservatively rather than penalizing unseen turns.
+- Omit `proven`/`unproven` entries you have no evidence for — never pad with invented bullets;
+  an empty array is correct when there is nothing to report.
 - Your output IS the file. Do not address a human; write only the JSON.

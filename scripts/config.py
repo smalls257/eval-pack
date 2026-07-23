@@ -50,6 +50,8 @@ DEFAULTS = {
         {"skill": "review", "role": "contributor"},
         {"skill": "business-risk", "role": "contributor"},
         {"skill": "friction", "role": "contributor"},
+        {"skill": "requirement-drift", "role": "scorer"},
+        {"skill": "verification-rigor", "role": "scorer"},
     ],
     # How scorer-lens scores combine with the core verdict (see AGGREGATION_RULES).
     "verdictAggregation": "core",

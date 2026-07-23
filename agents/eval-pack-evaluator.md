@@ -41,7 +41,7 @@ Then do this:
      files); user skipped: some-cache-repo"). Weigh each repo's insertions/deletions MAGNITUDE
      (not just file counts) when assessing change size and risk — a repo with +9000/-100 is a
      larger surface than one with +12 across more files. If the transcript clearly shows work in a repo that
-     appears in `skipped`, call that out as a coverage limitation in `whatStillNotProven` — the
+     appears in `skipped`, call that out as a coverage limitation in `confidenceNotes` — the
      evaluation cannot vouch for a change surface it was told to skip.
    - **If absent** (legacy path, single-repo session), fall back to running git yourself from
      REPO_ROOT: `git -C "$REPO_ROOT" diff --stat "$DIFF_BASE"` and
@@ -54,11 +54,12 @@ Rules:
 - Omit any section for which there is no evidence — never emit empty arrays or null fields.
 - Do not inflate `confidencePercent`. Anchor it to what the artifacts prove, and explain
   the anchor in `confidenceNotes`. Heuristic flags in patterns.json (e.g. false completions)
-  must lower confidence and appear in `whatStillNotProven`.
+  must lower confidence and be named in `confidenceNotes` — the detailed evidence gap itself is
+  the verification-rigor lens's job (its `unproven` array), not yours.
 - If `patterns.json` has `partialSession` set (or a "Partial session" flag), the transcript
-  is incomplete — earlier turns are missing. Say so explicitly in `whatStillNotProven`, note
-  it in `confidenceNotes`, and lower `confidencePercent` accordingly. Do not present a
-  partial-session evaluation as if it covered the whole session.
+  is incomplete — earlier turns are missing. Say so explicitly in `confidenceNotes` and lower
+  `confidencePercent` accordingly. Do not present a partial-session evaluation as if it covered
+  the whole session.
 - Your output IS the file. Do not address a human; do not summarize what you wrote.
 
 Schema for `analysis.json`:
@@ -72,11 +73,6 @@ Schema for `analysis.json`:
     "confidenceNotes": "One sentence explaining the confidence score — what evidence supports it or limits it",
     "bestProof": { "badges": ["Screenshots", "Passing"], "note": "One sentence on strongest evidence type" },
     "strongestEvidence": "One sentence naming the single most convincing proof point"
-  },
-  "summary": {
-    "whatChanged": ["bullet: what changed in the extension/codebase", "..."],
-    "whatTranscriptProves": ["point: what the session transcript directly demonstrates", "..."],
-    "whatStillNotProven": ["gap: what was not verified or remains uncertain", "..."]
   },
   "proof": {
     "evidenceTable": [
