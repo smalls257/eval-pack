@@ -137,6 +137,87 @@ class TestFrictionContract(unittest.TestCase):
             self.assertTrue(gaps, "expected the render-time gate to refuse an off-taxonomy type")
             self.assertTrue(any("not-a-real-category" in g for g in gaps))
 
+    def test_entry_missing_type_is_gap(self):
+        with tempfile.TemporaryDirectory() as d:
+            _pack(d, {"frictionCategories": ["tooling", "docs"]}, analysis={"title": "t"})
+            _write_friction_lens(d, [{"friction": "x", "impact": "y"}])  # no type key
+            gaps = validate_contracts.collect_gaps(d)
+            self.assertTrue(any("friction entry type" in g for g in gaps))
+
+
+class TestFrictionMalformedLens(unittest.TestCase):
+    """lenses/friction.json is LLM-authored — the gate now reads it, so any shape it can
+    emit (top-level list, non-list entries, non-dict entry, null entries) must yield a
+    deterministic GAP or a clean no-op, never an uncaught exception. A crash here would be
+    a Black Box: render_html's collect_gaps call has no try/except, so an AttributeError
+    would die with a raw traceback and NO CONTRACT: line — the opposite of a clean gate."""
+
+    def _write_raw_friction(self, pack_dir, payload_json):
+        lens_dir = Path(pack_dir) / "lenses"
+        lens_dir.mkdir(parents=True, exist_ok=True)
+        (lens_dir / "friction.json").write_text(payload_json, encoding="utf-8")
+
+    def _cfg(self, d):
+        _pack(d, {"frictionCategories": ["tooling", "docs"]}, analysis={"title": "t"})
+
+    def test_top_level_list_is_gap_not_crash(self):
+        with tempfile.TemporaryDirectory() as d:
+            self._cfg(d)
+            self._write_raw_friction(d, json.dumps([{"type": "docs"}]))
+            gaps = validate_contracts._friction_gaps(config.read_config(), d)
+            self.assertTrue(gaps)
+            self.assertTrue(any("malformed" in g for g in gaps))
+
+    def test_entries_dict_is_gap_not_crash(self):
+        with tempfile.TemporaryDirectory() as d:
+            self._cfg(d)
+            self._write_raw_friction(d, json.dumps({"entries": {"type": "docs"}}))
+            gaps = validate_contracts._friction_gaps(config.read_config(), d)
+            self.assertTrue(gaps)
+            self.assertTrue(any("entries" in g and "list" in g for g in gaps))
+
+    def test_string_entry_is_gap_not_crash(self):
+        with tempfile.TemporaryDirectory() as d:
+            self._cfg(d)
+            self._write_raw_friction(d, json.dumps({"entries": ["just a string"]}))
+            gaps = validate_contracts._friction_gaps(config.read_config(), d)
+            self.assertTrue(gaps)
+            self.assertTrue(any("entry is not an object" in g for g in gaps))
+
+    def test_entries_null_is_no_gap(self):
+        with tempfile.TemporaryDirectory() as d:
+            self._cfg(d)
+            self._write_raw_friction(d, json.dumps({"entries": None}))
+            self.assertEqual(validate_contracts._friction_gaps(config.read_config(), d), [])
+
+    def test_malformed_shapes_never_raise_through_collect_gaps(self):
+        for payload in ('[{"type": "docs"}]', '{"entries": {"type": "x"}}',
+                        '{"entries": ["str"]}', '{"entries": 42}', '"just a string"'):
+            with tempfile.TemporaryDirectory() as d:
+                self._cfg(d)
+                self._write_raw_friction(d, payload)
+                try:
+                    gaps = validate_contracts.collect_gaps(d)
+                except Exception as exc:  # noqa: BLE001 — the whole point is: it must NOT raise
+                    self.fail("collect_gaps raised on malformed friction {!r}: {}".format(payload, exc))
+                self.assertTrue(gaps, "malformed friction {!r} should yield a gap".format(payload))
+
+
+class TestFrictionGateUnderDisabledAnalysis(unittest.TestCase):
+    """The friction gate's data source is the LENS (Step 4.7 reads analysisLenses
+    independently of the evaluator's analysis:false), so it must run REGARDLESS of the
+    evaluator's `disabled` flag. Guarding it behind `disabled` would ship a bad taxonomy
+    un-gated whenever analysis is off — a Silent Fallback."""
+
+    def test_disabled_analysis_still_gates_bad_friction_type(self):
+        with tempfile.TemporaryDirectory() as d:
+            _pack(d, {"frictionCategories": ["tooling", "docs"]},
+                  analysis={"title": "disabled", "disabled": True})
+            _write_friction_lens(d, [{"friction": "x", "impact": "y", "type": "vibes"}])
+            gaps = validate_contracts.collect_gaps(d)
+            self.assertTrue(any("vibes" in g for g in gaps),
+                            "friction gate must fire even when analysis is disabled")
+
 
 class TestRetrospectiveContract(unittest.TestCase):
     def test_missing_answer_is_gap(self):

@@ -49,15 +49,31 @@ def _friction_gaps(cfg, pack_dir):
     'lensFailed' red flag from assemble_lenses.py, so gating it again here would be a
     duplicate, confusing signal for the same root cause (Silent Fallback in reverse:
     don't manufacture a second failure mode for one absence).
+
+    The file is LLM-authored, so every access is type-guarded: a non-dict payload,
+    non-list `entries`, or non-dict entry each yields a deterministic GAP, never an
+    exception. render_html's collect_gaps call has no try/except, so a raw AttributeError
+    here would kill the render gate with a traceback and NO 'CONTRACT:' line — a Black Box
+    where a clean, attributable gate is the whole point.
     """
-    gaps = []
     cats = set(cfg.get("frictionCategories") or [])
     if not cats:
-        return gaps
+        return []
     friction = _read(pack_dir, "lenses/friction.json")
     if friction is None:
-        return gaps
-    for item in friction.get("entries") or []:
+        return []  # absent lens is a legitimate no-op (see docstring)
+    if not isinstance(friction, dict):
+        return ["lenses/friction.json is malformed (expected an object with 'entries')"]
+    entries = friction.get("entries")
+    if entries is None:
+        return []
+    if not isinstance(entries, list):
+        return ["lenses/friction.json 'entries' must be a list"]
+    gaps = []
+    for item in entries:
+        if not isinstance(item, dict):
+            gaps.append("lenses/friction.json entry is not an object")
+            continue
         t = item.get("type")
         if t not in cats:
             gaps.append("friction entry type {!r} not in frictionCategories {}".format(
@@ -182,10 +198,15 @@ def collect_gaps(pack_dir):
     analysis = _read(pack_dir, "analysis.json") or {}
     results = _read(pack_dir, "test-results.json") or {}
 
+    # retrospective/rubric are EVALUATOR-owned — they only exist when analysis ran, so
+    # they stay behind the `disabled` guard. friction is LENS-owned: Step 4.7 dispatches
+    # analysisLenses independently of analysis:false, so the friction lens (and a bad
+    # taxonomy) can exist even with analysis disabled — its gate must run unconditionally,
+    # alongside the command and repo-coverage gates, or a bad type ships un-gated.
     if not analysis.get("disabled"):
-        gaps.extend(_friction_gaps(cfg, pack_dir))
         gaps.extend(_retrospective_gaps(cfg, analysis))
         gaps.extend(_rubric_gaps(cfg, analysis))
+    gaps.extend(_friction_gaps(cfg, pack_dir))
     gaps.extend(_command_gaps(cfg, results))
     gaps.extend(_repo_coverage_gaps(pack_dir))
     return gaps

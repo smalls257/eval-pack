@@ -162,9 +162,6 @@ cat > "$TEST_DIR/$SESSION_ID/analysis.json" << 'JSON'
     "narrative": "No new test files were added. The midnight edge case was covered by an existing parameterized test that was previously skipped.",
     "newTests": []
   },
-  "frictionLog": [
-    {"friction": "Missing boundary test for midnight edge case", "evidence": "User had to point out the failing edge case after agent claimed completion", "type": "docs", "resolution": "Edge case fixed, but test was user-identified not agent-identified"}
-  ],
   "diff": {
     "artifactStatus": { "hasDiffStat": false, "hasDiffPatch": false, "note": "No diff artifacts captured in this test run" },
     "filesChanged": [{"file": "login.ts", "description": "Fixed token expiry comparison operator"}],
