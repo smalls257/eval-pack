@@ -20,7 +20,8 @@
     "./agents/eval-pack-evaluator.md",
     "./agents/lenses/requirement-drift.md",
     "./agents/lenses/verification-rigor.md",
-    "./agents/lenses/review.md"
+    "./agents/lenses/review.md",
+    "./agents/lenses/business-risk.md"
   ],
   "userConfig": {
     "pythonExecutable": {

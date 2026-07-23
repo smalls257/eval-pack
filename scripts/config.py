@@ -46,7 +46,10 @@ DEFAULTS = {
     # Path to an override evaluator prompt; empty uses the bundled default.
     "evaluatorPromptFile": "",
     # Extension lenses: list of {"skill": str, "role": "contributor"|"scorer"}.
-    "analysisLenses": [{"skill": "review", "role": "contributor"}],
+    "analysisLenses": [
+        {"skill": "review", "role": "contributor"},
+        {"skill": "business-risk", "role": "contributor"},
+    ],
     # How scorer-lens scores combine with the core verdict (see AGGREGATION_RULES).
     "verdictAggregation": "core",
     # Presentation. Defaults preserve today's look (brand "Eval Pack", dark theme, "extension").

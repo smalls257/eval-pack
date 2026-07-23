@@ -71,11 +71,8 @@ Schema for `analysis.json`:
     "completionStatus": { "label": "Completion below", "color": "green", "notes": "One sentence on what was achieved" },
     "confidencePercent": 85,
     "confidenceNotes": "One sentence explaining the confidence score — what evidence supports it or limits it",
-    "businessRisk": { "level": "low|medium|high", "notes": "One sentence on why this risk level was assigned" },
-    "riskMitigation": ["Step to reduce risk", "Step to reduce risk"],
     "bestProof": { "badges": ["Screenshots", "Passing"], "note": "One sentence on strongest evidence type" },
-    "strongestEvidence": "One sentence naming the single most convincing proof point",
-    "mainRisk": "One sentence on the biggest remaining uncertainty or gap"
+    "strongestEvidence": "One sentence naming the single most convincing proof point"
   },
   "summary": {
     "whatChanged": ["bullet: what changed in the extension/codebase", "..."],

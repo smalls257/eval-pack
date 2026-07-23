@@ -372,9 +372,11 @@ never your own reasoning.
 - `verification-rigor` (scorer) — were success claims backed by observed evidence?
 - `review` (contributor) — adversarial review findings: bugs/risks in the delivered work,
   most-severe-first. Default-on in `analysisLenses` (see the config defaults).
+- `business-risk` (contributor) — business/stakeholder risk of the delivered work: level,
+  mitigation steps, and the biggest remaining uncertainty. Default-on in `analysisLenses`.
 
-> More first-party lenses (`business-risk`, `friction`) are planned; dispatch any lens present
-> in `analysisLenses` the same way, using its `skill` as the `subagent_type` suffix.
+> More first-party lenses (`friction`) are planned; dispatch any lens present in
+> `analysisLenses` the same way, using its `skill` as the `subagent_type` suffix.
 
 > Run the `<skill>` lens. PACK_DIR is `${ABS_PACK_DIR}`. REPO_ROOT is `${REPO_ROOT}`. DIFF_BASE is
 > `${DIFF_BASE}`. Read the artifacts, then write your result to

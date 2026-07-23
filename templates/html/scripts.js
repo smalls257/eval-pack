@@ -114,9 +114,19 @@ function renderPageHeader(data) {
   }
 }
 
+// Pure lookup: the business-risk lens is a contributor named "business-risk" in
+// data.lenses.contributors. Kept separate from the DOM-touching renderer so it is
+// unit-testable without a document shim (Airplane Test: an absent lens must yield null,
+// not throw — the three highlight cards it feeds then degrade to hidden).
+function businessRiskFrom(lenses) {
+  const contributors = (lenses && lenses.contributors) || [];
+  return contributors.find(c => c.skill === 'business-risk') || null;
+}
+
 function renderHighlights(analysis, lenses) {
   const h = (analysis || {}).highlights || {};
   const cs = h.completionStatus || {};
+  const biz = businessRiskFrom(lenses) || {};
 
   // Completion card
   const card = document.getElementById('completion-card');
@@ -153,7 +163,6 @@ function renderHighlights(analysis, lenses) {
   const bizCard = document.getElementById('biz-risk-card');
   const bizVal = document.getElementById('biz-risk-value');
   const bizNotes = document.getElementById('biz-risk-notes');
-  const biz = h.businessRisk || {};
   if (bizCard && biz.level) {
     const lvl = /^(low|medium|high)$/.test(biz.level) ? biz.level : 'medium';
     bizCard.className = `highlight-card biz-risk-card biz-risk-${lvl}`;
@@ -167,7 +176,7 @@ function renderHighlights(analysis, lenses) {
   // Risk mitigation card
   const mitCard = document.getElementById('mitigation-card');
   const mitVal = document.getElementById('mitigation-value');
-  const steps = h.riskMitigation || [];
+  const steps = biz.mitigation || [];
   if (mitCard && steps.length > 0) {
     mitCard.style.display = '';
     if (mitVal) mitVal.innerHTML = steps.map(s =>
@@ -181,7 +190,7 @@ function renderHighlights(analysis, lenses) {
   const riskVal = document.getElementById('risk-value');
   const riskCard = document.getElementById('risk-card');
   if (riskVal) {
-    const risk = h.mainRisk || '';
+    const risk = biz.mainRisk || '';
     if (risk) {
       riskVal.textContent = risk;
       if (riskCard) riskCard.style.display = '';
@@ -232,9 +241,10 @@ function renderVerdict(data) {
   if (text) text.textContent = summaryText;
 
   const h = (data.analysis || {}).highlights || {};
+  const biz = businessRiskFrom(data.lenses);
   const highlightParts = [
     h.strongestEvidence,
-    h.mainRisk ? 'Risk: ' + h.mainRisk : null
+    biz && biz.mainRisk ? 'Risk: ' + biz.mainRisk : null
   ].filter(Boolean);
   if (detail && highlightParts.length > 0) {
     detail.textContent = highlightParts.join(' · ');
@@ -1151,7 +1161,7 @@ function renderLensTemplate(tpl, data) {
 
 // Contributors that render in their own dedicated tab/table — excluded from the generic
 // Lenses list to avoid double-rendering. Grows as dimensions are extracted into lenses.
-const DEDICATED_CONTRIBUTORS = new Set(['review']);
+const DEDICATED_CONTRIBUTORS = new Set(['review', 'business-risk']);
 
 function renderLenses(data) {
   const lenses = data.lenses;
@@ -1300,5 +1310,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, businessRiskFrom };
 }
