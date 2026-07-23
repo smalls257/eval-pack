@@ -1149,6 +1149,10 @@ function renderLensTemplate(tpl, data) {
   return out.replace(/\{\{([\w.]+)\}\}/g, (m, k) => escapeHtml(lensValueText(lensPath(data, k))));
 }
 
+// Contributors that render in their own dedicated tab/table — excluded from the generic
+// Lenses list to avoid double-rendering. Grows as dimensions are extracted into lenses.
+const DEDICATED_CONTRIBUTORS = new Set(['review']);
+
 function renderLenses(data) {
   const lenses = data.lenses;
   const tabBtn = document.querySelector('.tab-btn[data-panel="lenses"]');
@@ -1186,9 +1190,10 @@ function renderLenses(data) {
     parts.push(html`<div class="lens-card"><div class="lens-head"><span class="lens-meta">scorer · ${s.skill}</span><span class="lens-score">${lensScore(s.score)}</span></div><p class="lens-rationale">${s.rationale}</p>${safe(findings ? html`<ul class="lens-findings">${safe(findings)}</ul>` : '')}</div>`);
   });
   (lenses.contributors || []).forEach(c => {
-    // "review" renders in its own dedicated Review Findings table (renderReviewFindings);
-    // showing it again here would double-render the same contributor.
-    if (c.skill === 'review') return;
+    // Contributors with a dedicated render site (their own tab/table) must NOT also
+    // appear in the generic Lenses list — that would double-render. As more dimensions
+    // become dedicated lenses (business-risk, friction), add their skill to this set.
+    if (DEDICATED_CONTRIBUTORS.has(c.skill)) return;
     if (c.templateHtml) {
       parts.push(customCard(c));
       return;
