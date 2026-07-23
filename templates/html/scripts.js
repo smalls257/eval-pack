@@ -712,24 +712,30 @@ function renderTestsNew(analysis) {
   }
 }
 
-function renderReviewFindings(analysis) {
+// Pure lookup: the review lens is a contributor named "review" in data.lenses.contributors.
+// Kept separate from the DOM-touching renderer so it is unit-testable without a document shim
+// (Airplane Test for the render path: an absent/empty lens must yield an empty list, not throw).
+function reviewFindingsFrom(lenses) {
+  const contributors = (lenses && lenses.contributors) || [];
+  const review = contributors.find(c => c.skill === 'review');
+  return (review && review.findings) || [];
+}
+
+function renderReviewFindings(data) {
   const tbody = document.getElementById('review-findings-tbody');
   if (!tbody) return;
-  const rows = analysis.reviewFindings || [];
+  const rows = reviewFindingsFrom(data && data.lenses);
   if (rows.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No review findings recorded.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No review findings recorded.</td></tr>';
     return;
   }
   tbody.innerHTML = rows.map(r => {
-    const sev = r.severity || 'suggestion';
+    const sev = r.severity || 'minor';
     return html`<tr>
       <td>${safe(renderMarkdown(r.issue))}</td>
       <td><span class="review-severity review-severity-${sev}">${sev}</span></td>
       <td>${r.foundIn || '—'}</td>
       <td>${safe(renderMarkdown(r.resolution || '—'))}</td>
-      <td>${safe(r.commit ? (safeUrl(EVAL_CONFIG.commitUrlTemplate ? EVAL_CONFIG.commitUrlTemplate.replace('{sha}', r.commit) : '')
-        ? html`<a class="review-commit" href="${safeUrl(EVAL_CONFIG.commitUrlTemplate.replace('{sha}', r.commit))}">${r.commit}</a>`
-        : html`<code class="review-commit">${r.commit}</code>`) : '—')}</td>
     </tr>`;
   }).join('');
 }
@@ -1180,6 +1186,9 @@ function renderLenses(data) {
     parts.push(html`<div class="lens-card"><div class="lens-head"><span class="lens-meta">scorer · ${s.skill}</span><span class="lens-score">${lensScore(s.score)}</span></div><p class="lens-rationale">${s.rationale}</p>${safe(findings ? html`<ul class="lens-findings">${safe(findings)}</ul>` : '')}</div>`);
   });
   (lenses.contributors || []).forEach(c => {
+    // "review" renders in its own dedicated Review Findings table (renderReviewFindings);
+    // showing it again here would double-render the same contributor.
+    if (c.skill === 'review') return;
     if (c.templateHtml) {
       parts.push(customCard(c));
       return;
@@ -1207,7 +1216,7 @@ function renderSession(data) {
   renderProof(analysis);
   renderTestsExisting(analysis);
   renderTestsNew(analysis);
-  renderReviewFindings(analysis);
+  renderReviewFindings(data);
   renderFriction(analysis);
   renderDiff(analysis);
   renderTools(data.tools);
@@ -1286,5 +1295,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom };
 }

@@ -183,7 +183,7 @@ class TestLensKeys(unittest.TestCase):
     def test_new_defaults(self):
         with tempfile.TemporaryDirectory() as d:
             cfg = config.load_config(d, env={})
-            self.assertEqual(cfg["analysisLenses"], [])
+            self.assertEqual(cfg["analysisLenses"], [{"skill": "review", "role": "contributor"}])
             self.assertEqual(cfg["verdictAggregation"], "core")
 
     def test_unknown_aggregation_rejected(self):

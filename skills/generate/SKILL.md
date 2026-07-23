@@ -370,6 +370,11 @@ never your own reasoning.
 
 - `requirement-drift` (scorer) — did the delivered work match what the user originally asked?
 - `verification-rigor` (scorer) — were success claims backed by observed evidence?
+- `review` (contributor) — adversarial review findings: bugs/risks in the delivered work,
+  most-severe-first. Default-on in `analysisLenses` (see the config defaults).
+
+> More first-party lenses (`business-risk`, `friction`) are planned; dispatch any lens present
+> in `analysisLenses` the same way, using its `skill` as the `subagent_type` suffix.
 
 > Run the `<skill>` lens. PACK_DIR is `${ABS_PACK_DIR}`. REPO_ROOT is `${REPO_ROOT}`. DIFF_BASE is
 > `${DIFF_BASE}`. Read the artifacts, then write your result to

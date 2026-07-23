@@ -3,8 +3,8 @@ import assert from 'node:assert';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 global.window = { __EVAL_PACK_TEST__: true };
-const { effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText } =
-  require('../templates/html/scripts.js');
+const { effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText,
+  reviewFindingsFrom } = require('../templates/html/scripts.js');
 
 test('effectiveConfidence uses finalScore when a non-core rule ran scorers', () => {
   const analysis = { highlights: { confidencePercent: 90 } };
@@ -61,4 +61,24 @@ test('renderLensTemplate unknown fields empty, dot paths work', () => {
 
 test('renderLensTemplate non-array section renders empty', () => {
   assert.strictEqual(renderLensTemplate('{{#x}}boom{{/x}}', { x: 'not-array' }), '');
+});
+
+test('reviewFindingsFrom reads findings from the review contributor', () => {
+  const lenses = {
+    contributors: [
+      { skill: 'other', role: 'contributor', title: 'Other', findings: [{ x: 1 }] },
+      { skill: 'review', role: 'contributor', title: 'Review Findings', findings: [
+        { severity: 'critical', issue: 'off-by-one', foundIn: 'a.py' },
+      ] },
+    ],
+  };
+  assert.deepStrictEqual(reviewFindingsFrom(lenses), [
+    { severity: 'critical', issue: 'off-by-one', foundIn: 'a.py' },
+  ]);
+});
+
+test('reviewFindingsFrom degrades to empty list when the lens is absent (Airplane Test)', () => {
+  assert.deepStrictEqual(reviewFindingsFrom(null), []);
+  assert.deepStrictEqual(reviewFindingsFrom({ contributors: [] }), []);
+  assert.deepStrictEqual(reviewFindingsFrom({ contributors: [{ skill: 'other', findings: [{ x: 1 }] }] }), []);
 });

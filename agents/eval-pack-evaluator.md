@@ -103,9 +103,6 @@ Schema for `analysis.json`:
     "narrative": "Paragraph describing any new tests added.",
     "newTests": ["test name or description", "..."]
   },
-  "reviewFindings": [
-    {"issue": "Short description of what the reviewer found", "severity": "critical|important|suggestion", "foundIn": "Task N — filename.py or section name", "resolution": "How it was fixed", "commit": "commit message or short SHA (optional)"}
-  ],
   "frictionLog": [
     {"friction": "what slowed things down", "evidence": "specific transcript moment or pattern", "type": "MUST be one of eval-config.json frictionCategories — a validator rejects anything else", "resolution": "how it was resolved or what the impact was"}
   ],

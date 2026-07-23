@@ -211,4 +211,5 @@ class TestLensTemplateGate(unittest.TestCase):
             r = _run([root, pack])
             self.assertEqual(r.returncode, 0, r.stderr)
             cfg = json.loads((Path(pack) / "eval-config.json").read_text())
-            self.assertEqual(cfg["analysisLenses"][0]["templateHtml"], "<b>{{score}}</b>")
+            lenses = {lens["skill"]: lens for lens in cfg["analysisLenses"]}
+            self.assertEqual(lenses["s"]["templateHtml"], "<b>{{score}}</b>")

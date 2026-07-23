@@ -123,7 +123,12 @@
           "role"
         ]
       },
-      "default": [],
+      "default": [
+        {
+          "skill": "review",
+          "role": "contributor"
+        }
+      ],
       "description": "Extension lenses that contribute analysis or feed the verdict."
     },
     "verdictAggregation": {
