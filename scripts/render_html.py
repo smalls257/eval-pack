@@ -231,6 +231,87 @@ def report_config(cfg):
     return {k: cfg[k] for k in _REPORT_CONFIG_KEYS}
 
 
+# Deterministic metadata for known single-file artifacts: filename -> {name, type, description}.
+# "list the pack's files with a type" is mechanical fact-gathering, not judgment — it belongs
+# in code, not in the evaluator's LLM dispatch (Filter: the evaluator's prose should not be
+# doing a script's job).
+_KNOWN_ARTIFACT_FILES = {
+    "test-results.json": {
+        "name": "Test Results", "type": "tests",
+        "description": "Recorded test commands and verdict",
+    },
+    "metrics.json": {
+        "name": "Metrics", "type": "data",
+        "description": "Token, turn, and file-change statistics for the session",
+    },
+    "patterns.json": {
+        "name": "Patterns", "type": "data",
+        "description": "Heuristic flags — false completions, retries, scope drift",
+    },
+    "tools.json": {
+        "name": "Tools", "type": "data",
+        "description": "Tools and skills invoked during the session",
+    },
+    "lenses.json": {
+        "name": "Lenses", "type": "data",
+        "description": "Scorer and contributor lens outputs",
+    },
+}
+
+
+def build_artifact_inventory(pack_dir, include_transcript=True):
+    """Enumerate the pack's actual evidence files and return `[{name, path, type,
+    description}]` — deterministically, from what is on disk. Replaces the evaluator's
+    former `artifactInventory` (an LLM was being asked to do a directory listing's job;
+    Filter: judgment prose belongs to the evaluator, mechanical facts belong to code).
+
+    Paths are relative to the pack root, matching the template's existing convention
+    (e.g. "transcript.html", "screenshots/foo.png").
+    """
+    pack_dir = Path(pack_dir)
+    items = []
+
+    transcript_html = pack_dir / "transcript.html"
+    if include_transcript and transcript_html.is_file():
+        items.append({
+            "name": "Transcript",
+            "path": "transcript.html",
+            "type": "transcript",
+            "description": "Rendered conversation — commands, outputs, failures",
+        })
+
+    screenshots_dir = pack_dir / "screenshots"
+    if screenshots_dir.is_dir():
+        for f in sorted(screenshots_dir.glob("*.png")):
+            items.append({
+                "name": f.name,
+                "path": f"screenshots/{f.name}",
+                "type": "screenshot",
+                "description": "Browser screenshot captured during the session",
+            })
+
+    logs_dir = pack_dir / "logs"
+    if logs_dir.is_dir():
+        for f in sorted(logs_dir.glob("*.log")):
+            items.append({
+                "name": f.name,
+                "path": f"logs/{f.name}",
+                "type": "log",
+                "description": "Captured command/build output",
+            })
+
+    for filename, meta in _KNOWN_ARTIFACT_FILES.items():
+        if (pack_dir / filename).is_file():
+            items.append({
+                "name": meta["name"],
+                "path": filename,
+                "type": meta["type"],
+                "description": meta["description"],
+            })
+
+    return items
+
+
 def build_directory_structure(pack_dir, template_dir, user_template_dir=None):
     """Create pack layout; copy templates project-first (user file wins, bundled fills gaps)."""
     pack_dir.mkdir(parents=True, exist_ok=True)
@@ -625,6 +706,7 @@ def main():
     }
 
     transcript_jsonl = pack_dir / "transcript.jsonl"
+    include_transcript = bool(cfg["includeTranscript"])
     data = {
         "sessionId": args.session_id,
         "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -634,6 +716,7 @@ def main():
         "testResults": read_json(pack_dir / "test-results.json"),
         "tools": read_json(pack_dir / "tools.json"),
         "lenses": read_json(pack_dir / "lenses.json"),
+        "artifactInventory": build_artifact_inventory(pack_dir, include_transcript),
         "rounds": list(prev_data.get("rounds") or []) + [new_round],
         "transcript": load_jsonl(transcript_jsonl) if transcript_jsonl.is_file() else [],
         "evalConfig": report_config(cfg),
@@ -649,7 +732,6 @@ def main():
     # tools.json, transcript.jsonl, …) before zip/publish. transcript.html was masked at source.
     redact_pack(pack_dir, redaction_rules)
 
-    include_transcript = bool(cfg["includeTranscript"])
     write_zip(pack_dir, zip_path, args.session_id, include_transcript)
 
     # Gate 1 (halts): the zip is the durable artifact. If it doesn't reopen clean and

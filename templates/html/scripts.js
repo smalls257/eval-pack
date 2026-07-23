@@ -630,13 +630,15 @@ function renderSummary(analysis) {
   if (notProven) notProven.innerHTML = makeList(s.whatStillNotProven);
 }
 
-function renderProof(analysis) {
+function renderProof(data) {
+  const analysis = data.analysis || {};
   const proof = analysis.proof || {};
 
-  // Artifact inventory — index.html has <ul id="artifact-inventory">
+  // Artifact inventory — deterministic (built by render_html.py from the pack's actual
+  // files, not the evaluator), so index.html reads it off data.artifactInventory.
   const invEl = document.getElementById('artifact-inventory');
   if (invEl) {
-    const items = proof.artifactInventory || [];
+    const items = data.artifactInventory || [];
     if (items.length === 0) {
       invEl.innerHTML = '<li class="empty-state">No artifacts recorded.</li>';
     } else {
@@ -1237,7 +1239,7 @@ function renderSession(data) {
   renderStats(data);
   renderFlags(data);
   renderSummary(analysis);
-  renderProof(analysis);
+  renderProof(data);
   renderTestsExisting(analysis);
   renderTestsNew(analysis);
   renderReviewFindings(data);
