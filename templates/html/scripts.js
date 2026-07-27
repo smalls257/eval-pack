@@ -853,28 +853,28 @@ function userImprovementsFrom(lenses) {
   return contributors.find(c => c.skill === 'user-improvements') || null;
 }
 
+// One improvement item — a plain string or a {title, detail} record. Shared by both the
+// repo and user improvement lists so the string-vs-record handling lives in one place.
+function improvementItem(item) {
+  if (typeof item === 'string') return html`<li>${safe(renderMarkdown(item))}</li>`;
+  return html`<li><strong>${item.title || ''}</strong>${safe(item.detail ? `<br><span class="improvement-detail">${renderMarkdown(item.detail)}</span>` : '')}</li>`;
+}
+
+function improvementList(items) {
+  return items.length > 0
+    ? items.map(improvementItem).join('')
+    : '<li class="empty-state">No improvements recorded.</li>';
+}
+
 function renderImprovements(data) {
   const repoEl = document.getElementById('repo-improvements-list');
   if (repoEl) {
-    const items = repoImprovementsFrom(data && data.lenses);
-    repoEl.innerHTML = items.length > 0
-      ? items.map(item => {
-          if (typeof item === 'string') return html`<li>${safe(renderMarkdown(item))}</li>`;
-          return html`<li><strong>${item.title || ''}</strong>${safe(item.detail ? `<br><span class="improvement-detail">${renderMarkdown(item.detail)}</span>` : '')}</li>`;
-        }).join('')
-      : '<li class="empty-state">No improvements recorded.</li>';
+    repoEl.innerHTML = improvementList(repoImprovementsFrom(data && data.lenses));
   }
-
   const userEl = document.getElementById('user-improvements-list');
   if (userEl) {
     const userLens = userImprovementsFrom(data && data.lenses);
-    const items = (userLens && userLens.items) || [];
-    userEl.innerHTML = items.length > 0
-      ? items.map(item => {
-          if (typeof item === 'string') return html`<li>${safe(renderMarkdown(item))}</li>`;
-          return html`<li><strong>${item.title || ''}</strong>${safe(item.detail ? `<br><span class="improvement-detail">${renderMarkdown(item.detail)}</span>` : '')}</li>`;
-        }).join('')
-      : '<li class="empty-state">No improvements recorded.</li>';
+    userEl.innerHTML = improvementList((userLens && userLens.items) || []);
   }
 }
 
