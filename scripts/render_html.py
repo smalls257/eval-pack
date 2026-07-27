@@ -716,6 +716,10 @@ def main():
         "testResults": read_json(pack_dir / "test-results.json"),
         "tools": read_json(pack_dir / "tools.json"),
         "lenses": read_json(pack_dir / "lenses.json"),
+        "repoDiffs": read_json(
+            pack_dir / "repo-diffs.json",
+            {"repos": [], "skipped": [], "errors": []},
+        ),
         "artifactInventory": build_artifact_inventory(pack_dir, include_transcript),
         "rounds": list(prev_data.get("rounds") or []) + [new_round],
         "transcript": load_jsonl(transcript_jsonl) if transcript_jsonl.is_file() else [],

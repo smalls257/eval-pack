@@ -820,63 +820,53 @@ function renderFriction(data) {
   ).join('');
 }
 
-function renderDiff(analysis) {
-  const diff = analysis.diff || {};
+// Pure lookup: the deterministic repo diff surface lives in data.repoDiffs (loaded from
+// repo-diffs.json by render_html). Kept separate from the DOM renderer so it is unit-testable
+// without a document shim (Airplane Test: an absent artifact must yield empty buckets, not
+// throw — the Diff tab then degrades to its empty-state instead of blanking the report).
+function diffReposFrom(data) {
+  const rd = (data && data.repoDiffs) || {};
+  return { repos: rd.repos || [], skipped: rd.skipped || [], errors: rd.errors || [] };
+}
 
-  // Artifact status badges
-  const statusEl = document.getElementById('diff-artifact-status');
-  if (statusEl) {
-    const st = diff.artifactStatus || {};
-    const badges = [
-      { label: 'Diff stat', key: 'hasDiffStat' },
-      { label: 'Diff patch', key: 'hasDiffPatch' }
-    ];
-    let badgeHtml = badges.map(b => {
-      const present = st[b.key];
-      return html`<span class="diff-badge ${present ? 'present' : 'absent'}">${b.label}: ${present ? 'Yes' : 'No'}</span>`;
-    }).join('');
-    if (st.note) badgeHtml += html`<p class="diff-note">${safe(renderMarkdown(st.note))}</p>`;
-    statusEl.innerHTML = badgeHtml;
+function renderDiff(data) {
+  const body = document.getElementById('diff-body');
+  if (!body) return;
+
+  const { repos, skipped, errors } = diffReposFrom(data);
+  if (repos.length === 0 && skipped.length === 0 && errors.length === 0) {
+    body.innerHTML = '<p class="empty-state">No repo diffs recorded.</p>';
+    return;
   }
 
-  // Files changed list
-  const filesEl = document.getElementById('diff-files-changed');
-  if (filesEl) {
-    const files = diff.filesChanged || [];
-    if (files.length === 0) {
-      filesEl.innerHTML = '<li class="empty-state">No files recorded.</li>';
-    } else {
-      filesEl.innerHTML = files.map(f => {
-        const path = typeof f === 'string' ? f : (f.file || '');
-        const desc = typeof f === 'object' ? (f.description || '') : '';
-        return html`<li>${safe(pathLink(path))}${safe(desc ? ` — ${renderMarkdown(desc)}` : '')}</li>`;
-      }).join('');
-    }
+  let out = '';
+
+  for (const repo of repos) {
+    const files = repo.files || [];
+    const filesHtml = files.length === 0
+      ? html`<li class="empty-state">No files recorded.</li>`
+      : files.map(f => html`<li>${safe(pathLink(f))}</li>`).join('');
+    const statHtml = repo.stat
+      ? html`<pre class="code-block">${repo.stat}</pre>`
+      : '';
+    out += html`<div class="diff-repo">
+      <h3 class="section-subheading">${repo.repoRoot} @ ${repo.branch}</h3>
+      <p class="diff-repo-meta">base ${repo.base} → ${repo.baseResolved ? repo.baseResolved.slice(0, 9) : '?'} · +${repo.insertions} −${repo.deletions} · ${repo.filesChanged} file(s)</p>
+      <ul class="files-changed-list">${safe(filesHtml)}</ul>
+      ${safe(statHtml)}
+    </div>`;
   }
 
-  // Change table
-  const tbody = document.getElementById('diff-change-tbody');
-  if (tbody) {
-    const rows = diff.changeTable || [];
-    if (rows.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No changes recorded.</td></tr>';
-    } else {
-      tbody.innerHTML = rows.map(r =>
-        html`<tr><td>${safe(renderMarkdown(r.area))}</td><td>${safe(renderMarkdown(r.evidenceInTranscript))}</td><td>${safe(renderMarkdown(r.observedEffect))}</td></tr>`
-      ).join('');
-    }
+  for (const s of skipped) {
+    out += html`<p class="empty-state">Skipped: ${s.repoRoot} — ${s.reason}</p>`;
   }
 
-  // Representative commands
-  const cmds = document.getElementById('diff-commands');
-  if (cmds) {
-    const commands = diff.representativeCommands || [];
-    if (commands.length === 0) {
-      cmds.textContent = '# No commands recorded';
-    } else {
-      cmds.textContent = commands.join('\n');
-    }
+  // Never swallow a diff failure — surface it visibly (Sensor).
+  for (const e of errors) {
+    out += html`<div class="lens-fail">diff failed · ${e.repoRoot} — ${e.error}</div>`;
   }
+
+  body.innerHTML = out;
 }
 
 // Pure lookup: the repo-improvements lens is a contributor named "repo-improvements" in
@@ -1373,7 +1363,7 @@ function renderSession(data) {
   renderTests(data);
   renderReviewFindings(data);
   renderFriction(data);
-  renderDiff(analysis);
+  renderDiff(data);
   renderTools(data.tools);
   renderImprovements(data);
   renderPromptPattern(data);
@@ -1450,5 +1440,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom, repoImprovementsFrom, userImprovementsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern, lensTabsFrom };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern, lensTabsFrom };
 }

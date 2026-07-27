@@ -91,12 +91,6 @@ Schema for `analysis.json`:
     {"question": "Configured question, verbatim", "answer": "Your answer."}
   ],
   "rubricApplied": {"band": "rubric band key", "why": "One sentence on why this band applies"},
-  "diff": {
-    "artifactStatus": { "hasDiffStat": false, "hasDiffPatch": false, "note": "Why diff artifacts are absent or what they show" },
-    "filesChanged": [{"file": "path/to/file", "description": "what changed and why"}],
-    "changeTable": [{"area": "logical area changed", "evidenceInTranscript": "command or message proving this", "observedEffect": "what the change does"}],
-    "representativeCommands": ["git commit -m ...", "npm test", "..."]
-  },
   "sessionTimeline": [
     "User asked to X — brief neutral description of the opening prompt",
     "Agent and user brainstormed Y — key decisions made",

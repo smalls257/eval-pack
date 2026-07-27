@@ -18,7 +18,7 @@ function makeFakeDocument(ids) {
 }
 
 const { effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText,
-  reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom,
+  reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom, diffReposFrom,
   repoImprovementsFrom, userImprovementsFrom,
   deliveredFrom, unmetFrom, provenFrom, unprovenFrom,
   testResultsSummary, renderImprovements, renderPromptPattern, lensTabsFrom } = require('../templates/html/scripts.js');
@@ -140,6 +140,23 @@ test('frictionEntriesFrom degrades to empty list when the lens is absent (Airpla
   assert.deepStrictEqual(frictionEntriesFrom(null), []);
   assert.deepStrictEqual(frictionEntriesFrom({ contributors: [] }), []);
   assert.deepStrictEqual(frictionEntriesFrom({ contributors: [{ skill: 'other', entries: [{ x: 1 }] }] }), []);
+});
+
+test('diffReposFrom degrades to empty buckets when repoDiffs is absent (Airplane Test)', () => {
+  assert.deepStrictEqual(diffReposFrom(null), { repos: [], skipped: [], errors: [] });
+  assert.deepStrictEqual(diffReposFrom({}), { repos: [], skipped: [], errors: [] });
+  assert.deepStrictEqual(diffReposFrom({ repoDiffs: {} }), { repos: [], skipped: [], errors: [] });
+});
+
+test('diffReposFrom passes through populated repoDiffs buckets', () => {
+  const data = {
+    repoDiffs: {
+      repos: [{ repoRoot: '/r', branch: 'main', base: 'HEAD', baseResolved: 'abc123def456', insertions: 3, deletions: 1, filesChanged: 2, files: ['a.py', 'b.py'], stat: ' a.py | 2 +-' }],
+      skipped: [{ repoRoot: '/s', reason: 'user skipped' }],
+      errors: [{ repoRoot: '/e', base: 'HEAD', error: 'not a git repo' }],
+    },
+  };
+  assert.deepStrictEqual(diffReposFrom(data), data.repoDiffs);
 });
 
 test('repoImprovementsFrom reads items from the repo-improvements contributor', () => {
