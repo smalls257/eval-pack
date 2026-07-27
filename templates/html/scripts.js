@@ -1114,17 +1114,29 @@ function applySections(data) {
   if (!nav) return;
   const btns = Array.from(nav.querySelectorAll('.tab-btn'));
   const actions = nav.querySelector('.tab-nav-actions');
-  const known = order.filter(panel => btns.some(b => b.dataset.panel === panel));
+  // The legacy 'lenses' token now stands for the whole group of dynamically-injected
+  // per-lens tabs (data-panel="lens-*"); it's "known" iff any such button exists.
+  const lensBtns = btns.filter(b => (b.dataset.panel || '').startsWith('lens-'));
+  const isLensGroup = panel => panel === 'lenses';
+  const matchesOrder = b => order.includes(b.dataset.panel) ||
+    (order.includes('lenses') && lensBtns.includes(b));
+  const known = order.filter(panel =>
+    isLensGroup(panel) ? lensBtns.length : btns.some(b => b.dataset.panel === panel));
   // All-unknown list: leave the default nav intact rather than hiding every tab.
   if (!known.length) return;
   btns.forEach(b => {
-    if (!order.includes(b.dataset.panel)) b.style.display = 'none';
+    if (!matchesOrder(b)) b.style.display = 'none';
   });
   known.forEach(panel => {
+    if (isLensGroup(panel)) {
+      // Move the lens buttons as a contiguous group to the 'lenses' token's position.
+      lensBtns.forEach(btn => nav.insertBefore(btn, actions || null));
+      return;
+    }
     const btn = btns.find(b => b.dataset.panel === panel);
     if (btn) nav.insertBefore(btn, actions || null);
   });
-  activatePanel(known[0]);
+  activatePanel(isLensGroup(known[0]) ? (lensBtns[0].dataset.panel) : known[0]);
 }
 
 function renderBranding(data) {
@@ -1238,58 +1250,112 @@ function renderLensTemplate(tpl, data) {
 // Lenses list to avoid double-rendering. Grows as dimensions are extracted into lenses.
 const DEDICATED_CONTRIBUTORS = new Set(['review', 'business-risk', 'friction', 'repo-improvements', 'user-improvements']);
 
+// Slugify a skill name into a stable, id-safe token (fallback 'lens' when empty).
+function lensSlug(skill) {
+  const s = String(skill == null ? '' : skill).toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return s || 'lens';
+}
+
+// Title-case a skill name for a tab label (fallback 'Lens' when empty).
+function lensTabLabel(skill) {
+  const words = String(skill == null ? '' : skill).split(/[-_\s]+/).filter(Boolean)
+    .map(w => w[0].toUpperCase() + w.slice(1));
+  return words.length ? words.join(' ') : 'Lens';
+}
+
+// PURE lookup (separate from the DOM renderer, matching this file's lens idiom): which
+// lenses should each get their own nav tab, and in what order. Scorers first, then
+// non-dedicated contributors (dedicated ones own their hardcoded tabs), then failures.
+// Airplane Test: absent/empty lenses → [], never throws on missing arrays.
+function lensTabsFrom(lenses) {
+  const l = lenses || {};
+  const records = [];
+  (l.scorers || []).forEach(r => records.push({ kind: 'scorer', record: r }));
+  (l.contributors || []).forEach(r => {
+    if (DEDICATED_CONTRIBUTORS.has(r.skill)) return;
+    records.push({ kind: 'contributor', record: r });
+  });
+  (l.failures || []).forEach(r => records.push({ kind: 'failure', record: r }));
+
+  const seen = new Map();  // panelId → count, to de-dupe colliding slugs
+  return records.map(({ kind, record }) => {
+    const id = lensSlug(record.skill);
+    let panelId = 'lens-' + id;
+    const n = (seen.get(panelId) || 0) + 1;
+    seen.set(panelId, n);
+    if (n > 1) panelId = `${panelId}-${n}`;
+    const label = (typeof record.title === 'string' && record.title)
+      ? record.title : lensTabLabel(record.skill);
+    return { id, panelId, label, kind, record };
+  });
+}
+
+// A record with a repo-authored templateHtml renders via the mustache-lite interpolator
+// (markup trusted, values escaped); on interpolation failure fall back to a VISIBLE
+// failure card rather than a blank/broken one.
+function lensCustomCard(rec, headExtra) {
+  try {
+    return html`<div class="lens-card lens-custom"><div class="lens-head"><span class="lens-meta">${rec.role} · ${rec.skill}</span>${safe(headExtra || '')}</div>${safe(renderLensTemplate(rec.templateHtml, rec))}</div>`;
+  } catch (e) {
+    return html`<div class="lens-card lens-fail"><div class="lens-meta">template failed · ${rec.skill}</div><p>${String(e)}</p></div>`;
+  }
+}
+
+// The lens card markup for one tab's panel body — dispatched by kind. Uses the html`` tag
+// (not safe() in plain literals — that stringifies to "[object Object]"). html`` escapes
+// each interpolation, which is what we want for untrusted lens output (skill names,
+// rationales, findings, error text).
+function lensCardMarkup(tab) {
+  const rec = tab.record;
+  if (tab.kind === 'scorer') {
+    if (rec.templateHtml) return lensCustomCard(rec, html`<span class="lens-score">${lensScore(rec.score)}</span>`);
+    const findings = (rec.findings || []).map(f => html`<li>${lensFindingText(f)}</li>`).join('');
+    return html`<div class="lens-card"><div class="lens-head"><span class="lens-meta">scorer · ${rec.skill}</span><span class="lens-score">${lensScore(rec.score)}</span></div><p class="lens-rationale">${rec.rationale}</p>${safe(findings ? html`<ul class="lens-findings">${safe(findings)}</ul>` : '')}</div>`;
+  }
+  if (tab.kind === 'contributor') {
+    if (rec.templateHtml) return lensCustomCard(rec);
+    const findings = (rec.findings || []).map(f => html`<li>${lensFindingText(f)}</li>`).join('');
+    return html`<div class="lens-card"><div class="lens-head"><span class="lens-meta">contributor · ${rec.skill}</span></div><h4>${rec.title}</h4><ul class="lens-findings">${safe(findings)}</ul></div>`;
+  }
+  // failure
+  return html`<div class="lens-card lens-fail"><div class="lens-meta">failed · ${rec.skill}</div><p>${rec.error}</p></div>`;
+}
+
 function renderLenses(data) {
-  const lenses = data.lenses;
-  const tabBtn = document.querySelector('.tab-btn[data-panel="lenses"]');
-  const panel = document.getElementById('panel-lenses');
-  const body = panel ? panel.querySelector('.lens-body') : null;
-  const has = lenses && ((lenses.contributors || []).length || (lenses.scorers || []).length ||
-                         (lenses.failures || []).length);
-  if (!has) {
-    if (tabBtn) tabBtn.style.display = 'none';
-    return;
-  }
-  // Use the html`` tag (not safe() in plain literals — that stringifies to
-  // "[object Object]"). html`` escapes each interpolation, which is what we want for
-  // untrusted lens output (skill names, rationales, findings, error text).
-  const parts = [];
-  if (lenses.finalScore != null) {
-    parts.push(html`<p class="lens-agg">Verdict aggregation — core <strong>${lensScore(lenses.coreScore)}</strong> <code>${lenses.rule}</code> lenses → final <strong>${lensScore(lenses.finalScore)}</strong></p>`);
-  }
-  // A record with a repo-authored templateHtml renders via the mustache-lite interpolator
-  // (markup trusted, values escaped); on interpolation failure fall back to a VISIBLE
-  // failure card rather than a blank/broken one.
-  const customCard = (rec, headExtra) => {
-    try {
-      return html`<div class="lens-card lens-custom"><div class="lens-head"><span class="lens-meta">${rec.role} · ${rec.skill}</span>${safe(headExtra || '')}</div>${safe(renderLensTemplate(rec.templateHtml, rec))}</div>`;
-    } catch (e) {
-      return html`<div class="lens-card lens-fail"><div class="lens-meta">template failed · ${rec.skill}</div><p>${String(e)}</p></div>`;
+  const tabs = lensTabsFrom(data.lenses);
+  const nav = document.getElementById('tab-nav');
+  const actions = nav.querySelector('.tab-nav-actions');
+  const sessionArtifacts = document.getElementById('session-artifacts');
+  const panelsParent = sessionArtifacts.parentNode;
+  // No surfaced lenses → no lens tabs at all (the old code hid an empty shared tab).
+  if (!tabs.length) return;
+
+  tabs.forEach((t, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'tab-btn';
+    btn.dataset.panel = t.panelId;
+    btn.setAttribute('role', 'tab');
+    btn.setAttribute('aria-selected', 'false');
+    btn.textContent = t.label;
+    nav.insertBefore(btn, actions || null);
+
+    const section = document.createElement('section');
+    section.className = 'tab-panel card';
+    section.id = 'panel-' + t.panelId;
+    section.setAttribute('role', 'tabpanel');
+    section.style.display = 'none';
+    let inner = lensCardMarkup(t);
+    // Aggregation transparency — the core X → final Y math must stay visible exactly once;
+    // prepend it to the first generated panel (verbatim markup preserved).
+    if (i === 0 && data.lenses.finalScore != null) {
+      inner = html`<p class="lens-agg">Verdict aggregation — core <strong>${lensScore(data.lenses.coreScore)}</strong> <code>${data.lenses.rule}</code> lenses → final <strong>${lensScore(data.lenses.finalScore)}</strong></p>` + inner;
     }
-  };
-  (lenses.scorers || []).forEach(s => {
-    if (s.templateHtml) {
-      parts.push(customCard(s, html`<span class="lens-score">${lensScore(s.score)}</span>`));
-      return;
-    }
-    const findings = (s.findings || []).map(f => html`<li>${lensFindingText(f)}</li>`).join('');
-    parts.push(html`<div class="lens-card"><div class="lens-head"><span class="lens-meta">scorer · ${s.skill}</span><span class="lens-score">${lensScore(s.score)}</span></div><p class="lens-rationale">${s.rationale}</p>${safe(findings ? html`<ul class="lens-findings">${safe(findings)}</ul>` : '')}</div>`);
+    section.innerHTML = inner;
+    panelsParent.insertBefore(section, sessionArtifacts);
   });
-  (lenses.contributors || []).forEach(c => {
-    // Contributors with a dedicated render site (their own tab/table) must NOT also
-    // appear in the generic Lenses list — that would double-render. As more dimensions
-    // become dedicated lenses (business-risk, friction), add their skill to this set.
-    if (DEDICATED_CONTRIBUTORS.has(c.skill)) return;
-    if (c.templateHtml) {
-      parts.push(customCard(c));
-      return;
-    }
-    const findings = (c.findings || []).map(f => html`<li>${lensFindingText(f)}</li>`).join('');
-    parts.push(html`<div class="lens-card"><div class="lens-head"><span class="lens-meta">contributor · ${c.skill}</span></div><h4>${c.title}</h4><ul class="lens-findings">${safe(findings)}</ul></div>`);
-  });
-  (lenses.failures || []).forEach(f => {
-    parts.push(html`<div class="lens-card lens-fail"><div class="lens-meta">failed · ${f.skill}</div><p>${f.error}</p></div>`);
-  });
-  if (body) body.innerHTML = parts.join('');
+  // Click handlers are NOT attached here: init() wires every .tab-btn after renderSession
+  // (which calls renderLenses) runs, so these injected buttons are present in time.
 }
 
 function renderSession(data) {
@@ -1384,5 +1450,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom, repoImprovementsFrom, userImprovementsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom, repoImprovementsFrom, userImprovementsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern, lensTabsFrom };
 }

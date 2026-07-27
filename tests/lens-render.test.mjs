@@ -21,7 +21,7 @@ const { effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lens
   reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom,
   repoImprovementsFrom, userImprovementsFrom,
   deliveredFrom, unmetFrom, provenFrom, unprovenFrom,
-  testResultsSummary, renderImprovements, renderPromptPattern } = require('../templates/html/scripts.js');
+  testResultsSummary, renderImprovements, renderPromptPattern, lensTabsFrom } = require('../templates/html/scripts.js');
 
 test('effectiveConfidence uses finalScore when a non-core rule ran scorers', () => {
   const analysis = { highlights: { confidencePercent: 90 } };
@@ -252,6 +252,35 @@ test('testResultsSummary tolerates a verdict with no per-test records (no crash,
     summary: '',
     testsRun: [],
   });
+});
+
+test('lensTabsFrom returns [] for absent/empty/dedicated-only lenses', () => {
+  assert.deepStrictEqual(lensTabsFrom(null), []);
+  assert.deepStrictEqual(lensTabsFrom({}), []);
+  assert.deepStrictEqual(
+    lensTabsFrom({ contributors: [{ skill: 'friction', role: 'contributor' }] }), []);
+});
+
+test('lensTabsFrom surfaces scorers then non-dedicated contributors then failures, in order', () => {
+  const tabs = lensTabsFrom({
+    scorers: [{ skill: 'requirement-drift', role: 'scorer', score: 93 },
+              { skill: 'verification-rigor', role: 'scorer', score: 90 }],
+    contributors: [{ skill: 'friction', role: 'contributor' },
+                   { skill: 'my-custom', role: 'contributor', title: 'My Custom' }],
+    failures: [{ skill: 'broken-lens', error: 'boom' }],
+  });
+  assert.deepStrictEqual(tabs.map(t => [t.kind, t.panelId, t.label]), [
+    ['scorer',      'lens-requirement-drift',  'Requirement Drift'],
+    ['scorer',      'lens-verification-rigor', 'Verification Rigor'],
+    ['contributor', 'lens-my-custom',          'My Custom'],
+    ['failure',     'lens-broken-lens',        'Broken Lens'],
+  ]);
+});
+
+test('lensTabsFrom de-dupes colliding panel ids', () => {
+  const tabs = lensTabsFrom({ scorers: [
+    { skill: 'a/b', score: 1 }, { skill: 'a-b', score: 2 } ] });
+  assert.deepStrictEqual(tabs.map(t => t.panelId), ['lens-a-b', 'lens-a-b-2']);
 });
 
 // e2e: render a pack whose lenses include repo-improvements.json and user-improvements.json
