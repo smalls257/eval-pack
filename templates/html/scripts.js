@@ -417,13 +417,21 @@ const openLightbox = (() => {
     img.addEventListener('load', () => { recomputeBaseFit(); applyZoom(); });
     document.addEventListener('mousemove', onDragMove);
     document.addEventListener('mouseup', onDragEnd);
-    window.addEventListener('resize', () => { recomputeBaseFit(); applyZoom(); });
+    // The overlay is hidden (not destroyed) on close, and this window listener lives for
+    // the page's lifetime — early-return when closed so we don't recompute against a
+    // display:none stage (whose clientWidth is 0). Symmetric intent with keydown's removal.
+    window.addEventListener('resize', () => {
+      if (!overlay || overlay.style.display === 'none') return;
+      recomputeBaseFit(); applyZoom();
+    });
     document.body.appendChild(overlay);
   }
 
   // Recompute baseFit from the img's natural size (available once loaded) and the
   // stage's current client box. Safe to call before the image has loaded — falls
   // back to 1 (computeBaseFit's Airplane-Test guard against 0/NaN).
+  // Note: scale/pan intentionally persist across a resize; a rare resize while zoomed+panned
+  // can off-center the image, but overflow:hidden clips it and reset/dblclick recenters.
   function recomputeBaseFit() {
     const img = overlay.querySelector('.lightbox-img');
     const stage = overlay.querySelector('.lightbox-stage');
