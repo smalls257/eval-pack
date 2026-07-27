@@ -50,6 +50,8 @@ DEFAULTS = {
         {"skill": "review", "role": "contributor"},
         {"skill": "business-risk", "role": "contributor"},
         {"skill": "friction", "role": "contributor"},
+        {"skill": "repo-improvements", "role": "contributor"},
+        {"skill": "user-improvements", "role": "contributor"},
         {"skill": "requirement-drift", "role": "scorer"},
         {"skill": "verification-rigor", "role": "scorer"},
     ],

@@ -7,8 +7,8 @@ tools: Read, Write, Bash, Glob, Grep
 You are an independent synthesizer, not a judge of individual dimensions. You did NOT
 perform the work in this session, and you do NOT re-score the dimensions the lenses
 already own (requirement drift, verification rigor, review findings, business risk,
-friction). Those lenses have already read the transcript and written their verdicts to
-`lenses/*.json` — your job is to READ those findings, read `patterns.json` flags, and
+friction, repo improvements, user improvements). Those lenses have already read the
+transcript and written their verdicts to `lenses/*.json` — your job is to READ those findings, read `patterns.json` flags, and
 SYNTHESIZE a single completion/confidence verdict from them. Judge with the configured
 stance (default: a skeptical reviewer) — do not assume success the lens findings and
 flags do not support.
@@ -38,8 +38,9 @@ Then do this:
    - `test-results.json` — verdict and tests run
    - `lenses.json` (or `lenses/*.json` if written per-file) — the scorer and contributor
      lens findings: `requirement-drift` and `verification-rigor` scores/findings, plus
-     `review`, `business-risk`, and `friction` contributor output. These lenses have
-     already judged their dimensions in depth — do not re-derive their verdicts, read them.
+     `review`, `business-risk`, `friction`, `repo-improvements`, and `user-improvements`
+     contributor output. These lenses have already judged their dimensions in depth — do
+     not re-derive their verdicts, read them.
 2. Inspect the actual code change. FIRST check for `repo-diffs.json` in PACK_DIR:
    - **If present**, it lists every repo the session touched that the user confirmed evaluating
      or skipping: `{repos: [{repoRoot, branch, base, insertions, deletions, filesChanged, files,
@@ -96,13 +97,6 @@ Schema for `analysis.json`:
     "changeTable": [{"area": "logical area changed", "evidenceInTranscript": "command or message proving this", "observedEffect": "what the change does"}],
     "representativeCommands": ["git commit -m ...", "npm test", "..."]
   },
-  "repoImprovements": [
-    {"title": "Short title for improvement", "detail": "Full paragraph explaining the improvement and its impact."}
-  ],
-  "userImprovements": [
-    {"title": "Short title for improvement", "detail": "Full paragraph explaining the improvement and its impact."}
-  ],
-  "promptPattern": "Example prompt that would have reduced friction — include file names and context clues that would have front-loaded the right information.",
   "sessionTimeline": [
     "User asked to X — brief neutral description of the opening prompt",
     "Agent and user brainstormed Y — key decisions made",

@@ -833,10 +833,30 @@ function renderDiff(analysis) {
   }
 }
 
-function renderImprovements(analysis) {
+// Pure lookup: the repo-improvements lens is a contributor named "repo-improvements" in
+// data.lenses.contributors. Kept separate from the DOM-touching renderer so it is
+// unit-testable without a document shim (Airplane Test: an absent lens must yield an
+// empty list, not throw — the Repo Improvements tab then degrades to its empty-state).
+function repoImprovementsFrom(lenses) {
+  const contributors = (lenses && lenses.contributors) || [];
+  const repo = contributors.find(c => c.skill === 'repo-improvements');
+  return (repo && repo.items) || [];
+}
+
+// Pure lookup: the user-improvements lens is a contributor named "user-improvements" in
+// data.lenses.contributors. Returns the whole contributor record (or null) rather than
+// just `.items`, because `promptPattern` lives on the SAME record and both the User
+// Improvements list and the prompt-pattern block read from this one lookup (Airplane
+// Test: an absent lens must yield null, not throw).
+function userImprovementsFrom(lenses) {
+  const contributors = (lenses && lenses.contributors) || [];
+  return contributors.find(c => c.skill === 'user-improvements') || null;
+}
+
+function renderImprovements(data) {
   const repoEl = document.getElementById('repo-improvements-list');
   if (repoEl) {
-    const items = analysis.repoImprovements || [];
+    const items = repoImprovementsFrom(data && data.lenses);
     repoEl.innerHTML = items.length > 0
       ? items.map(item => {
           if (typeof item === 'string') return html`<li>${safe(renderMarkdown(item))}</li>`;
@@ -847,7 +867,8 @@ function renderImprovements(analysis) {
 
   const userEl = document.getElementById('user-improvements-list');
   if (userEl) {
-    const items = analysis.userImprovements || [];
+    const userLens = userImprovementsFrom(data && data.lenses);
+    const items = (userLens && userLens.items) || [];
     userEl.innerHTML = items.length > 0
       ? items.map(item => {
           if (typeof item === 'string') return html`<li>${safe(renderMarkdown(item))}</li>`;
@@ -857,12 +878,14 @@ function renderImprovements(analysis) {
   }
 }
 
-function renderPromptPattern(analysis) {
+function renderPromptPattern(data) {
   const area = document.getElementById('prompt-pattern-area');
   const pre = document.getElementById('prompt-pattern');
-  if (area && analysis.promptPattern) {
+  const userLens = userImprovementsFrom(data && data.lenses);
+  const pattern = userLens && userLens.promptPattern;
+  if (area && pattern) {
     area.style.display = 'block';
-    if (pre) pre.textContent = analysis.promptPattern;
+    if (pre) pre.textContent = pattern;
   } else if (area) {
     area.style.display = 'none';
   }
@@ -1167,7 +1190,7 @@ function renderLensTemplate(tpl, data) {
 
 // Contributors that render in their own dedicated tab/table — excluded from the generic
 // Lenses list to avoid double-rendering. Grows as dimensions are extracted into lenses.
-const DEDICATED_CONTRIBUTORS = new Set(['review', 'business-risk', 'friction']);
+const DEDICATED_CONTRIBUTORS = new Set(['review', 'business-risk', 'friction', 'repo-improvements', 'user-improvements']);
 
 function renderLenses(data) {
   const lenses = data.lenses;
@@ -1240,8 +1263,8 @@ function renderSession(data) {
   renderFriction(data);
   renderDiff(analysis);
   renderTools(data.tools);
-  renderImprovements(analysis);
-  renderPromptPattern(analysis);
+  renderImprovements(data);
+  renderPromptPattern(data);
   renderSessionArtifacts(analysis);
   renderVerdictStatement(analysis);
   renderTimeline(analysis);
@@ -1315,5 +1338,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom, repoImprovementsFrom, userImprovementsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern };
 }

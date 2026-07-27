@@ -327,6 +327,10 @@ never your own reasoning.
   classified into the configured `frictionCategories`. Default-on in `analysisLenses`. A
   deterministic gate (`validate_contracts.py`, run again at render time) rejects any entry whose
   `type` is not in `frictionCategories`.
+- `repo-improvements` (contributor) — how the repo/codebase could be improved: tooling,
+  structure, or docs gaps the session surfaced. Default-on in `analysisLenses`.
+- `user-improvements` (contributor) — how the user could improve their prompting/interaction,
+  plus an example better prompt (`promptPattern`). Default-on in `analysisLenses`.
 
 > Dispatch any other lens present in `analysisLenses` the same way, using its `skill` as the
 > `subagent_type` suffix.

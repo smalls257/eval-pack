@@ -22,7 +22,9 @@
     "./agents/lenses/verification-rigor.md",
     "./agents/lenses/review.md",
     "./agents/lenses/business-risk.md",
-    "./agents/lenses/friction.md"
+    "./agents/lenses/friction.md",
+    "./agents/lenses/repo-improvements.md",
+    "./agents/lenses/user-improvements.md"
   ],
   "userConfig": {
     "pythonExecutable": {

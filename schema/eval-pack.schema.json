@@ -137,6 +137,14 @@
           "role": "contributor"
         },
         {
+          "skill": "repo-improvements",
+          "role": "contributor"
+        },
+        {
+          "skill": "user-improvements",
+          "role": "contributor"
+        },
+        {
           "skill": "requirement-drift",
           "role": "scorer"
         },

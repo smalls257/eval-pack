@@ -3,10 +3,25 @@ import assert from 'node:assert';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 global.window = { __EVAL_PACK_TEST__: true };
+
+// Minimal DOM stub — just enough for renderImprovements/renderPromptPattern to run
+// end-to-end against a fake element registry, without pulling in a real DOM library.
+function makeFakeDocument(ids) {
+  const elements = {};
+  for (const id of ids) {
+    elements[id] = { innerHTML: '', textContent: '', style: {} };
+  }
+  return {
+    elements,
+    getElementById(id) { return elements[id] || null; },
+  };
+}
+
 const { effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText,
   reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom,
+  repoImprovementsFrom, userImprovementsFrom,
   deliveredFrom, unmetFrom, provenFrom, unprovenFrom,
-  testResultsSummary } = require('../templates/html/scripts.js');
+  testResultsSummary, renderImprovements, renderPromptPattern } = require('../templates/html/scripts.js');
 
 test('effectiveConfidence uses finalScore when a non-core rule ran scorers', () => {
   const analysis = { highlights: { confidencePercent: 90 } };
@@ -127,6 +142,48 @@ test('frictionEntriesFrom degrades to empty list when the lens is absent (Airpla
   assert.deepStrictEqual(frictionEntriesFrom({ contributors: [{ skill: 'other', entries: [{ x: 1 }] }] }), []);
 });
 
+test('repoImprovementsFrom reads items from the repo-improvements contributor', () => {
+  const lenses = {
+    contributors: [
+      { skill: 'other', role: 'contributor', title: 'Other', items: [{ x: 1 }] },
+      { skill: 'repo-improvements', role: 'contributor', title: 'Repo Improvements', items: [
+        { title: 'Add schema-sync test', detail: 'Prevents config.py and the schema drifting.' },
+      ] },
+    ],
+  };
+  assert.deepStrictEqual(repoImprovementsFrom(lenses), [
+    { title: 'Add schema-sync test', detail: 'Prevents config.py and the schema drifting.' },
+  ]);
+});
+
+test('repoImprovementsFrom degrades to empty list when the lens is absent (Airplane Test)', () => {
+  assert.deepStrictEqual(repoImprovementsFrom(null), []);
+  assert.deepStrictEqual(repoImprovementsFrom({ contributors: [] }), []);
+  assert.deepStrictEqual(repoImprovementsFrom({ contributors: [{ skill: 'other', items: [{ x: 1 }] }] }), []);
+});
+
+test('userImprovementsFrom reads the full user-improvements contributor record, including promptPattern', () => {
+  const lenses = {
+    contributors: [
+      { skill: 'other', role: 'contributor', title: 'Other' },
+      { skill: 'user-improvements', role: 'contributor', title: 'User Improvements',
+        items: [{ title: 'Name files up front', detail: 'Saved two turns of grepping.' }],
+        promptPattern: 'Update templates/html/scripts.js to add X' },
+    ],
+  };
+  assert.deepStrictEqual(userImprovementsFrom(lenses), {
+    skill: 'user-improvements', role: 'contributor', title: 'User Improvements',
+    items: [{ title: 'Name files up front', detail: 'Saved two turns of grepping.' }],
+    promptPattern: 'Update templates/html/scripts.js to add X',
+  });
+});
+
+test('userImprovementsFrom degrades to null when the lens is absent (Airplane Test)', () => {
+  assert.strictEqual(userImprovementsFrom(null), null);
+  assert.strictEqual(userImprovementsFrom({ contributors: [] }), null);
+  assert.strictEqual(userImprovementsFrom({ contributors: [{ skill: 'other' }] }), null);
+});
+
 test('deliveredFrom/unmetFrom read the requirement-drift SCORER lens (not a contributor)', () => {
   const lenses = {
     scorers: [
@@ -195,4 +252,62 @@ test('testResultsSummary tolerates a verdict with no per-test records (no crash,
     summary: '',
     testsRun: [],
   });
+});
+
+// e2e: render a pack whose lenses include repo-improvements.json and user-improvements.json
+// output — both tabs render content sourced from the lenses (not from any evaluator field),
+// and promptPattern shows from the SAME user-improvements lens record.
+test('renderImprovements/renderPromptPattern render tab content from lens output', () => {
+  const ids = ['repo-improvements-list', 'user-improvements-list', 'prompt-pattern-area', 'prompt-pattern'];
+  const fakeDoc = makeFakeDocument(ids);
+  const restore = global.document;
+  global.document = fakeDoc;
+  try {
+    const data = {
+      lenses: {
+        contributors: [
+          { skill: 'repo-improvements', role: 'contributor', title: 'Repo Improvements', items: [
+            { title: 'Add CI lint step', detail: 'Would have caught the trailing whitespace earlier.' },
+          ] },
+          { skill: 'user-improvements', role: 'contributor', title: 'User Improvements',
+            items: [{ title: 'Name the target file', detail: 'Saved a round of grepping.' }],
+            promptPattern: 'Update scripts/config.py to add the new lens defaults' },
+        ],
+      },
+    };
+    renderImprovements(data);
+    renderPromptPattern(data);
+
+    assert.match(fakeDoc.elements['repo-improvements-list'].innerHTML, /Add CI lint step/);
+    assert.match(fakeDoc.elements['repo-improvements-list'].innerHTML, /trailing whitespace/);
+    assert.match(fakeDoc.elements['user-improvements-list'].innerHTML, /Name the target file/);
+    assert.strictEqual(fakeDoc.elements['prompt-pattern-area'].style.display, 'block');
+    assert.strictEqual(fakeDoc.elements['prompt-pattern'].textContent,
+      'Update scripts/config.py to add the new lens defaults');
+  } finally {
+    global.document = restore;
+  }
+});
+
+// Airplane Test for the render path: none of the 3 old evaluator fields exist AND neither
+// new lens file exists — no crash, both tabs show their empty-state, prompt-pattern-area
+// stays hidden exactly as it did before the decomposition.
+test('renderImprovements/renderPromptPattern degrade to empty-state with no lenses and no legacy evaluator fields (Airplane Test)', () => {
+  const ids = ['repo-improvements-list', 'user-improvements-list', 'prompt-pattern-area', 'prompt-pattern'];
+  const fakeDoc = makeFakeDocument(ids);
+  const restore = global.document;
+  global.document = fakeDoc;
+  try {
+    const data = { analysis: {} }; // no repoImprovements/userImprovements/promptPattern, no lenses
+    assert.doesNotThrow(() => {
+      renderImprovements(data);
+      renderPromptPattern(data);
+    });
+    assert.match(fakeDoc.elements['repo-improvements-list'].innerHTML, /empty-state/);
+    assert.match(fakeDoc.elements['repo-improvements-list'].innerHTML, /No improvements recorded/);
+    assert.match(fakeDoc.elements['user-improvements-list'].innerHTML, /empty-state/);
+    assert.strictEqual(fakeDoc.elements['prompt-pattern-area'].style.display, 'none');
+  } finally {
+    global.document = restore;
+  }
 });
