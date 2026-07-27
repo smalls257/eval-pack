@@ -19,9 +19,9 @@ function makeFakeDocument(ids) {
 
 const { effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText,
   reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom, diffReposFrom,
-  repoImprovementsFrom, userImprovementsFrom,
+  repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom,
   deliveredFrom, unmetFrom, provenFrom, unprovenFrom,
-  testResultsSummary, renderImprovements, renderPromptPattern, lensTabsFrom } = require('../templates/html/scripts.js');
+  testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom } = require('../templates/html/scripts.js');
 
 test('effectiveConfidence uses finalScore when a non-core rule ran scorers', () => {
   const analysis = { highlights: { confidencePercent: 90 } };
@@ -157,6 +157,46 @@ test('diffReposFrom passes through populated repoDiffs buckets', () => {
     },
   };
   assert.deepStrictEqual(diffReposFrom(data), data.repoDiffs);
+});
+
+test('sessionArtifactsFrom degrades to empty list when artifactInventory is absent (Airplane Test)', () => {
+  assert.deepStrictEqual(sessionArtifactsFrom(null), []);
+  assert.deepStrictEqual(sessionArtifactsFrom({}), []);
+  assert.deepStrictEqual(sessionArtifactsFrom({ artifactInventory: undefined }), []);
+});
+
+test('sessionArtifactsFrom passes through the deterministic artifactInventory', () => {
+  const data = {
+    artifactInventory: [
+      { name: 'Transcript', path: 'transcript.html', type: 'transcript', description: 'Rendered conversation' },
+      { name: 'metrics.json', path: 'metrics.json', type: 'data', description: 'Session metrics' },
+    ],
+  };
+  assert.strictEqual(sessionArtifactsFrom(data), data.artifactInventory);
+});
+
+// Render-level XSS regression: a malicious repoRoot from repo-diffs.json must be escaped by
+// renderDiff before it reaches innerHTML — a raw <script> would be a stored-XSS Silent Fallback
+// where the render "succeeds" but injects executable markup.
+test('renderDiff escapes a malicious repoRoot instead of injecting raw markup', () => {
+  const fakeDoc = makeFakeDocument(['diff-body']);
+  const restore = global.document;
+  global.document = fakeDoc;
+  try {
+    renderDiff({
+      repoDiffs: {
+        repos: [{ repoRoot: '<script>alert(1)</script>', branch: 'main', base: 'x', baseResolved: 'y',
+          insertions: 0, deletions: 0, filesChanged: 0, files: [], stat: '' }],
+        skipped: [],
+        errors: [],
+      },
+    });
+    const out = fakeDoc.elements['diff-body'].innerHTML;
+    assert.ok(out.includes('&lt;script&gt;'), out);
+    assert.ok(!out.includes('<script>'), out);
+  } finally {
+    global.document = restore;
+  }
 });
 
 test('repoImprovementsFrom reads items from the repo-improvements contributor', () => {

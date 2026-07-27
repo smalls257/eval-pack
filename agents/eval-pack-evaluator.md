@@ -98,9 +98,6 @@ Schema for `analysis.json`:
     "Code review caught issues, fixes applied",
     "Session concluded with outcome"
   ],
-  "sessionArtifacts": [
-    {"name": "artifact name", "path": "relative/path/in/pack", "description": "what this artifact contains"}
-  ],
   "verdictStatement": "Closing italic sentence summarizing the session outcome and its trustworthiness as evidence."
 }
 ```

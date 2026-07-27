@@ -123,6 +123,14 @@ cat > "$TEST_DIR/$SESSION_ID/test-results.json" << 'JSON'
 JSON
 echo "  PASS"
 
+# Step 3.5: Create mock repo diffs (exercises the deterministic Diff path)
+echo ""
+echo "--- Step 3.5: Mock repo diffs ---"
+cat > "$TEST_DIR/$SESSION_ID/repo-diffs.json" << 'JSON'
+{"repos":[{"repoRoot":"/tmp/x","branch":"main","base":"HEAD~1","baseResolved":"abc1234","insertions":1,"deletions":0,"filesChanged":1,"files":["a.txt"],"stat":" a.txt | 1 +"}],"skipped":[],"errors":[]}
+JSON
+echo "  PASS"
+
 # Step 4: Create mock analysis
 echo ""
 echo "--- Step 4: Mock analysis ---"
@@ -134,12 +142,6 @@ cat > "$TEST_DIR/$SESSION_ID/analysis.json" << 'JSON'
     "confidencePercent": 90,
     "confidenceNotes": "Test suite output showing 8/8 pass after boundary condition fix; no integration test covering the token refresh path under load"
   },
-  "diff": {
-    "artifactStatus": { "hasDiffStat": false, "hasDiffPatch": false, "note": "No diff artifacts captured in this test run" },
-    "filesChanged": [{"file": "login.ts", "description": "Fixed token expiry comparison operator"}],
-    "changeTable": [{"area": "Token expiry logic", "evidenceInTranscript": "The comparison uses < instead of <=", "observedEffect": "Tokens expiring exactly at boundary are now correctly rejected"}],
-    "representativeCommands": []
-  },
   "repoImprovements": [
     {"title": "Add boundary tests to auth module", "detail": "The auth.test.ts file lacks explicit boundary tests for token expiry timestamps. Add parameterized tests covering exactly-at-expiry, one-second-before, and one-second-after cases."}
   ],
@@ -147,9 +149,6 @@ cat > "$TEST_DIR/$SESSION_ID/analysis.json" << 'JSON'
     {"title": "Front-load edge case context in prompts", "detail": "The developer knew about the midnight edge case but did not mention it in the initial prompt. Including known edge cases upfront would have prevented the false completion."}
   ],
   "promptPattern": "Fix the token expiry check in login.ts — the < vs <= comparison is wrong. Known edge case: tokens expiring exactly at midnight should be rejected. Run auth.test.ts to verify.",
-  "sessionArtifacts": [
-    {"name": "Transcript", "path": "transcript.jsonl", "description": "Full session conversation in JSONL format"}
-  ],
   "verdictStatement": "The auth token boundary fix is correctly implemented and verified by the test suite, though the false completion pattern indicates the agent should run edge case tests proactively before claiming completion."
 }
 JSON

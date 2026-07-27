@@ -942,10 +942,18 @@ function artifactLinkable(p) {
   return isSafePath(p) && (!p.endsWith('.jsonl') || p === 'transcript.jsonl');
 }
 
-function renderSessionArtifacts(analysis) {
+// Pure lookup: the Session Artifacts list mirrors data.artifactInventory — the deterministic
+// on-disk file enumeration built by render_html.py's build_artifact_inventory. Sourced here (not
+// from the evaluator's prose) so the list is a directory listing's job, not an LLM's (Sensor:
+// the evidence list must reflect what actually shipped in the pack, not what an LLM recalled).
+function sessionArtifactsFrom(data) {
+  return (data && data.artifactInventory) || [];
+}
+
+function renderSessionArtifacts(data) {
   const list = document.getElementById('session-artifacts-list');
   if (!list) return;
-  const items = analysis.sessionArtifacts || [];
+  const items = sessionArtifactsFrom(data);
   if (items.length === 0) {
     list.innerHTML = '<li class="empty-state">No artifacts recorded.</li>';
     return;
@@ -1367,7 +1375,7 @@ function renderSession(data) {
   renderTools(data.tools);
   renderImprovements(data);
   renderPromptPattern(data);
-  renderSessionArtifacts(analysis);
+  renderSessionArtifacts(data);
   renderVerdictStatement(analysis);
   renderTimeline(analysis);
   renderLenses(data);
@@ -1440,5 +1448,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern, lensTabsFrom };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom };
 }
