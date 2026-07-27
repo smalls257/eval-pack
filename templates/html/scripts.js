@@ -1343,6 +1343,13 @@ function renderLensCards(lenses) {
 
 function renderLenses(data) {
   renderLensCards(data.lenses);  // card lenses land in the highlights row (before any tabs)
+  // Aggregation transparency — the core X → final Y math must stay auditable independent of
+  // whether any lens renders as a tab (all lenses could be display:'card', leaving zero tabs).
+  // Render it into the always-present #lens-agg-line so it never depends on tab existence.
+  const aggLine = document.getElementById('lens-agg-line');
+  if (aggLine && data.lenses && data.lenses.finalScore != null) {
+    aggLine.innerHTML = html`<p class="lens-agg">Verdict aggregation — core <strong>${lensScore(data.lenses.coreScore)}</strong> <code>${data.lenses.rule}</code> lenses → final <strong>${lensScore(data.lenses.finalScore)}</strong></p>`;
+  }
   const tabs = lensTabsFrom(data.lenses);
   const nav = document.getElementById('tab-nav');
   const actions = nav.querySelector('.tab-nav-actions');
@@ -1351,7 +1358,7 @@ function renderLenses(data) {
   // No surfaced lenses → no lens tabs at all (the old code hid an empty shared tab).
   if (!tabs.length) return;
 
-  tabs.forEach((t, i) => {
+  tabs.forEach((t) => {
     const btn = document.createElement('button');
     btn.className = 'tab-btn';
     btn.dataset.panel = t.panelId;
@@ -1365,12 +1372,7 @@ function renderLenses(data) {
     section.id = 'panel-' + t.panelId;
     section.setAttribute('role', 'tabpanel');
     section.style.display = 'none';
-    let inner = lensCardMarkup(t);
-    // Aggregation transparency — the core X → final Y math must stay visible exactly once;
-    // prepend it to the first generated panel (verbatim markup preserved).
-    if (i === 0 && data.lenses.finalScore != null) {
-      inner = html`<p class="lens-agg">Verdict aggregation — core <strong>${lensScore(data.lenses.coreScore)}</strong> <code>${data.lenses.rule}</code> lenses → final <strong>${lensScore(data.lenses.finalScore)}</strong></p>` + inner;
-    }
+    const inner = lensCardMarkup(t);
     section.innerHTML = inner;
     panelsParent.insertBefore(section, sessionArtifacts);
   });

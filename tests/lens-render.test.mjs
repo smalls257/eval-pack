@@ -415,6 +415,41 @@ test('renderLenses injects card lenses into the highlights row and escapes their
   }
 });
 
+// Transparency guard: the core → final aggregation math must render even when EVERY lens is
+// configured display:'card', so lensTabsFrom returns [] and no lens tab panel exists to host it.
+test('renderLenses renders the aggregation line even when there are no lens tabs', () => {
+  const require2 = createRequire(import.meta.url);
+  const { renderLenses } = require2('../templates/html/scripts.js');
+  const row = { children: [], appendChild(el) { this.children.push(el); } };
+  const nav = { querySelector() { return null; }, insertBefore() {} };
+  const aggLine = { innerHTML: '' };
+  const elements = {
+    'highlights-row': row,
+    'lens-agg-line': aggLine,
+    'tab-nav': nav,
+    'session-artifacts': { parentNode: { insertBefore() {} } },
+  };
+  const fakeDoc = {
+    getElementById(id) { return elements[id] || null; },
+    createElement() { return { className: '', innerHTML: '', appendChild() {} }; },
+  };
+  const restore = global.document;
+  global.document = fakeDoc;
+  try {
+    const data = { lenses: {
+      finalScore: 82, coreScore: 82, rule: 'core',
+      scorers: [{ skill: 'requirement-drift', score: 82, display: 'card' }],
+      contributors: [], failures: [],
+    } };
+    assert.strictEqual(lensTabsFrom(data.lenses).length, 0);  // all lenses are cards → zero tabs
+    renderLenses(data);
+    assert.match(aggLine.innerHTML, /Verdict aggregation/);
+    assert.match(aggLine.innerHTML, /82/);
+  } finally {
+    global.document = restore;
+  }
+});
+
 test('lensTabsFrom de-dupes colliding panel ids', () => {
   const tabs = lensTabsFrom({ scorers: [
     { skill: 'a/b', score: 1 }, { skill: 'a-b', score: 2 } ] });
