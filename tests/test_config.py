@@ -186,7 +186,8 @@ class TestLensKeys(unittest.TestCase):
             lenses = {lens["skill"]: lens for lens in cfg["analysisLenses"]}
             self.assertEqual(len(cfg["analysisLenses"]), 7)
             self.assertEqual(lenses["review"], {"skill": "review", "role": "contributor"})
-            self.assertEqual(lenses["business-risk"], {"skill": "business-risk", "role": "contributor"})
+            self.assertEqual(lenses["business-risk"],
+                             {"skill": "business-risk", "role": "contributor", "display": "card"})
             self.assertEqual(lenses["friction"], {"skill": "friction", "role": "contributor"})
             self.assertEqual(lenses["repo-improvements"], {"skill": "repo-improvements", "role": "contributor"})
             self.assertEqual(lenses["user-improvements"], {"skill": "user-improvements", "role": "contributor"})
@@ -215,6 +216,18 @@ class TestLensKeys(unittest.TestCase):
         self.assertTrue(any("template" in e for e in errs))
         self.assertEqual(config.validate({"analysisLenses": [
             {"skill": "x", "role": "scorer", "template": "t.html"}]}), [])
+
+    def test_lens_display_must_be_card_or_tab(self):
+        bad = config.validate({"analysisLenses": [
+            {"skill": "x", "role": "scorer", "display": "sideways"}]})
+        self.assertTrue(any("display" in e for e in bad))
+        self.assertEqual(config.validate({"analysisLenses": [
+            {"skill": "x", "role": "scorer", "display": "card"}]}), [])
+        self.assertEqual(config.validate({"analysisLenses": [
+            {"skill": "x", "role": "scorer", "display": "tab"}]}), [])
+        # omitted display is valid (generic lenses default to a tab)
+        self.assertEqual(config.validate({"analysisLenses": [
+            {"skill": "x", "role": "scorer"}]}), [])
 
 
 class TestCosmeticKeys(unittest.TestCase):

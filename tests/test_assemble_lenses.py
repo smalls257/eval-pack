@@ -225,6 +225,31 @@ class TestLensGates(unittest.TestCase):
             # The confined config markup wins; the lens's self-declared decoy never survives.
             self.assertEqual(perf["templateHtml"], "<b>{{score}}</b>")
 
+    def test_display_carried_from_config_not_from_lens(self):
+        # display is presentation config — config-sourced only, same trust rule as templateHtml.
+        # A lens's self-declared display must NOT survive; the configured one wins.
+        with tempfile.TemporaryDirectory() as d:
+            pack = Path(d)
+            (pack / "lenses").mkdir()
+            (pack / "lenses" / "business-risk.json").write_text(
+                json.dumps({"skill": "business-risk", "role": "contributor",
+                            "level": "medium", "notes": "x", "display": "tab"}),  # self-declared decoy
+                encoding="utf-8")
+            (pack / "lenses" / "perf.json").write_text(
+                json.dumps({"skill": "perf", "role": "scorer", "score": 61, "rationale": "slow"}),
+                encoding="utf-8")
+            (pack / "analysis.json").write_text(
+                json.dumps({"highlights": {"confidencePercent": 90}}), encoding="utf-8")
+            self._cfg(d, [
+                {"skill": "business-risk", "role": "contributor", "display": "card"},
+                {"skill": "perf", "role": "scorer"},  # no display configured
+            ])
+            out = assemble_lenses.assemble(d)
+            biz = next(c for c in out["contributors"] if c["skill"] == "business-risk")
+            self.assertEqual(biz["display"], "card")  # config wins over lens self-declaration
+            perf = next(s for s in out["scorers"] if s["skill"] == "perf")
+            self.assertNotIn("display", perf)  # no display configured -> none attached
+
     def test_write_outputs_idempotent_on_rerun(self):
         with tempfile.TemporaryDirectory() as d:
             pack = Path(d)

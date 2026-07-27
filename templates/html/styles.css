@@ -196,13 +196,6 @@ main.container {
 .completion-red .highlight-card-value   { color: var(--red, #e5484d); }
 .completion-red .completion-dot         { background: var(--red, #e5484d); }
 
-.risk-card .highlight-card-value {
-  font-size: 13px;
-  font-weight: 400;
-  color: var(--text);
-  line-height: 1.5;
-}
-
 .confidence-bar {
   height: 6px;
   border-radius: 3px;
@@ -226,19 +219,23 @@ main.container {
 .biz-risk-medium .highlight-card-value { color: var(--amber, #f5a623); }
 .biz-risk-high   .highlight-card-value { color: var(--red, #e5484d); }
 
-.mitigation-card .highlight-card-value {
+/* Card-lens item list (e.g. business-risk mitigation steps + main risk). */
+.mitigation-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
   font-size: 12px;
   font-weight: 400;
+  display: flex;
   flex-direction: column;
-  align-items: flex-start;
   gap: 4px;
 }
-.mitigation-step {
+.mitigation-list li {
   display: flex;
   gap: 6px;
   line-height: 1.4;
 }
-.mitigation-step::before {
+.mitigation-list li::before {
   content: '→';
   color: var(--text-secondary);
   flex-shrink: 0;

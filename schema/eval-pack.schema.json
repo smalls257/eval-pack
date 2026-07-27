@@ -116,6 +116,14 @@
           "template": {
             "type": "string",
             "description": "Repo-relative path to an HTML template (mustache-lite) controlling how this lens renders. Markup is trusted (repo file, resolve-time confined); interpolated values are always HTML-escaped."
+          },
+          "display": {
+            "type": "string",
+            "enum": [
+              "card",
+              "tab"
+            ],
+            "description": "How this lens renders: 'card' = compact header card, 'tab' = its own nav tab. Default 'tab' for generic lenses."
           }
         },
         "required": [
@@ -130,7 +138,8 @@
         },
         {
           "skill": "business-risk",
-          "role": "contributor"
+          "role": "contributor",
+          "display": "card"
         },
         {
           "skill": "friction",

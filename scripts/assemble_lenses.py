@@ -63,11 +63,19 @@ def assemble(pack_dir):
     # be rendered as trusted — a stored XSS (finding: trust inversion, security review).
     tpl_by_skill = {l.get("skill"): l.get("templateHtml")
                     for l in cfg.get("analysisLenses") or [] if l.get("templateHtml")}
+    # display is presentation config, not lens output — same trust rule as templateHtml:
+    # a lens's self-declared display is untrusted and stripped; the configured value wins.
+    disp_by_skill = {l.get("skill"): l.get("display")
+                     for l in cfg.get("analysisLenses") or [] if l.get("display")}
     for r in results:
         r.pop("templateHtml", None)  # never trust lens-supplied markup — resolve-embedded only
+        r.pop("display", None)       # never trust lens-supplied presentation — config only
         t = tpl_by_skill.get(r.get("skill"))
         if t and "error" not in r:
             r["templateHtml"] = t
+        d = disp_by_skill.get(r.get("skill"))
+        if d and "error" not in r:
+            r["display"] = d
 
     analysis_path = pack / "analysis.json"
     analysis = {}

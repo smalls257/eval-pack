@@ -21,7 +21,8 @@ const { effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lens
   reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom, diffReposFrom,
   repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom,
   deliveredFrom, unmetFrom, provenFrom, unprovenFrom,
-  testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom } = require('../templates/html/scripts.js');
+  testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom,
+  lensCardsFrom } = require('../templates/html/scripts.js');
 
 test('effectiveConfidence uses finalScore when a non-core rule ran scorers', () => {
   const analysis = { highlights: { confidencePercent: 90 } };
@@ -332,6 +333,86 @@ test('lensTabsFrom surfaces scorers then non-dedicated contributors then failure
     ['contributor', 'lens-my-custom',          'My Custom'],
     ['failure',     'lens-broken-lens',        'Broken Lens'],
   ]);
+});
+
+test('lensCardsFrom maps a display:"card" business-risk contributor to a card descriptor', () => {
+  const lenses = { contributors: [
+    { skill: 'business-risk', role: 'contributor', display: 'card', level: 'medium',
+      notes: 'redaction off by default', mitigation: ['safe default ruleset'],
+      mainRisk: 'raw transcript published' },
+  ] };
+  const cards = lensCardsFrom(lenses);
+  assert.strictEqual(cards.length, 1);
+  const c = cards[0];
+  assert.strictEqual(c.label, 'Business Risk');
+  assert.strictEqual(c.value, 'Medium');
+  assert.strictEqual(c.level, 'medium');
+  assert.strictEqual(c.note, 'redaction off by default');
+  assert.deepStrictEqual(c.items, ['safe default ruleset', 'main risk: raw transcript published']);
+  // a card must NOT also become a tab
+  assert.deepStrictEqual(lensTabsFrom(lenses), []);
+});
+
+test('lensCardsFrom maps a display:"card" scorer using its numeric score', () => {
+  const lenses = { scorers: [
+    { skill: 'x', role: 'scorer', score: 88, display: 'card', rationale: 'ok' },
+  ] };
+  const cards = lensCardsFrom(lenses);
+  assert.strictEqual(cards.length, 1);
+  assert.strictEqual(cards[0].value, 88);
+  assert.strictEqual(cards[0].level, null);
+  assert.strictEqual(cards[0].note, 'ok');
+  assert.strictEqual(cards[0].kind, 'scorer');
+});
+
+test('lensCardsFrom ignores records with no display or display:"tab"; those stay tabs', () => {
+  const lenses = { scorers: [
+    { skill: 'a', role: 'scorer', score: 50 },              // no display
+    { skill: 'b', role: 'scorer', score: 60, display: 'tab' },
+  ] };
+  assert.deepStrictEqual(lensCardsFrom(lenses), []);
+  assert.deepStrictEqual(lensTabsFrom(lenses).map(t => t.panelId), ['lens-a', 'lens-b']);
+});
+
+test('lensCardsFrom degrades to [] for absent/empty lenses (Airplane Test)', () => {
+  assert.deepStrictEqual(lensCardsFrom(null), []);
+  assert.deepStrictEqual(lensCardsFrom({}), []);
+});
+
+// Render-level: a display:'card' business-risk lens is injected into #highlights-row with its
+// level class, and its untrusted values are ESCAPED (no raw <script> reaches innerHTML).
+test('renderLenses injects card lenses into the highlights row and escapes their values', () => {
+  const require2 = createRequire(import.meta.url);
+  const { renderLenses } = require2('../templates/html/scripts.js');
+  const row = { children: [], appendChild(el) { this.children.push(el); } };
+  const nav = { querySelector() { return null; }, insertBefore() {} };
+  const elements = {
+    'highlights-row': row,
+    'tab-nav': nav,
+    'session-artifacts': { parentNode: { insertBefore() {} } },
+  };
+  const fakeDoc = {
+    getElementById(id) { return elements[id] || null; },
+    createElement() { return { className: '', innerHTML: '', appendChild() {} }; },
+  };
+  const restore = global.document;
+  global.document = fakeDoc;
+  try {
+    renderLenses({ lenses: { contributors: [
+      { skill: 'business-risk', role: 'contributor', display: 'card', level: 'high',
+        notes: '<script>alert(1)</script>', mitigation: ['flag it'], mainRisk: 'boom' },
+    ] } });
+    assert.strictEqual(row.children.length, 1);
+    const card = row.children[0];
+    assert.match(card.className, /biz-risk-high/);
+    assert.match(card.innerHTML, /Business Risk/);
+    assert.match(card.innerHTML, /&lt;script&gt;/);       // escaped
+    assert.ok(!card.innerHTML.includes('<script>'), card.innerHTML);
+    assert.match(card.innerHTML, /flag it/);
+    assert.match(card.innerHTML, /main risk: boom/);
+  } finally {
+    global.document = restore;
+  }
 });
 
 test('lensTabsFrom de-dupes colliding panel ids', () => {

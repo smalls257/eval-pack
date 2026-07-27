@@ -126,7 +126,6 @@ function businessRiskFrom(lenses) {
 function renderHighlights(analysis, lenses) {
   const h = (analysis || {}).highlights || {};
   const cs = h.completionStatus || {};
-  const biz = businessRiskFrom(lenses) || {};
 
   // Completion card
   const card = document.getElementById('completion-card');
@@ -158,46 +157,8 @@ function renderHighlights(analysis, lenses) {
   } else if (confCard) {
     confCard.style.display = 'none';
   }
-
-  // Business risk card
-  const bizCard = document.getElementById('biz-risk-card');
-  const bizVal = document.getElementById('biz-risk-value');
-  const bizNotes = document.getElementById('biz-risk-notes');
-  if (bizCard && biz.level) {
-    const lvl = /^(low|medium|high)$/.test(biz.level) ? biz.level : 'medium';
-    bizCard.className = `highlight-card biz-risk-card biz-risk-${lvl}`;
-    bizCard.style.display = '';
-    if (bizVal) bizVal.textContent = lvl.charAt(0).toUpperCase() + lvl.slice(1);
-    if (bizNotes) bizNotes.textContent = biz.notes || '';
-  } else if (bizCard) {
-    bizCard.style.display = 'none';
-  }
-
-  // Risk mitigation card
-  const mitCard = document.getElementById('mitigation-card');
-  const mitVal = document.getElementById('mitigation-value');
-  const steps = biz.mitigation || [];
-  if (mitCard && steps.length > 0) {
-    mitCard.style.display = '';
-    if (mitVal) mitVal.innerHTML = steps.map(s =>
-      html`<div class="mitigation-step">${s}</div>`
-    ).join('');
-  } else if (mitCard) {
-    mitCard.style.display = 'none';
-  }
-
-  // Main risk card
-  const riskVal = document.getElementById('risk-value');
-  const riskCard = document.getElementById('risk-card');
-  if (riskVal) {
-    const risk = biz.mainRisk || '';
-    if (risk) {
-      riskVal.textContent = risk;
-      if (riskCard) riskCard.style.display = '';
-    } else {
-      if (riskCard) riskCard.style.display = 'none';
-    }
-  }
+  // business-risk no longer special-cased here: it renders via the generic display:'card'
+  // mechanism (config analysisLenses → lensCardsFrom → renderLensCards into #highlights-row).
 }
 
 function renderVerdict(data) {
@@ -946,6 +907,8 @@ function artifactLinkable(p) {
 // on-disk file enumeration built by render_html.py's build_artifact_inventory. Sourced here (not
 // from the evaluator's prose) so the list is a directory listing's job, not an LLM's (Sensor:
 // the evidence list must reflect what actually shipped in the pack, not what an LLM recalled).
+// Note: some of these artifacts (e.g. the transcript) are ALSO surfaced in the Proof sidebar.
+// That duplication is intentional — both are ground-truth views — not a double-render bug.
 function sessionArtifactsFrom(data) {
   return (data && data.artifactInventory) || [];
 }
@@ -1246,7 +1209,7 @@ function renderLensTemplate(tpl, data) {
 
 // Contributors that render in their own dedicated tab/table — excluded from the generic
 // Lenses list to avoid double-rendering. Grows as dimensions are extracted into lenses.
-const DEDICATED_CONTRIBUTORS = new Set(['review', 'business-risk', 'friction', 'repo-improvements', 'user-improvements']);
+const DEDICATED_CONTRIBUTORS = new Set(['review', 'friction', 'repo-improvements', 'user-improvements']);
 
 // Slugify a skill name into a stable, id-safe token (fallback 'lens' when empty).
 function lensSlug(skill) {
@@ -1269,12 +1232,13 @@ function lensTabLabel(skill) {
 function lensTabsFrom(lenses) {
   const l = lenses || {};
   const records = [];
-  (l.scorers || []).forEach(r => records.push({ kind: 'scorer', record: r }));
+  // display:'card' lenses render as header cards (lensCardsFrom), not nav tabs — exclude them here.
+  (l.scorers || []).forEach(r => { if (r.display !== 'card') records.push({ kind: 'scorer', record: r }); });
   (l.contributors || []).forEach(r => {
-    if (DEDICATED_CONTRIBUTORS.has(r.skill)) return;
+    if (DEDICATED_CONTRIBUTORS.has(r.skill) || r.display === 'card') return;
     records.push({ kind: 'contributor', record: r });
   });
-  (l.failures || []).forEach(r => records.push({ kind: 'failure', record: r }));
+  (l.failures || []).forEach(r => { if (r.display !== 'card') records.push({ kind: 'failure', record: r }); });
 
   const seen = new Map();  // panelId → count, to de-dupe colliding slugs
   return records.map(({ kind, record }) => {
@@ -1286,6 +1250,41 @@ function lensTabsFrom(lenses) {
     const label = (typeof record.title === 'string' && record.title)
       ? record.title : lensTabLabel(record.skill);
     return { id, panelId, label, kind, record };
+  });
+}
+
+// PURE lookup (lens idiom): which lenses render as compact HEADER CARDS (display:'card')
+// rather than nav tabs — projected into descriptors the highlights-row renderer consumes.
+// Order mirrors lensTabsFrom: scorers → non-dedicated contributors → failures. This is the
+// generic mechanism business-risk migrated onto (it used to be three bespoke hardcoded cards).
+// Airplane Test: absent/empty lenses → [], never throws on a missing field.
+function lensCardsFrom(lenses) {
+  const l = lenses || {};
+  const records = [];
+  (l.scorers || []).forEach(r => { if (r.display === 'card') records.push({ kind: 'scorer', record: r }); });
+  (l.contributors || []).forEach(r => { if (r.display === 'card') records.push({ kind: 'contributor', record: r }); });
+  (l.failures || []).forEach(r => { if (r.display === 'card') records.push({ kind: 'failure', record: r }); });
+
+  const isLevel = v => typeof v === 'string' && /^(low|medium|high)$/i.test(v);
+  return records.map(({ kind, record }) => {
+    const level = isLevel(record.level) ? record.level.toLowerCase() : null;
+    const value = (typeof record.score === 'number') ? record.score
+      : (level ? level.charAt(0).toUpperCase() + level.slice(1) : null);
+    const items = [
+      ...(record.findings || []).map(lensFindingText),
+      ...(record.mitigation || []),
+      ...(record.mainRisk ? ['main risk: ' + record.mainRisk] : []),
+    ];
+    return {
+      id: lensSlug(record.skill),
+      label: record.title || lensTabLabel(record.skill),
+      kind,
+      value,
+      level,
+      note: record.rationale || record.notes || '',
+      items,
+      record,
+    };
   });
 }
 
@@ -1320,7 +1319,30 @@ function lensCardMarkup(tab) {
   return html`<div class="lens-card lens-fail"><div class="lens-meta">failed · ${rec.skill}</div><p>${rec.error}</p></div>`;
 }
 
+// Inject display:'card' lenses as compact cards into the highlights row, after the static
+// completion/confidence cards. business-risk arrives here via the generic mechanism (it used
+// to be three hardcoded cards + special-cased renderHighlights logic). All values are untrusted
+// LLM output → escaped via html`` / textContent; the only markup is our own card scaffold.
+function renderLensCards(lenses) {
+  const row = document.getElementById('highlights-row');
+  if (!row) return;
+  lensCardsFrom(lenses).forEach(c => {
+    const card = document.createElement('div');
+    card.className = 'highlight-card' + (c.level ? ' biz-risk-' + c.level : '');
+    const list = c.items.length
+      ? html`<ul class="mitigation-list">${safe(c.items.map(it => html`<li>${it}</li>`).join(''))}</ul>`
+      : '';
+    card.innerHTML =
+      html`<div class="highlight-card-label">${c.label}</div>` +
+      html`<div class="highlight-card-value">${c.value == null ? '' : c.value}</div>` +
+      html`<div class="highlight-card-notes">${c.note}</div>` +
+      list;
+    row.appendChild(card);
+  });
+}
+
 function renderLenses(data) {
+  renderLensCards(data.lenses);  // card lenses land in the highlights row (before any tabs)
   const tabs = lensTabsFrom(data.lenses);
   const nav = document.getElementById('tab-nav');
   const actions = nav.querySelector('.tab-nav-actions');
@@ -1448,5 +1470,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom, lensCardsFrom, renderLenses };
 }

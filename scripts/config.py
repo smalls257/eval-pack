@@ -48,7 +48,7 @@ DEFAULTS = {
     # Extension lenses: list of {"skill": str, "role": "contributor"|"scorer"}.
     "analysisLenses": [
         {"skill": "review", "role": "contributor"},
-        {"skill": "business-risk", "role": "contributor"},
+        {"skill": "business-risk", "role": "contributor", "display": "card"},
         {"skill": "friction", "role": "contributor"},
         {"skill": "repo-improvements", "role": "contributor"},
         {"skill": "user-improvements", "role": "contributor"},
@@ -371,6 +371,8 @@ def validate(cfg):
                 )
             if isinstance(lens, dict) and "template" in lens and not isinstance(lens.get("template"), str):
                 errors.append("analysisLenses[{}]: template must be a string path".format(i))
+            if isinstance(lens, dict) and "display" in lens and lens.get("display") not in ("card", "tab"):
+                errors.append("analysisLenses[{}]: display must be 'card' or 'tab'".format(i))
     theme = cfg.get("defaultTheme")
     if theme is not None and theme not in THEMES:
         errors.append("defaultTheme: {!r} is not one of {}".format(theme, list(THEMES)))
