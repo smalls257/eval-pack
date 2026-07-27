@@ -324,6 +324,17 @@ function wrapIndex(i, n) {
   return ((i % n) + n) % n;
 }
 
+// Pure fit math. The zoom=1 display factor that fits a NATURAL-size image into the
+// stage box (letterboxing, aspect preserved) — baked into the transform alongside the
+// user's zoom `scale` so the img can be laid out at its native raster size (crisp at
+// any zoom) while still presenting a consistent fit-to-stage baseline across
+// differently-shaped screenshots. Falls back to 1 (no scaling) when either dimension
+// is not yet known (0/NaN) — e.g. before the image has finished loading.
+function computeBaseFit(naturalW, naturalH, stageW, stageH) {
+  if (!(naturalW > 0) || !(naturalH > 0) || !(stageW > 0) || !(stageH > 0)) return 1;
+  return Math.min(stageW / naturalW, stageH / naturalH);
+}
+
 // Pure zoom math. Given current scale + pan and a cursor offset from the image's
 // (untransformed) centre, return the new scale (clamped to [1, maxScale]) and the
 // pan that keeps the point under the cursor fixed. cursor (0,0) zooms about the
@@ -351,6 +362,11 @@ const openLightbox = (() => {
   let scale = 1, panX = 0, panY = 0;
   let dragging = false, dragMoved = false;
   let dragX = 0, dragY = 0, panStartX = 0, panStartY = 0;
+  // baseFit: the zoom=1 "fit natural image to stage" factor (see computeBaseFit).
+  // Baked into the transform alongside the user's `scale` so the img can stay laid
+  // out at its native raster size (crisp) while presenting a consistent fit-to-stage
+  // baseline. Recomputed on image load, image change, and window resize.
+  let baseFit = 1;
 
   function shots() {
     return (rounds[roundIdx] && rounds[roundIdx].screenshots) || [];
@@ -398,14 +414,28 @@ const openLightbox = (() => {
     img.addEventListener('dblclick', resetZoom);
     img.addEventListener('wheel', onWheel, { passive: false });
     img.addEventListener('mousedown', onDragStart);
+    img.addEventListener('load', () => { recomputeBaseFit(); applyZoom(); });
     document.addEventListener('mousemove', onDragMove);
     document.addEventListener('mouseup', onDragEnd);
+    window.addEventListener('resize', () => { recomputeBaseFit(); applyZoom(); });
     document.body.appendChild(overlay);
+  }
+
+  // Recompute baseFit from the img's natural size (available once loaded) and the
+  // stage's current client box. Safe to call before the image has loaded — falls
+  // back to 1 (computeBaseFit's Airplane-Test guard against 0/NaN).
+  function recomputeBaseFit() {
+    const img = overlay.querySelector('.lightbox-img');
+    const stage = overlay.querySelector('.lightbox-stage');
+    baseFit = computeBaseFit(img.naturalWidth, img.naturalHeight, stage.clientWidth, stage.clientHeight);
   }
 
   function applyZoom() {
     const img = overlay.querySelector('.lightbox-img');
-    img.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+    // -50%,-50% recenters the natural-size box (CSS position:absolute;top/left:50%)
+    // before panning/scaling — see .modal-overlay .lightbox-img in styles.css.
+    img.style.transform =
+      `translate(-50%, -50%) translate(${panX}px, ${panY}px) scale(${baseFit * scale})`;
     img.style.cursor = scale > 1 ? (dragging ? 'grabbing' : 'grab') : '';
     overlay.querySelector('.lightbox-zoomlevel').textContent = Math.round(scale * 100) + '%';
     overlay.querySelector('.lightbox-zoomout').disabled = scale <= 1;
@@ -472,13 +502,21 @@ const openLightbox = (() => {
   }
 
   function render() {
-    resetZoom();  // each image opens at fit; nav/round-change start un-zoomed
+    scale = 1; panX = 0; panY = 0;  // each image opens at fit; nav/round-change start un-zoomed
     const list = shots();
     const s = list[imgIdx] || {};
     const badge = screenshotBadge(s.source);
     const img = overlay.querySelector('.lightbox-img');
     img.src = s.path || '';
     img.alt = s.label || '';
+    // The previous image's naturalWidth/Height is stale for this src until `load`
+    // fires (browsers fire `load` even for cache hits, which then recomputes and
+    // repaints via the `load` listener). Recompute+paint now too against whatever the
+    // img element currently reports (0 if not yet decoded, which computeBaseFit
+    // treats as "unknown" and falls back to 1) so there's no flash of the previous
+    // image's fit factor.
+    recomputeBaseFit();
+    applyZoom();
     const badgeEl = overlay.querySelector('.lightbox-details .screenshot-badge');
     badgeEl.textContent = badge.text;
     badgeEl.className = 'screenshot-badge ' + badge.cls;
@@ -1338,5 +1376,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom, repoImprovementsFrom, userImprovementsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom, repoImprovementsFrom, userImprovementsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern };
 }

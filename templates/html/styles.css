@@ -848,7 +848,11 @@ details[open] .collapsible-trigger::before { content: '▾ '; }
   cursor: pointer;
 }
 
-.modal-overlay img {
+.modal-overlay img:not(.lightbox-img) {
+  /* Generic single-image modal (not the lightbox, which lays its img out at natural
+     raster size — see .modal-overlay .lightbox-img below — and would otherwise have
+     its backing bitmap downsampled by this max-width/height before zoom scale()
+     upscales it, causing blur). */
   max-width: 90vw;
   max-height: 90vh;
   border-radius: var(--radius);
@@ -895,19 +899,26 @@ details[open] .collapsible-trigger::before { content: '▾ '; }
   align-items: center;
   gap: 8px;
   min-height: 0;
+  width: 82vw;
+  height: 72vh;
+  position: relative;  /* containing block for the absolutely-positioned img + nav */
   overflow: hidden;   /* clip a zoomed image to the stage, not the whole screen */
 }
 
 .modal-overlay .lightbox-img {
-  /* Fixed viewport box, consistent across every screenshot regardless of native
-     dimensions — so the zoom baseline is identical shot-to-shot. object-fit:contain
-     letterboxes each image into the same box (aspect preserved, no distortion). */
-  width: 82vw;
-  height: 72vh;
-  object-fit: contain;
+  /* Laid out at NATURAL raster size (no width/height/object-fit) so the browser never
+     downsamples the bitmap before scale() is applied — that downsample-then-upscale is
+     what made zoomed screenshots blurry. The "fit-to-stage" factor that used to come
+     from the fixed box is instead baked into the JS transform (baseFit * scale), so the
+     zoom-1 baseline is still consistent across differently-shaped screenshots. Absolute
+     + centered so a natural-size (possibly huge) box doesn't disturb the stage's layout. */
+  position: absolute;
+  top: 50%;
+  left: 50%;
   border-radius: var(--radius);
   display: block;
   transform-origin: center center;
+  transform: translate(-50%, -50%);  /* overwritten by JS applyZoom() once loaded */
   will-change: transform;
 }
 
@@ -922,9 +933,13 @@ details[open] .collapsible-trigger::before { content: '▾ '; }
   cursor: pointer;
   opacity: 0.55;
   transition: opacity 0.12s ease;
-  position: relative;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
   z-index: 2;         /* stay above a zoomed image */
 }
+.lightbox-prev { left: 4px; }
+.lightbox-next { right: 4px; }
 .lightbox-nav:hover { opacity: 1; }
 
 /* ===== Lightbox zoom controls ===== */
