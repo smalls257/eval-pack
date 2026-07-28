@@ -114,15 +114,6 @@ function renderPageHeader(data) {
   }
 }
 
-// Pure lookup: the business-risk lens is a contributor named "business-risk" in
-// data.lenses.contributors. Kept separate from the DOM-touching renderer so it is
-// unit-testable without a document shim (Airplane Test: an absent lens must yield null,
-// not throw — the three highlight cards it feeds then degrade to hidden).
-function businessRiskFrom(lenses) {
-  const contributors = (lenses && lenses.contributors) || [];
-  return contributors.find(c => c.skill === 'business-risk') || null;
-}
-
 function renderHighlights(analysis, lenses) {
   const h = (analysis || {}).highlights || {};
   const cs = h.completionStatus || {};
@@ -202,10 +193,8 @@ function renderVerdict(data) {
   if (text) text.textContent = summaryText;
 
   const h = (data.analysis || {}).highlights || {};
-  const biz = businessRiskFrom(data.lenses);
   const highlightParts = [
     h.confidenceNotes,
-    biz && biz.mainRisk ? 'Risk: ' + biz.mainRisk : null
   ].filter(Boolean);
   if (detail && highlightParts.length > 0) {
     detail.textContent = highlightParts.join(' · ');
@@ -1472,5 +1461,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom, lensCardsFrom, renderLenses };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom, lensCardsFrom, renderLenses };
 }

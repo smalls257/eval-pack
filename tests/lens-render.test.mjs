@@ -18,7 +18,7 @@ function makeFakeDocument(ids) {
 }
 
 const { effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText,
-  reviewFindingsFrom, businessRiskFrom, frictionEntriesFrom, diffReposFrom,
+  reviewFindingsFrom, frictionEntriesFrom, diffReposFrom,
   repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom,
   deliveredFrom, unmetFrom, provenFrom, unprovenFrom,
   testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom,
@@ -99,28 +99,6 @@ test('reviewFindingsFrom degrades to empty list when the lens is absent (Airplan
   assert.deepStrictEqual(reviewFindingsFrom(null), []);
   assert.deepStrictEqual(reviewFindingsFrom({ contributors: [] }), []);
   assert.deepStrictEqual(reviewFindingsFrom({ contributors: [{ skill: 'other', findings: [{ x: 1 }] }] }), []);
-});
-
-test('businessRiskFrom reads the business-risk contributor', () => {
-  const lenses = {
-    contributors: [
-      { skill: 'other', role: 'contributor', title: 'Other' },
-      { skill: 'business-risk', role: 'contributor', title: 'Business Risk',
-        level: 'high', notes: 'wide blast radius', mitigation: ['add a feature flag'],
-        mainRisk: 'rollback path is untested' },
-    ],
-  };
-  assert.deepStrictEqual(businessRiskFrom(lenses), {
-    skill: 'business-risk', role: 'contributor', title: 'Business Risk',
-    level: 'high', notes: 'wide blast radius', mitigation: ['add a feature flag'],
-    mainRisk: 'rollback path is untested',
-  });
-});
-
-test('businessRiskFrom degrades to null when the lens is absent (Airplane Test)', () => {
-  assert.strictEqual(businessRiskFrom(null), null);
-  assert.strictEqual(businessRiskFrom({ contributors: [] }), null);
-  assert.strictEqual(businessRiskFrom({ contributors: [{ skill: 'other' }] }), null);
 });
 
 test('frictionEntriesFrom reads entries from the friction contributor', () => {
