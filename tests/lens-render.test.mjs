@@ -22,7 +22,7 @@ const { effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lens
   repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom,
   deliveredFrom, unmetFrom, provenFrom, unprovenFrom,
   testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom,
-  lensCardsFrom } = require('../templates/html/scripts.js');
+  lensCardsFrom, lensContributorBody } = require('../templates/html/scripts.js');
 
 test('effectiveConfidence uses finalScore when a non-core rule ran scorers', () => {
   const analysis = { highlights: { confidencePercent: 90 } };
@@ -397,6 +397,87 @@ test('renderLenses injects card lenses into the highlights row and escapes their
     // Card is at-a-glance only: no mitigation list, no main-risk line (those live in the tab).
     assert.ok(!card.innerHTML.includes('flag it'), card.innerHTML);
     assert.ok(!card.innerHTML.includes('main risk: boom'), card.innerHTML);
+  } finally {
+    global.document = restore;
+  }
+});
+
+// Pure unit: lensContributorBody is FIELD-DRIVEN — it renders whatever the lens produced,
+// keyed on which fields are present, NOT on the skill name (business-risk is just a
+// contributor whose fields happen to be populated). All values are untrusted → escaped.
+test('lensContributorBody renders present fields (level/notes/mitigation/main-risk), escaped', () => {
+  const out = lensContributorBody({
+    level: 'High', notes: 'watch the auth path', mitigation: ['add a test', 'gate the flag'],
+    mainRisk: 'silent data loss',
+  });
+  assert.match(out, /biz-risk-high/);          // level whitelisted + lowercased into the class
+  assert.match(out, /watch the auth path/);
+  assert.match(out, /Mitigation/);
+  assert.match(out, /add a test/);
+  assert.match(out, /gate the flag/);
+  assert.match(out, /Main risk:/);
+  assert.match(out, /silent data loss/);
+});
+
+test('lensContributorBody Airplane Test: empty rec returns "" and never throws', () => {
+  assert.strictEqual(lensContributorBody({}), '');
+});
+
+test('lensContributorBody drops a non-whitelisted level rather than injecting it into a class', () => {
+  const out = lensContributorBody({ level: 'critical"><img src=x>' });
+  assert.strictEqual(out, '');                 // level not in (low|medium|high) → no badge at all
+});
+
+test('lensContributorBody escapes an XSS payload in mainRisk and mitigation', () => {
+  const out = lensContributorBody({
+    mainRisk: '<script>alert(1)</script>',
+    mitigation: ['<script>evil()</script>'],
+  });
+  assert.match(out, /&lt;script&gt;/);
+  assert.ok(!out.includes('<script>'), out);
+});
+
+// Render-level: a display:'both' contributor lens puts its at-a-glance summary in the header
+// card (lean — no mitigation), and its full DETAIL (mitigation + main risk) in its own tab.
+test('renderLenses puts contributor detail (mitigation + main risk) in its lens tab, not the header card', () => {
+  const require2 = createRequire(import.meta.url);
+  const { renderLenses } = require2('../templates/html/scripts.js');
+  const row = { children: [], appendChild(el) { this.children.push(el); } };
+  const nav = { querySelector() { return null; }, insertBefore() {} };
+  const created = [];
+  const elements = {
+    'highlights-row': row,
+    'tab-nav': nav,
+    'session-artifacts': { parentNode: { insertBefore() {} } },
+  };
+  const fakeDoc = {
+    getElementById(id) { return elements[id] || null; },
+    createElement() {
+      const el = { className: '', innerHTML: '', id: '', textContent: '',
+        style: {}, dataset: {}, setAttribute() {}, appendChild() {} };
+      created.push(el);
+      return el;
+    },
+  };
+  const restore = global.document;
+  global.document = fakeDoc;
+  try {
+    renderLenses({ lenses: { contributors: [
+      { skill: 'business-risk', role: 'contributor', display: 'both', title: 'Business Risk',
+        level: 'high', notes: 'watch the auth path', mitigation: ['gate the flag'],
+        mainRisk: 'silent data loss' },
+    ] } });
+    // Header card: at-a-glance only — has the notes, but NOT the mitigation/main-risk detail.
+    assert.strictEqual(row.children.length, 1);
+    const card = row.children[0];
+    assert.match(card.innerHTML, /watch the auth path/);
+    assert.ok(!card.innerHTML.includes('gate the flag'), card.innerHTML);
+    // Tab panel: the injected panel-lens-business-risk carries the full detail.
+    const panel = created.find(el => el.id === 'panel-lens-business-risk');
+    assert.ok(panel, 'expected an injected panel-lens-business-risk section');
+    assert.match(panel.innerHTML, /gate the flag/);       // mitigation
+    assert.match(panel.innerHTML, /silent data loss/);    // main risk
+    assert.match(panel.innerHTML, /biz-risk-high/);        // whitelisted level badge
   } finally {
     global.document = restore;
   }

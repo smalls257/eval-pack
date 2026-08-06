@@ -1284,6 +1284,25 @@ function lensCustomCard(rec, headExtra) {
   }
 }
 
+// Field-driven detail body for a contributor lens tab. Renders whatever the lens actually
+// produced — level, notes, findings, mitigation, main risk — WITHOUT keying on any skill
+// name (business-risk is just a contributor whose fields happen to be populated). All values
+// are untrusted LLM output → escaped via html``; `level` is drawn from a whitelist before it
+// reaches a class attribute.
+function lensContributorBody(rec) {
+  const level = (typeof rec.level === 'string' && /^(low|medium|high)$/i.test(rec.level))
+    ? rec.level.toLowerCase() : null;
+  const note = rec.rationale || rec.notes || '';
+  const findings = (rec.findings || []).map(f => html`<li>${lensFindingText(f)}</li>`).join('');
+  const mitigation = (rec.mitigation || []).map(m => html`<li>${m}</li>`).join('');
+  return '' +
+    (level ? html`<div class="lens-level biz-risk-${level}">${level}</div>` : '') +
+    (note ? html`<p class="lens-rationale">${note}</p>` : '') +
+    (findings ? html`<ul class="lens-findings">${safe(findings)}</ul>` : '') +
+    (mitigation ? html`<h5 class="lens-subhead">Mitigation</h5><ul class="mitigation-list">${safe(mitigation)}</ul>` : '') +
+    (rec.mainRisk ? html`<p class="lens-mainrisk"><strong>Main risk:</strong> ${rec.mainRisk}</p>` : '');
+}
+
 // The lens card markup for one tab's panel body — dispatched by kind. Uses the html`` tag
 // (not safe() in plain literals — that stringifies to "[object Object]"). html`` escapes
 // each interpolation, which is what we want for untrusted lens output (skill names,
@@ -1297,8 +1316,7 @@ function lensCardMarkup(tab) {
   }
   if (tab.kind === 'contributor') {
     if (rec.templateHtml) return lensCustomCard(rec);
-    const findings = (rec.findings || []).map(f => html`<li>${lensFindingText(f)}</li>`).join('');
-    return html`<div class="lens-card"><div class="lens-head"><span class="lens-meta">contributor · ${rec.skill}</span></div><h4>${rec.title}</h4><ul class="lens-findings">${safe(findings)}</ul></div>`;
+    return html`<div class="lens-card"><div class="lens-head"><span class="lens-meta">contributor · ${rec.skill}</span></div><h4>${rec.title}</h4>${safe(lensContributorBody(rec))}</div>`;
   }
   // failure
   return html`<div class="lens-card lens-fail"><div class="lens-meta">failed · ${rec.skill}</div><p>${rec.error}</p></div>`;
@@ -1456,5 +1474,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom, lensCardsFrom, renderLenses };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom, lensCardsFrom, lensContributorBody, renderLenses };
 }
