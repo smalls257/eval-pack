@@ -33,7 +33,7 @@
 }
 
 /* ===== Base ===== */
-html { height: 100%; }
+html { height: 100%; scrollbar-gutter: stable; }
 body {
   background: var(--bg);
   color: var(--text);
@@ -1218,6 +1218,9 @@ div.lens-fail {
   letter-spacing: 0.04em;
   margin-bottom: 8px;
 }
+.lens-level.biz-risk-low    { background: rgba(23, 177, 105, 0.12); color: var(--green); border: 1px solid rgba(23, 177, 105, 0.25); }
+.lens-level.biz-risk-medium { background: rgba(245, 166, 35, 0.12); color: var(--amber); border: 1px solid rgba(245, 166, 35, 0.25); }
+.lens-level.biz-risk-high   { background: rgba(229, 72, 77, 0.12);  color: var(--red);   border: 1px solid rgba(229, 72, 77, 0.25); }
 .lens-subhead {
   margin: 12px 0 4px;
   font-size: 0.8rem;
