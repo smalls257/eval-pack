@@ -250,6 +250,25 @@ class TestLensGates(unittest.TestCase):
             perf = next(s for s in out["scorers"] if s["skill"] == "perf")
             self.assertNotIn("display", perf)  # no display configured -> none attached
 
+    def test_display_both_survives_config_reattach(self):
+        # The 'both' value (summary card + detail tab) rides the same config-sourced reattach
+        # path as 'card'; pin it so the round-trip is asserted, not merely inferred.
+        with tempfile.TemporaryDirectory() as d:
+            pack = Path(d)
+            (pack / "lenses").mkdir()
+            (pack / "lenses" / "business-risk.json").write_text(
+                json.dumps({"skill": "business-risk", "role": "contributor",
+                            "level": "high", "notes": "x", "display": "card"}),  # self-declared decoy
+                encoding="utf-8")
+            (pack / "analysis.json").write_text(
+                json.dumps({"highlights": {"confidencePercent": 90}}), encoding="utf-8")
+            self._cfg(d, [
+                {"skill": "business-risk", "role": "contributor", "display": "both"},
+            ])
+            out = assemble_lenses.assemble(d)
+            biz = next(c for c in out["contributors"] if c["skill"] == "business-risk")
+            self.assertEqual(biz["display"], "both")  # configured 'both' wins over the 'card' decoy
+
     def test_write_outputs_idempotent_on_rerun(self):
         with tempfile.TemporaryDirectory() as d:
             pack = Path(d)
