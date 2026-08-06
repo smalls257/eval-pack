@@ -1250,20 +1250,17 @@ function lensTabsFrom(lenses) {
 function lensCardsFrom(lenses) {
   const l = lenses || {};
   const records = [];
-  (l.scorers || []).forEach(r => { if (r.display === 'card') records.push({ kind: 'scorer', record: r }); });
-  (l.contributors || []).forEach(r => { if (r.display === 'card') records.push({ kind: 'contributor', record: r }); });
-  (l.failures || []).forEach(r => { if (r.display === 'card') records.push({ kind: 'failure', record: r }); });
+  const carded = d => d === 'card' || d === 'both';
+  (l.scorers || []).forEach(r => { if (carded(r.display)) records.push({ kind: 'scorer', record: r }); });
+  (l.contributors || []).forEach(r => { if (carded(r.display)) records.push({ kind: 'contributor', record: r }); });
+  (l.failures || []).forEach(r => { if (carded(r.display)) records.push({ kind: 'failure', record: r }); });
 
   const isLevel = v => typeof v === 'string' && /^(low|medium|high)$/i.test(v);
   return records.map(({ kind, record }) => {
     const level = isLevel(record.level) ? record.level.toLowerCase() : null;
     const value = (typeof record.score === 'number') ? record.score
       : (level ? level.charAt(0).toUpperCase() + level.slice(1) : null);
-    const items = [
-      ...(record.findings || []).map(lensFindingText),
-      ...(record.mitigation || []),
-      ...(record.mainRisk ? ['main risk: ' + record.mainRisk] : []),
-    ];
+    // AT-A-GLANCE only: value + one-line note. Findings/mitigation/mainRisk live in the tab.
     return {
       id: lensSlug(record.skill),
       label: record.title || lensTabLabel(record.skill),
@@ -1271,7 +1268,6 @@ function lensCardsFrom(lenses) {
       value,
       level,
       note: record.rationale || record.notes || '',
-      items,
       record,
     };
   });
@@ -1318,14 +1314,13 @@ function renderLensCards(lenses) {
   lensCardsFrom(lenses).forEach(c => {
     const card = document.createElement('div');
     card.className = 'highlight-card' + (c.level ? ' biz-risk-' + c.level : '');
-    const list = c.items.length
-      ? html`<ul class="mitigation-list">${safe(c.items.map(it => html`<li>${it}</li>`).join(''))}</ul>`
-      : '';
+    // Card is an at-a-glance summary: label + value + one-line note only. A display:'both'
+    // lens carries its full detail (findings, mitigation, main risk) in its own tab — a
+    // header card that grows a list is a God-card.
     card.innerHTML =
       html`<div class="highlight-card-label">${c.label}</div>` +
       html`<div class="highlight-card-value">${c.value == null ? '' : c.value}</div>` +
-      html`<div class="highlight-card-notes">${c.note}</div>` +
-      list;
+      html`<div class="highlight-card-notes">${c.note}</div>`;
     row.appendChild(card);
   });
 }

@@ -313,22 +313,25 @@ test('lensTabsFrom surfaces scorers then non-dedicated contributors then failure
   ]);
 });
 
-test('lensCardsFrom maps a display:"card" business-risk contributor to a card descriptor', () => {
+test('lensCardsFrom maps a display:"card" business-risk contributor to a summary descriptor (no items)', () => {
   const lenses = { contributors: [
     { skill: 'business-risk', role: 'contributor', display: 'card', level: 'medium',
-      notes: 'redaction off by default', mitigation: ['safe default ruleset'],
-      mainRisk: 'raw transcript published' },
-  ] };
+      notes: 'Moderate blast radius.', mitigation: ['add a flag'], mainRisk: 'rollback path' }] };
   const cards = lensCardsFrom(lenses);
   assert.strictEqual(cards.length, 1);
-  const c = cards[0];
-  assert.strictEqual(c.label, 'Business Risk');
-  assert.strictEqual(c.value, 'Medium');
-  assert.strictEqual(c.level, 'medium');
-  assert.strictEqual(c.note, 'redaction off by default');
-  assert.deepStrictEqual(c.items, ['safe default ruleset', 'main risk: raw transcript published']);
-  // a card must NOT also become a tab
+  assert.strictEqual(cards[0].value, 'Medium');
+  assert.strictEqual(cards[0].level, 'medium');
+  assert.strictEqual(cards[0].note, 'Moderate blast radius.');
+  assert.ok(!('items' in cards[0]), 'card descriptor must not carry a detail list');
   assert.deepStrictEqual(lensTabsFrom(lenses), []);
+});
+
+test('lensCardsFrom + lensTabsFrom BOTH surface a display:"both" lens', () => {
+  const lenses = { contributors: [
+    { skill: 'business-risk', role: 'contributor', display: 'both', level: 'high',
+      notes: 'High.', mitigation: ['flag it'], mainRisk: 'x' }] };
+  assert.strictEqual(lensCardsFrom(lenses).length, 1);
+  assert.deepStrictEqual(lensTabsFrom(lenses).map(t => t.panelId), ['lens-business-risk']);
 });
 
 test('lensCardsFrom maps a display:"card" scorer using its numeric score', () => {
@@ -371,23 +374,29 @@ test('renderLenses injects card lenses into the highlights row and escapes their
   };
   const fakeDoc = {
     getElementById(id) { return elements[id] || null; },
-    createElement() { return { className: '', innerHTML: '', appendChild() {} }; },
+    // display:'both' now also drives the tab path; return a stub rich enough for it to run
+    // without throwing. Tab-side assertions belong to Task 3 — this test only checks the card.
+    createElement() {
+      return { className: '', innerHTML: '', id: '', textContent: '',
+        style: {}, dataset: {}, setAttribute() {}, appendChild() {} };
+    },
   };
   const restore = global.document;
   global.document = fakeDoc;
   try {
     renderLenses({ lenses: { contributors: [
-      { skill: 'business-risk', role: 'contributor', display: 'card', level: 'high',
+      { skill: 'business-risk', role: 'contributor', display: 'both', level: 'high',
         notes: '<script>alert(1)</script>', mitigation: ['flag it'], mainRisk: 'boom' },
     ] } });
     assert.strictEqual(row.children.length, 1);
     const card = row.children[0];
     assert.match(card.className, /biz-risk-high/);
     assert.match(card.innerHTML, /Business Risk/);
-    assert.match(card.innerHTML, /&lt;script&gt;/);       // escaped
+    assert.match(card.innerHTML, /&lt;script&gt;/);       // escaped (the notes value)
     assert.ok(!card.innerHTML.includes('<script>'), card.innerHTML);
-    assert.match(card.innerHTML, /flag it/);
-    assert.match(card.innerHTML, /main risk: boom/);
+    // Card is at-a-glance only: no mitigation list, no main-risk line (those live in the tab).
+    assert.ok(!card.innerHTML.includes('flag it'), card.innerHTML);
+    assert.ok(!card.innerHTML.includes('main risk: boom'), card.innerHTML);
   } finally {
     global.document = restore;
   }
