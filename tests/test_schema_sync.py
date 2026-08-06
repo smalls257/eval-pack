@@ -23,6 +23,11 @@ class TestSchemaSync(unittest.TestCase):
         schema = json.loads((ROOT / "schema" / "eval-pack.schema.json").read_text())
         self.assertFalse(schema["additionalProperties"])
 
+    def test_display_enum_matches_config_display_modes(self):
+        schema = json.loads((ROOT / "schema" / "eval-pack.schema.json").read_text())
+        enum = schema["properties"]["analysisLenses"]["items"]["properties"]["display"]["enum"]
+        self.assertEqual(list(enum), list(config.DISPLAY_MODES))
+
     def test_schema_types_and_defaults_match(self):
         # Guard against type/default drift, not just key drift: the schema must
         # agree with the runtime _TYPES and DEFAULTS for every known key.

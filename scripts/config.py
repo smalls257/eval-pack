@@ -148,6 +148,7 @@ AGGREGATION_RULES = ("core", "min", "mean")
 
 # Allowed report themes.
 THEMES = ("dark", "light", "system")
+DISPLAY_MODES = ("card", "tab", "both")
 
 # Allowed per-flag severity overrides.
 FLAG_LEVELS = ("red", "amber", "green", "off")
@@ -371,8 +372,9 @@ def validate(cfg):
                 )
             if isinstance(lens, dict) and "template" in lens and not isinstance(lens.get("template"), str):
                 errors.append("analysisLenses[{}]: template must be a string path".format(i))
-            if isinstance(lens, dict) and "display" in lens and lens.get("display") not in ("card", "tab", "both"):
-                errors.append("analysisLenses[{}]: display must be 'card', 'tab', or 'both'".format(i))
+            if isinstance(lens, dict) and "display" in lens and lens.get("display") not in DISPLAY_MODES:
+                errors.append("analysisLenses[{}]: display must be one of: {}".format(
+                    i, ", ".join(repr(m) for m in DISPLAY_MODES)))
     theme = cfg.get("defaultTheme")
     if theme is not None and theme not in THEMES:
         errors.append("defaultTheme: {!r} is not one of {}".format(theme, list(THEMES)))
