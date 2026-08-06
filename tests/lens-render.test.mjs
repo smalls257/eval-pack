@@ -22,7 +22,7 @@ const { effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lens
   repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom,
   deliveredFrom, unmetFrom, provenFrom, unprovenFrom,
   testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom,
-  lensCardsFrom, lensContributorBody, lensCardMarkup } = require('../templates/html/scripts.js');
+  lensCardsFrom, lensContributorBody, lensCardMarkup, lensHasDetail } = require('../templates/html/scripts.js');
 
 test('effectiveConfidence uses finalScore when a non-core rule ran scorers', () => {
   const analysis = { highlights: { confidencePercent: 90 } };
@@ -323,7 +323,9 @@ test('lensCardsFrom maps a display:"card" business-risk contributor to a summary
   assert.strictEqual(cards[0].level, 'medium');
   assert.strictEqual(cards[0].note, 'Moderate blast radius.');
   assert.ok(!('items' in cards[0]), 'card descriptor must not carry a detail list');
-  assert.deepStrictEqual(lensTabsFrom(lenses), []);
+  // This card carries detail (mitigation + mainRisk), so it also earns a tab — the detail is
+  // never silently dropped. A truly compact card (no detail) yields zero tabs (covered below).
+  assert.deepStrictEqual(lensTabsFrom(lenses).map(t => t.panelId), ['lens-business-risk']);
 });
 
 test('lensCardsFrom + lensTabsFrom BOTH surface a display:"both" lens', () => {
@@ -612,4 +614,33 @@ test('a display:"both" scorer tab omits the duplicated rationale but keeps score
 test('a display:"tab" scorer tab KEEPS its rationale', () => {
   const tab = { kind: 'scorer', record: { skill: 'perf', role: 'scorer', score: 61, rationale: 'KEEP RATIONALE', findings: [] } };
   assert.ok(lensCardMarkup(tab).includes('KEEP RATIONALE'));
+});
+
+test('lensHasDetail: true only when findings/mitigation/mainRisk present; never throws', () => {
+  assert.strictEqual(lensHasDetail({}), false);
+  assert.strictEqual(lensHasDetail({ level: 'low', notes: 'x' }), false);
+  assert.strictEqual(lensHasDetail({ mitigation: ['a'] }), true);
+  assert.strictEqual(lensHasDetail({ findings: ['a'] }), true);
+  assert.strictEqual(lensHasDetail({ mainRisk: 'r' }), true);
+});
+
+test('a display:"card" lens WITH detail gets a tab (no silent drop); WITHOUT detail stays card-only', () => {
+  const withDetail = { contributors: [
+    { skill: 'biz', role: 'contributor', display: 'card', level: 'high', notes: 'n', mitigation: ['gate it'] }] };
+  assert.deepStrictEqual(lensTabsFrom(withDetail).map(t => t.panelId), ['lens-biz']);
+  assert.strictEqual(lensCardsFrom(withDetail).length, 1);
+
+  const noDetail = { contributors: [
+    { skill: 'biz2', role: 'contributor', display: 'card', level: 'low', notes: 'n' }] };
+  assert.deepStrictEqual(lensTabsFrom(noDetail), []);
+  assert.strictEqual(lensCardsFrom(noDetail).length, 1);
+});
+
+test('a display:"card" contributor tab (auto-surfaced) omits the note (card owns it) but shows detail', () => {
+  const rec = { skill: 'biz', role: 'contributor', display: 'card', level: 'high',
+    notes: 'ONE LINER', mitigation: ['gate it'], mainRisk: 'rollback' };
+  const body = lensContributorBody(rec);
+  assert.ok(!body.includes('ONE LINER'));
+  assert.ok(body.includes('gate it'));
+  assert.ok(body.includes('rollback'));
 });

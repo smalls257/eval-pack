@@ -1221,13 +1221,15 @@ function lensTabLabel(skill) {
 function lensTabsFrom(lenses) {
   const l = lenses || {};
   const records = [];
-  // display:'card' lenses render as header cards (lensCardsFrom), not nav tabs — exclude them here.
-  (l.scorers || []).forEach(r => { if (r.display !== 'card') records.push({ kind: 'scorer', record: r }); });
+  // A card-only lens is normally excluded here — EXCEPT one that carries detail, which still
+  // earns a tab so its findings/mitigation/main-risk are never silently dropped.
+  const earnsTab = r => r.display !== 'card' || lensHasDetail(r);
+  (l.scorers || []).forEach(r => { if (earnsTab(r)) records.push({ kind: 'scorer', record: r }); });
   (l.contributors || []).forEach(r => {
-    if (DEDICATED_CONTRIBUTORS.has(r.skill) || r.display === 'card') return;
-    records.push({ kind: 'contributor', record: r });
+    if (DEDICATED_CONTRIBUTORS.has(r.skill)) return;
+    if (earnsTab(r)) records.push({ kind: 'contributor', record: r });
   });
-  (l.failures || []).forEach(r => { if (r.display !== 'card') records.push({ kind: 'failure', record: r }); });
+  (l.failures || []).forEach(r => { if (earnsTab(r)) records.push({ kind: 'failure', record: r }); });
 
   const seen = new Map();  // panelId → count, to de-dupe colliding slugs
   return records.map(({ kind, record }) => {
@@ -1247,6 +1249,19 @@ function lensTabsFrom(lenses) {
 // Order mirrors lensTabsFrom: scorers → non-dedicated contributors → failures. This is the
 // generic mechanism business-risk migrated onto (it used to be three bespoke hardcoded cards).
 // Airplane Test: absent/empty lenses → [], never throws on a missing field.
+// Does this lens carry renderable detail beyond its level/note/score summary? Drives whether a
+// display:'card' lens still earns a tab — so card-only never SILENTLY drops findings/mitigation.
+function lensHasDetail(rec) {
+  const r = rec || {};
+  return ((r.findings || []).length > 0) || ((r.mitigation || []).length > 0) || !!r.mainRisk;
+}
+
+// Does this lens render a header card (and therefore already show its one-line note there)?
+function lensHasCard(rec) {
+  const d = (rec || {}).display;
+  return d === 'card' || d === 'both';
+}
+
 function lensCardsFrom(lenses) {
   const l = lenses || {};
   const records = [];
@@ -1292,8 +1307,8 @@ function lensCustomCard(rec, headExtra) {
 function lensContributorBody(rec) {
   const level = (typeof rec.level === 'string' && /^(low|medium|high)$/i.test(rec.level))
     ? rec.level.toLowerCase() : null;
-  // A display:'both' lens already shows this one-line note on its header card — don't repeat it here.
-  const note = (rec.display === 'both') ? '' : (rec.rationale || rec.notes || '');
+  // A lens that also renders a header card already shows this one-line note there — don't repeat it here.
+  const note = lensHasCard(rec) ? '' : (rec.rationale || rec.notes || '');
   const findings = (rec.findings || []).map(f => html`<li>${lensFindingText(f)}</li>`).join('');
   const mitigation = (rec.mitigation || []).map(m => html`<li>${m}</li>`).join('');
   return '' +
@@ -1313,8 +1328,8 @@ function lensCardMarkup(tab) {
   if (tab.kind === 'scorer') {
     if (rec.templateHtml) return lensCustomCard(rec, html`<span class="lens-score">${lensScore(rec.score)}</span>`);
     const findings = (rec.findings || []).map(f => html`<li>${lensFindingText(f)}</li>`).join('');
-    // A display:'both' scorer shows its rationale on the header card — the tab carries only the findings detail.
-    const rationale = (rec.display === 'both') ? '' : html`<p class="lens-rationale">${rec.rationale}</p>`;
+    // A scorer that also renders a header card shows its rationale there — the tab carries only the findings detail.
+    const rationale = lensHasCard(rec) ? '' : html`<p class="lens-rationale">${rec.rationale}</p>`;
     return html`<div class="lens-card"><div class="lens-head"><span class="lens-meta">scorer · ${rec.skill}</span><span class="lens-score">${lensScore(rec.score)}</span></div>${safe(rationale)}${safe(findings ? html`<ul class="lens-findings">${safe(findings)}</ul>` : '')}</div>`;
   }
   if (tab.kind === 'contributor') {
@@ -1477,5 +1492,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom, lensCardsFrom, lensContributorBody, lensCardMarkup, renderLenses };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom, lensCardsFrom, lensContributorBody, lensCardMarkup, lensHasDetail, renderLenses };
 }
