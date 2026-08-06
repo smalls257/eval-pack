@@ -1292,7 +1292,8 @@ function lensCustomCard(rec, headExtra) {
 function lensContributorBody(rec) {
   const level = (typeof rec.level === 'string' && /^(low|medium|high)$/i.test(rec.level))
     ? rec.level.toLowerCase() : null;
-  const note = rec.rationale || rec.notes || '';
+  // A display:'both' lens already shows this one-line note on its header card — don't repeat it here.
+  const note = (rec.display === 'both') ? '' : (rec.rationale || rec.notes || '');
   const findings = (rec.findings || []).map(f => html`<li>${lensFindingText(f)}</li>`).join('');
   const mitigation = (rec.mitigation || []).map(m => html`<li>${m}</li>`).join('');
   return '' +
@@ -1312,7 +1313,9 @@ function lensCardMarkup(tab) {
   if (tab.kind === 'scorer') {
     if (rec.templateHtml) return lensCustomCard(rec, html`<span class="lens-score">${lensScore(rec.score)}</span>`);
     const findings = (rec.findings || []).map(f => html`<li>${lensFindingText(f)}</li>`).join('');
-    return html`<div class="lens-card"><div class="lens-head"><span class="lens-meta">scorer · ${rec.skill}</span><span class="lens-score">${lensScore(rec.score)}</span></div><p class="lens-rationale">${rec.rationale}</p>${safe(findings ? html`<ul class="lens-findings">${safe(findings)}</ul>` : '')}</div>`;
+    // A display:'both' scorer shows its rationale on the header card — the tab carries only the findings detail.
+    const rationale = (rec.display === 'both') ? '' : html`<p class="lens-rationale">${rec.rationale}</p>`;
+    return html`<div class="lens-card"><div class="lens-head"><span class="lens-meta">scorer · ${rec.skill}</span><span class="lens-score">${lensScore(rec.score)}</span></div>${safe(rationale)}${safe(findings ? html`<ul class="lens-findings">${safe(findings)}</ul>` : '')}</div>`;
   }
   if (tab.kind === 'contributor') {
     if (rec.templateHtml) return lensCustomCard(rec);
@@ -1474,5 +1477,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom, lensCardsFrom, lensContributorBody, renderLenses };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom, lensCardsFrom, lensContributorBody, lensCardMarkup, renderLenses };
 }

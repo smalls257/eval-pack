@@ -22,7 +22,7 @@ const { effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lens
   repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom,
   deliveredFrom, unmetFrom, provenFrom, unprovenFrom,
   testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom,
-  lensCardsFrom, lensContributorBody } = require('../templates/html/scripts.js');
+  lensCardsFrom, lensContributorBody, lensCardMarkup } = require('../templates/html/scripts.js');
 
 test('effectiveConfidence uses finalScore when a non-core rule ran scorers', () => {
   const analysis = { highlights: { confidencePercent: 90 } };
@@ -580,4 +580,36 @@ test('renderImprovements/renderPromptPattern degrade to empty-state with no lens
   } finally {
     global.document = restore;
   }
+});
+
+// ── display:'both' dedupe — a `both` lens's one-line summary lives on the header card,
+// so its tab must NOT repeat it (only the deeper detail). A `tab`/unset lens owns the
+// note as its only projection and MUST keep it. Decision keys ONLY on rec.display.
+test('a display:"both" contributor tab omits the summary note (card owns it) but keeps detail', () => {
+  const rec = { skill: 'business-risk', role: 'contributor', display: 'both', level: 'high',
+    notes: 'ONE LINER NOTE', mitigation: ['gate the flag'], mainRisk: 'rollback path' };
+  const body = lensContributorBody(rec);
+  assert.ok(!body.includes('ONE LINER NOTE'), 'note is on the card, not repeated in the both-tab');
+  assert.ok(body.includes('gate the flag'));
+  assert.ok(body.includes('rollback path'));
+  assert.match(body, /lens-level biz-risk-high/);
+});
+
+test('a display:"tab" (or unset) contributor tab KEEPS its note (only projection)', () => {
+  const rec = { skill: 'x', role: 'contributor', display: 'tab', notes: 'KEEP ME', mitigation: [] };
+  assert.ok(lensContributorBody(rec).includes('KEEP ME'));
+});
+
+test('a display:"both" scorer tab omits the duplicated rationale but keeps score + findings', () => {
+  const tab = { kind: 'scorer', record: { skill: 'perf', role: 'scorer', score: 61, display: 'both',
+    rationale: 'DUPED RATIONALE', findings: ['slow query in loop'] } };
+  const out = lensCardMarkup(tab);
+  assert.ok(!out.includes('DUPED RATIONALE'), 'rationale is on the card, not repeated in the both-tab');
+  assert.ok(out.includes('slow query in loop'));
+  assert.ok(out.includes('61'));
+});
+
+test('a display:"tab" scorer tab KEEPS its rationale', () => {
+  const tab = { kind: 'scorer', record: { skill: 'perf', role: 'scorer', score: 61, rationale: 'KEEP RATIONALE', findings: [] } };
+  assert.ok(lensCardMarkup(tab).includes('KEEP RATIONALE'));
 });
