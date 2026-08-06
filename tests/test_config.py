@@ -187,7 +187,7 @@ class TestLensKeys(unittest.TestCase):
             self.assertEqual(len(cfg["analysisLenses"]), 7)
             self.assertEqual(lenses["review"], {"skill": "review", "role": "contributor"})
             self.assertEqual(lenses["business-risk"],
-                             {"skill": "business-risk", "role": "contributor", "display": "card"})
+                             {"skill": "business-risk", "role": "contributor", "display": "both"})
             self.assertEqual(lenses["friction"], {"skill": "friction", "role": "contributor"})
             self.assertEqual(lenses["repo-improvements"], {"skill": "repo-improvements", "role": "contributor"})
             self.assertEqual(lenses["user-improvements"], {"skill": "user-improvements", "role": "contributor"})
@@ -225,6 +225,8 @@ class TestLensKeys(unittest.TestCase):
             {"skill": "x", "role": "scorer", "display": "card"}]}), [])
         self.assertEqual(config.validate({"analysisLenses": [
             {"skill": "x", "role": "scorer", "display": "tab"}]}), [])
+        self.assertEqual(config.validate({"analysisLenses": [
+            {"skill": "x", "role": "scorer", "display": "both"}]}), [])
         # omitted display is valid (generic lenses default to a tab)
         self.assertEqual(config.validate({"analysisLenses": [
             {"skill": "x", "role": "scorer"}]}), [])

@@ -121,9 +121,10 @@
             "type": "string",
             "enum": [
               "card",
-              "tab"
+              "tab",
+              "both"
             ],
-            "description": "How this lens renders: 'card' = compact header card, 'tab' = its own nav tab. Default 'tab' for generic lenses."
+            "description": "How this lens renders: 'card' = compact header card, 'tab' = its own nav tab, 'both' = a summary card up top AND a detail tab. Default 'tab' for generic lenses."
           }
         },
         "required": [
@@ -139,7 +140,7 @@
         {
           "skill": "business-risk",
           "role": "contributor",
-          "display": "card"
+          "display": "both"
         },
         {
           "skill": "friction",
