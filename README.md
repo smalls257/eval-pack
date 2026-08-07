@@ -22,8 +22,10 @@ A Claude Code plugin that generates eval packs — polished HTML reports capturi
   requirement-drift (did delivery match the ask?), verification-rigor (were claims backed by
   evidence?), review (adversarial findings), business-risk (stakeholder risk + mitigation),
   friction (dev-experience friction, classified), repo-improvements (how the codebase could
-  improve), and user-improvements (how the user could improve their prompting, + an example
-  better prompt). Every dimension is tunable per-repo via `analysisLenses` — see
+  improve), and user-improvements (how well the developer owned intent and engineering
+  decisions vs. offloaded that judgment to the AI — calling out both good ownership and
+  offloaded-judgment moments, each cited to a transcript moment, + an example better prompt).
+  Every dimension is tunable per-repo via `analysisLenses` — see
   [Extension lenses](#extension-lenses--your-own-analyses-and-scores).
 - **Tests tab** — deterministic, generated straight from `test-results.json`/`testCommands` exit
   codes, not LLM narrative. Note: this replaced the older LLM-authored `testsExisting` tab, which
