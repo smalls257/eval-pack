@@ -210,7 +210,7 @@ def _is_within(child, parent):
 # EVAL_CONFIG / pathLink / applySections reads in scripts.js.
 _REPORT_CONFIG_KEYS = (
     "brandName", "reportTitle", "footerText", "subjectNoun", "defaultTheme", "messages",
-    "repoBaseUrl", "sections",
+    "repoBaseUrl", "sections", "includeRenderedTranscript",
 )
 
 
@@ -259,7 +259,7 @@ _KNOWN_ARTIFACT_FILES = {
 }
 
 
-def build_artifact_inventory(pack_dir, include_transcript=True):
+def build_artifact_inventory(pack_dir, include_rendered=True):
     """Enumerate the pack's actual evidence files and return `[{name, path, type,
     description}]` — deterministically, from what is on disk. Replaces the evaluator's
     former `artifactInventory` (an LLM was being asked to do a directory listing's job;
@@ -272,7 +272,7 @@ def build_artifact_inventory(pack_dir, include_transcript=True):
     items = []
 
     transcript_html = pack_dir / "transcript.html"
-    if include_transcript and transcript_html.is_file():
+    if include_rendered and transcript_html.is_file():
         items.append({
             "name": "Transcript",
             "path": "transcript.html",
@@ -475,27 +475,38 @@ def inject_into_template(pack_dir, data):
     )
 
 
-def write_zip(pack_dir, zip_path, session_id, include_transcript=True):
-    """Write zip from pack_dir contents. The raw transcript.jsonl is bundled
-    only when include_transcript (the `includeTranscript` userConfig)."""
+def write_zip(pack_dir, zip_path, session_id, include_raw=False, include_rendered=True):
+    """Write zip from pack_dir contents. The raw transcript.jsonl is bundled only when
+    include_raw (`includeRawTranscript`); the rendered transcript.html only when
+    include_rendered (`includeRenderedTranscript`)."""
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for f in pack_dir.rglob("*"):
-            if f.is_file() and (include_transcript or f.suffix != ".jsonl"):
-                zf.write(f, f"{session_id}/{f.relative_to(pack_dir)}")
+            if not f.is_file():
+                continue
+            if f.suffix == ".jsonl" and not include_raw:
+                continue
+            if f.name == "transcript.html" and not include_rendered:
+                continue
+            zf.write(f, f"{session_id}/{f.relative_to(pack_dir)}")
 
 
-def publish_openable(pack_dir, session_id, open_base, include_transcript=True):
+def publish_openable(pack_dir, session_id, open_base, include_raw=False, include_rendered=True):
     """Copy rendered pack to an openable dir outside the repo; return that dir.
 
-    Sensor: the dashboard must be readable without a decompress step. The copy
-    lives outside the repo (system temp by default) so it is never pushed.
-    The raw .jsonl is included only when include_transcript.
+    Sensor: the dashboard must be readable without a decompress step. The copy lives outside
+    the repo (system temp by default) so it is never pushed. The raw .jsonl ships only when
+    include_raw; the rendered transcript.html only when include_rendered.
     """
     open_base.mkdir(parents=True, exist_ok=True)
     open_dir = open_base / f"eval-pack-{session_id}"
     if open_dir.exists():
         shutil.rmtree(open_dir)
-    ignore = None if include_transcript else shutil.ignore_patterns("*.jsonl")
+    patterns = []
+    if not include_raw:
+        patterns.append("*.jsonl")
+    if not include_rendered:
+        patterns.append("transcript.html")
+    ignore = shutil.ignore_patterns(*patterns) if patterns else None
     shutil.copytree(pack_dir, open_dir, ignore=ignore)
     return open_dir
 
@@ -557,18 +568,14 @@ def clickable_link(uri, label=None, env=None):
     return f"\033]8;;{uri}\033\\{label}\033]8;;\033\\"
 
 
-def _include_transcript():
-    """Legacy env shim (standalone renders + direct test): canonical coercion, default True.
-
-    Delegates to config.coerce_env_bool so the standalone path accepts exactly
-    the env layer's spellings (e.g. "off" is False) and raises ConfigError on
-    garbage instead of silently bundling the transcript. The pipeline path
-    reads the resolved eval-config.json, where env was applied at resolve time.
-    """
-    raw = os.environ.get("CLAUDE_PLUGIN_OPTION_includeTranscript")
+def _env_bool(key, default):
+    """Legacy env shim (standalone renders + direct tests): read CLAUDE_PLUGIN_OPTION_<key>,
+    canonical coercion, else `default`. The pipeline path reads the resolved eval-config.json,
+    where env was applied at resolve time."""
+    raw = os.environ.get("CLAUDE_PLUGIN_OPTION_" + key)
     if raw in (None, ""):
-        return True
-    return coerce_env_bool(raw, "includeTranscript")
+        return default
+    return coerce_env_bool(raw, key)
 
 
 def _resolve_render_config(cfg_path):
@@ -581,7 +588,8 @@ def _resolve_render_config(cfg_path):
     if cfg_path.is_file():
         return read_config(cfg_path)
     cfg = read_config(None)
-    cfg["includeTranscript"] = _include_transcript()
+    cfg["includeRawTranscript"] = _env_bool("includeRawTranscript", False)
+    cfg["includeRenderedTranscript"] = _env_bool("includeRenderedTranscript", True)
     return cfg
 
 
@@ -706,7 +714,8 @@ def main():
     }
 
     transcript_jsonl = pack_dir / "transcript.jsonl"
-    include_transcript = bool(cfg["includeTranscript"])
+    include_raw = bool(cfg["includeRawTranscript"])
+    include_rendered = bool(cfg["includeRenderedTranscript"])
     data = {
         "sessionId": args.session_id,
         "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -720,7 +729,7 @@ def main():
             pack_dir / "repo-diffs.json",
             {"repos": [], "skipped": [], "errors": []},
         ),
-        "artifactInventory": build_artifact_inventory(pack_dir, include_transcript),
+        "artifactInventory": build_artifact_inventory(pack_dir, include_rendered),
         "rounds": list(prev_data.get("rounds") or []) + [new_round],
         "transcript": load_jsonl(transcript_jsonl) if transcript_jsonl.is_file() else [],
         "evalConfig": report_config(cfg),
@@ -736,7 +745,7 @@ def main():
     # tools.json, transcript.jsonl, …) before zip/publish. transcript.html was masked at source.
     redact_pack(pack_dir, redaction_rules)
 
-    write_zip(pack_dir, zip_path, args.session_id, include_transcript)
+    write_zip(pack_dir, zip_path, args.session_id, include_raw, include_rendered)
 
     # Gate 1 (halts): the zip is the durable artifact. If it doesn't reopen clean and
     # contain the report's index.html, the render must NOT report success.
@@ -765,7 +774,7 @@ def main():
             )
         else:
             try:
-                open_dir = publish_openable(pack_dir, args.session_id, open_base, include_transcript)
+                open_dir = publish_openable(pack_dir, args.session_id, open_base, include_raw, include_rendered)
                 # Gate 2 (non-fatal): only advertise the link when index.html actually
                 # exists AND its file:// URI round-trips back to that real file — so we
                 # never print a link that doesn't open. The zip above is already durable.

@@ -59,19 +59,19 @@ class TestBuildArtifactInventory(unittest.TestCase):
             self.assertEqual(by_path["tools.json"]["type"], "data")
             self.assertEqual(by_path["lenses.json"]["type"], "data")
 
-    def test_include_transcript_false_omits_transcript_entry(self):
+    def test_include_rendered_false_omits_transcript_entry(self):
         with tempfile.TemporaryDirectory() as d:
             pack = Path(d)
             (pack / "transcript.html").write_text("<html></html>", encoding="utf-8")
 
-            items = render_html.build_artifact_inventory(pack, include_transcript=False)
+            items = render_html.build_artifact_inventory(pack, include_rendered=False)
 
             self.assertEqual(items, [])
 
     def test_no_transcript_html_means_no_transcript_entry_even_if_included(self):
         with tempfile.TemporaryDirectory() as d:
             pack = Path(d)
-            items = render_html.build_artifact_inventory(pack, include_transcript=True)
+            items = render_html.build_artifact_inventory(pack, include_rendered=True)
             self.assertEqual(items, [])
 
 
