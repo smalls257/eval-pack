@@ -1,0 +1,30 @@
+{
+  "business-risk": {
+    "sha256": "2db5650fe5625d3a683a2be341f48296a246abffb50344c779d433b947e861ec",
+    "version": "1.0.0"
+  },
+  "friction": {
+    "sha256": "2532026320d880d327a13abdb19433f1ceb674e348542ac5e7bab1cc3d71d848",
+    "version": "1.0.0"
+  },
+  "repo-improvements": {
+    "sha256": "40423d64f8d93b67817c5c17ca54df53b2be9b5eb77de5dfa525130149f6a7b5",
+    "version": "1.0.0"
+  },
+  "requirement-drift": {
+    "sha256": "39c72921cfcb279f100e04523ff76880625ddddf9ebe5ea7c9184ef9a44f98b0",
+    "version": "1.0.0"
+  },
+  "review": {
+    "sha256": "5a5c73a2d0b2ada805132e098679a3ca4fb456fcf0b52d848e5f5e4e396fa9d3",
+    "version": "1.0.0"
+  },
+  "user-improvements": {
+    "sha256": "8741017f8d9eea06f35ad6dd1bf037bb02d8e40c0350654894b6a3128c80fbc6",
+    "version": "1.0.0"
+  },
+  "verification-rigor": {
+    "sha256": "f3a921cfe576f9a271e5f6c3d3754eab6098ed23387cb740f12cfc0ef2096f09",
+    "version": "1.0.0"
+  }
+}
