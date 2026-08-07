@@ -269,6 +269,58 @@ class TestLensGates(unittest.TestCase):
             biz = next(c for c in out["contributors"] if c["skill"] == "business-risk")
             self.assertEqual(biz["display"], "both")  # configured 'both' wins over the 'card' decoy
 
+    def test_first_party_lens_gets_locked_version(self):
+        # 'review' has a lockfile entry (1.0.0); a first-party lens with no configured
+        # version inherits the trusted locked value onto its result.
+        with tempfile.TemporaryDirectory() as d:
+            pack = Path(d)
+            (pack / "lenses").mkdir()
+            (pack / "lenses" / "review.json").write_text(
+                json.dumps({"skill": "review", "role": "contributor",
+                            "title": "Review", "findings": ["ok"]}),
+                encoding="utf-8")
+            (pack / "analysis.json").write_text(
+                json.dumps({"highlights": {"confidencePercent": 90}}), encoding="utf-8")
+            self._cfg(d, [{"skill": "review", "role": "contributor"}])
+            out = assemble_lenses.assemble(d)
+            review = next(c for c in out["contributors"] if c["skill"] == "review")
+            self.assertEqual(review["version"], "1.0.0")  # from the lockfile
+
+    def test_config_version_overrides_lockfile(self):
+        # A configured version pins/overrides the locked value for that skill.
+        with tempfile.TemporaryDirectory() as d:
+            pack = Path(d)
+            (pack / "lenses").mkdir()
+            (pack / "lenses" / "review.json").write_text(
+                json.dumps({"skill": "review", "role": "contributor",
+                            "title": "Review", "findings": ["ok"]}),
+                encoding="utf-8")
+            (pack / "analysis.json").write_text(
+                json.dumps({"highlights": {"confidencePercent": 90}}), encoding="utf-8")
+            self._cfg(d, [{"skill": "review", "role": "contributor", "version": "2.5.0"}])
+            out = assemble_lenses.assemble(d)
+            review = next(c for c in out["contributors"] if c["skill"] == "review")
+            self.assertEqual(review["version"], "2.5.0")  # config wins over lockfile 1.0.0
+
+    def test_lens_self_declared_version_is_stripped(self):
+        # A lens's lenses/<skill>.json is LLM-authored (untrusted). A version it
+        # self-declares must be stripped and replaced by the trusted config/lockfile value.
+        with tempfile.TemporaryDirectory() as d:
+            pack = Path(d)
+            (pack / "lenses").mkdir()
+            (pack / "lenses" / "review.json").write_text(
+                json.dumps({"skill": "review", "role": "contributor",
+                            "title": "Review", "findings": ["ok"],
+                            "version": "9.9.9"}),  # self-declared decoy
+                encoding="utf-8")
+            (pack / "analysis.json").write_text(
+                json.dumps({"highlights": {"confidencePercent": 90}}), encoding="utf-8")
+            self._cfg(d, [{"skill": "review", "role": "contributor"}])
+            out = assemble_lenses.assemble(d)
+            review = next(c for c in out["contributors"] if c["skill"] == "review")
+            self.assertEqual(review["version"], "1.0.0")  # trusted lockfile, not the decoy
+            self.assertNotEqual(review["version"], "9.9.9")
+
     def test_write_outputs_idempotent_on_rerun(self):
         with tempfile.TemporaryDirectory() as d:
             pack = Path(d)

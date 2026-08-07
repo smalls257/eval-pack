@@ -374,6 +374,8 @@ def validate(cfg):
                 )
             if isinstance(lens, dict) and "template" in lens and not isinstance(lens.get("template"), str):
                 errors.append("analysisLenses[{}]: template must be a string path".format(i))
+            if isinstance(lens, dict) and "version" in lens and not isinstance(lens.get("version"), str):
+                errors.append("analysisLenses[{}]: version must be a string".format(i))
             if isinstance(lens, dict) and "display" in lens and lens.get("display") not in DISPLAY_MODES:
                 errors.append("analysisLenses[{}]: display must be one of: {}".format(
                     i, ", ".join(repr(m) for m in DISPLAY_MODES)))

@@ -217,6 +217,13 @@ class TestLensKeys(unittest.TestCase):
         self.assertEqual(config.validate({"analysisLenses": [
             {"skill": "x", "role": "scorer", "template": "t.html"}]}), [])
 
+    def test_lens_version_must_be_string(self):
+        self.assertEqual(config.validate({"analysisLenses": [
+            {"skill": "x", "role": "scorer", "version": "2.1.0"}]}), [])
+        errs = config.validate({"analysisLenses": [
+            {"skill": "x", "role": "scorer", "version": 3}]})
+        self.assertTrue(any("version" in e for e in errs))
+
     def test_lens_display_must_be_card_or_tab(self):
         bad = config.validate({"analysisLenses": [
             {"skill": "x", "role": "scorer", "display": "sideways"}]})

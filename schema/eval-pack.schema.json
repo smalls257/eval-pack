@@ -125,6 +125,10 @@
               "both"
             ],
             "description": "How this lens renders: 'card' = compact header card, 'tab' = its own nav tab, 'both' = a summary card up top AND a detail tab. Default 'tab' for generic lenses."
+          },
+          "version": {
+            "type": "string",
+            "description": "Version label for this lens, shown in the report. For first-party lenses it defaults from agents/lenses/lens-versions.json; set it here to pin/override or to version a third-party lens."
           }
         },
         "required": [

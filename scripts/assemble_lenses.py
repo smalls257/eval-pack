@@ -15,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))  # noqa: E402
 import aggregate  # noqa: E402
 import config  # noqa: E402
+import lens_versions  # noqa: E402
 
 
 def assemble(pack_dir):
@@ -67,15 +68,26 @@ def assemble(pack_dir):
     # a lens's self-declared display is untrusted and stripped; the configured value wins.
     disp_by_skill = {l.get("skill"): l.get("display")
                      for l in cfg.get("analysisLenses") or [] if l.get("display")}
+    # version is lens metadata — config/lockfile-sourced, same trust rule as display/templateHtml:
+    # a lens's self-declared version is untrusted and stripped; the configured/locked value wins.
+    _lock = lens_versions.load_lock()
+    ver_by_skill = {l.get("skill"): l.get("version")
+                    for l in cfg.get("analysisLenses") or [] if l.get("version")}
     for r in results:
         r.pop("templateHtml", None)  # never trust lens-supplied markup — resolve-embedded only
         r.pop("display", None)       # never trust lens-supplied presentation — config only
+        r.pop("version", None)       # never trust lens-supplied version — config/lockfile only
         t = tpl_by_skill.get(r.get("skill"))
         if t and "error" not in r:
             r["templateHtml"] = t
         d = disp_by_skill.get(r.get("skill"))
         if d and "error" not in r:
             r["display"] = d
+        # version attaches to failures too — it's metadata, not trusted markup; a failure card
+        # should show which lens version failed. So no "error not in r" guard here.
+        v = ver_by_skill.get(r.get("skill")) or (_lock.get(r.get("skill")) or {}).get("version")
+        if v:
+            r["version"] = v
 
     analysis_path = pack / "analysis.json"
     analysis = {}
