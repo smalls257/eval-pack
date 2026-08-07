@@ -101,7 +101,8 @@ eval-pack is configured per-repo via `.eval-pack.json` (committed) and `.eval-pa
 (gitignored, per-developer). Layering, lowest to highest: bundled defaults < `extends` presets <
 `.eval-pack.json` < `.eval-pack.local.json` < `CLAUDE_PLUGIN_OPTION_*` env. Validation is
 fail-loud: an unknown key, bad type, bad regex, or missing referenced file halts generation with
-a precise error. Run `/eval-pack:setup` for a guided start.
+a precise error. Run `/eval-pack:setup` for a guided start. **Full per-key reference (every
+option, type, default, and constraint):** [`docs/configuration.md`](docs/configuration.md).
 
 ```json
 {
@@ -131,7 +132,8 @@ list value uses comma shorthand for simple tokens (`"a,b,c"`). File-layer lists 
 instead (e.g. `["!replace", "ci-flake", "review-latency"]`) — a leading `"!replace"` in an env
 JSON list is honored the same way.
 
-Key groups (full key list + types: `schema/eval-pack.schema.json`):
+Key groups below (full per-key reference: [`docs/configuration.md`](docs/configuration.md); types:
+`schema/eval-pack.schema.json`):
 - **Evaluation prompts** — `analysisStance` (bundled: skeptical-reviewer, collaborative-coach,
   compliance-auditor; or your own at `.eval-pack/stances/<name>.md`), `rubric` (band → criteria;
   the evaluator must name the band it applied, and a validator rejects unknown bands),
