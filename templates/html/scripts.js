@@ -1286,6 +1286,7 @@ function lensCardsFrom(lenses) {
       value,
       level,
       note: record.rationale || record.notes || '',
+      version: record.version,
       record,
     };
   });
@@ -1326,6 +1327,13 @@ function lensContributorBody(rec) {
 // (not safe() in plain literals — that stringifies to "[object Object]"). html`` escapes
 // each interpolation, which is what we want for untrusted lens output (skill names,
 // rationales, findings, error text).
+// Trusted-but-escaped version marker for a lens meta line. Empty string when no version,
+// so the meta line reads "scorer · skill" unchanged (Airplane Test).
+function lensVersionSuffix(rec) {
+  const v = rec && rec.version;
+  return (typeof v === 'string' && v) ? html` · v${v}` : '';
+}
+
 function lensCardMarkup(tab) {
   const rec = tab.record;
   if (tab.kind === 'scorer') {
@@ -1333,14 +1341,14 @@ function lensCardMarkup(tab) {
     const findings = (rec.findings || []).map(f => html`<li>${lensFindingText(f)}</li>`).join('');
     // A scorer that also renders a header card shows its rationale there — the tab carries only the findings detail.
     const rationale = lensHasCard(rec) ? '' : html`<p class="lens-rationale">${rec.rationale}</p>`;
-    return html`<div class="lens-card"><div class="lens-head"><span class="lens-meta">scorer · ${rec.skill}</span><span class="lens-score">${lensScore(rec.score)}</span></div>${safe(rationale)}${safe(findings ? html`<ul class="lens-findings">${safe(findings)}</ul>` : '')}</div>`;
+    return html`<div class="lens-card"><div class="lens-head"><span class="lens-meta">scorer · ${rec.skill}${safe(lensVersionSuffix(rec))}</span><span class="lens-score">${lensScore(rec.score)}</span></div>${safe(rationale)}${safe(findings ? html`<ul class="lens-findings">${safe(findings)}</ul>` : '')}</div>`;
   }
   if (tab.kind === 'contributor') {
     if (rec.templateHtml) return lensCustomCard(rec);
-    return html`<div class="lens-card"><div class="lens-head"><span class="lens-meta">contributor · ${rec.skill}</span></div><h4>${rec.title}</h4>${safe(lensContributorBody(rec))}</div>`;
+    return html`<div class="lens-card"><div class="lens-head"><span class="lens-meta">contributor · ${rec.skill}${safe(lensVersionSuffix(rec))}</span></div><h4>${rec.title}</h4>${safe(lensContributorBody(rec))}</div>`;
   }
   // failure
-  return html`<div class="lens-card lens-fail"><div class="lens-meta">failed · ${rec.skill}</div><p>${rec.error}</p></div>`;
+  return html`<div class="lens-card lens-fail"><div class="lens-meta">failed · ${rec.skill}${safe(lensVersionSuffix(rec))}</div><p>${rec.error}</p></div>`;
 }
 
 // Inject display:'card' lenses as compact cards into the highlights row, after the static
@@ -1359,7 +1367,8 @@ function renderLensCards(lenses) {
     card.innerHTML =
       html`<div class="highlight-card-label">${c.label}</div>` +
       html`<div class="highlight-card-value">${c.value == null ? '' : c.value}</div>` +
-      html`<div class="highlight-card-notes">${c.note}</div>`;
+      html`<div class="highlight-card-notes">${c.note}</div>` +
+      ((typeof c.version === 'string' && c.version) ? html`<div class="highlight-card-version">v${c.version}</div>` : '');
     row.appendChild(card);
   });
 }
@@ -1495,5 +1504,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom, lensCardsFrom, lensContributorBody, lensCardMarkup, lensHasDetail, renderLenses, renderTranscript };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom, lensCardsFrom, lensContributorBody, lensCardMarkup, lensVersionSuffix, lensHasDetail, renderLenses, renderTranscript };
 }

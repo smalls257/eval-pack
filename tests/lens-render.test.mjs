@@ -22,7 +22,7 @@ const { effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lens
   repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom,
   deliveredFrom, unmetFrom, provenFrom, unprovenFrom,
   testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom,
-  lensCardsFrom, lensContributorBody, lensCardMarkup, lensHasDetail, renderTranscript } = require('../templates/html/scripts.js');
+  lensCardsFrom, lensContributorBody, lensCardMarkup, lensVersionSuffix, lensHasDetail, renderTranscript } = require('../templates/html/scripts.js');
 
 test('effectiveConfidence uses finalScore when a non-core rule ran scorers', () => {
   const analysis = { highlights: { confidencePercent: 90 } };
@@ -614,6 +614,24 @@ test('a display:"both" scorer tab omits the duplicated rationale but keeps score
 test('a display:"tab" scorer tab KEEPS its rationale', () => {
   const tab = { kind: 'scorer', record: { skill: 'perf', role: 'scorer', score: 61, rationale: 'KEEP RATIONALE', findings: [] } };
   assert.ok(lensCardMarkup(tab).includes('KEEP RATIONALE'));
+});
+
+test('lensCardMarkup appends the lens version to the meta line when present, omits when absent', () => {
+  const withV = lensCardMarkup({ kind: 'scorer', record: { skill: 'verification-rigor', score: 90, rationale: 'ok', version: '1.2.0' } });
+  assert.ok(withV.includes('verification-rigor'));
+  assert.match(withV, /v1\.2\.0/);
+  const noV = lensCardMarkup({ kind: 'scorer', record: { skill: 'verification-rigor', score: 90, rationale: 'ok' } });
+  assert.ok(!/·\s*v\d/.test(noV), 'no version marker when version absent');
+});
+
+test('a failed lens card shows its version when present', () => {
+  const out = lensCardMarkup({ kind: 'failure', record: { skill: 'broken', error: 'boom', version: '3.0.0' } });
+  assert.match(out, /v3\.0\.0/);
+});
+
+test('lensVersionSuffix escapes the version and is empty when absent', () => {
+  assert.strictEqual(lensVersionSuffix({}), '');
+  assert.match(String(lensVersionSuffix({ version: '1.0.0' })), /v1\.0\.0/);
 });
 
 test('lensHasDetail: true only when findings/mitigation/mainRisk present; never throws', () => {
