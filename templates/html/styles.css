@@ -698,6 +698,8 @@ main.container {
   margin-bottom: 6px;
 }
 
+.improvement-body { min-width: 0; }
+
 .improvement-detail {
   font-size: 14px;
   line-height: 1.6;

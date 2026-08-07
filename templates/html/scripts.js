@@ -843,13 +843,16 @@ function userImprovementsFrom(lenses) {
 // user improvement lists. A user-improvements item may carry kind: 'strength'|'improvement',
 // which renders a chip; repo items (no kind) render exactly as before.
 function improvementItem(item) {
-  if (typeof item === 'string') return html`<li>${safe(renderMarkdown(item))}</li>`;
+  // Content lives in a single .improvement-body cell so the li's `28px 1fr` grid (counter +
+  // body) never fractures — multiple inline children would auto-place across both columns and
+  // collapse the text column to one word per line.
+  if (typeof item === 'string') return html`<li><div class="improvement-body">${safe(renderMarkdown(item))}</div></li>`;
   const badge = item.kind === 'strength'
     ? html`<span class="improve-badge strength">Strength</span> `
     : item.kind === 'improvement'
       ? html`<span class="improve-badge improve">Improve</span> `
       : '';
-  return html`<li>${safe(badge)}<strong>${item.title || ''}</strong>${safe(item.detail ? `<br><span class="improvement-detail">${renderMarkdown(item.detail)}</span>` : '')}</li>`;
+  return html`<li><div class="improvement-body">${safe(badge)}<strong>${item.title || ''}</strong>${safe(item.detail ? `<br><span class="improvement-detail">${renderMarkdown(item.detail)}</span>` : '')}</div></li>`;
 }
 
 function improvementList(items) {

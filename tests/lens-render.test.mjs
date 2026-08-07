@@ -689,6 +689,7 @@ test('improvementItem badges strengths and improvements; plain items (repo) get 
   assert.match(improve, /improve-badge improve/);
   assert.ok(improve.includes('Improve'));
   const plain = improvementItem({ title: 'Add a Makefile', detail: 'No unified runner.' });
+  assert.ok(plain.includes('improvement-body'), 'content wrapped in one grid cell so the li grid never fractures');
   assert.ok(!plain.includes('improve-badge'));
 });
 
