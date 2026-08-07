@@ -150,7 +150,9 @@ Key groups (full key list + types: `schema/eval-pack.schema.json`):
 - **Report** — `brandName`, `reportTitle`, `footerText`, `subjectNoun`, `defaultTheme`,
   `sections`, `messages`, `templateDir` (project dir overriding index.html/styles.css/scripts.js
   per-file), `zipNameTemplate`, `repoBaseUrl`.
-- **Pipeline** — `outputDir`, `analysis`, `includeTranscript`.
+- **Pipeline** — `outputDir`, `analysis`, `includeRawTranscript` (bundle raw
+  `transcript.jsonl`; default off), `includeRenderedTranscript` (render/bundle human-readable
+  `transcript.html` + its Transcript artifact link; default on).
 
 `pythonExecutable` stays a plugin option in `.claude/settings.json` (`pluginConfigs.eval-pack.options`)
 rather than moving into `.eval-pack.json` — it has to resolve before any script, including the

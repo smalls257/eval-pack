@@ -28,8 +28,9 @@ rm -rf "$PACK_DIR" && unzip -qo "$ZIP" -d "$OUTPUT_DIR"
 ```
 
 If no zip exists, STOP: "no pack to tune — run /eval-pack:generate first."
-If `${PACK_DIR}/transcript.jsonl` is missing (pack was built with `includeTranscript: false`),
-STOP and say so: tuning needs the recorded transcript — regenerate with it enabled.
+If `${PACK_DIR}/transcript.jsonl` is missing (pack was built with `includeRawTranscript: false`,
+the default), STOP and say so: tuning needs the recorded raw transcript — regenerate with
+`includeRawTranscript: true`.
 
 ## Step 2: Re-resolve configuration (picks up your edits, fail-loud)
 

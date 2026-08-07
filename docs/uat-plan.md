@@ -1,4 +1,4 @@
-Grounding confirmed: `merge_sessions.py` exists; the openable copy is printed by generate as `Open: file://<dir>/index.html` (dir = `<open_base>/eval-pack-<session_id>`), the zip as `Eval pack rendered to <zip>`; `includeTranscript` is a `CLAUDE_PLUGIN_OPTION_includeTranscript` env flag (not a schema key). Below is the final plan.
+Grounding confirmed: `merge_sessions.py` exists; the openable copy is printed by generate as `Open: file://<dir>/index.html` (dir = `<open_base>/eval-pack-<session_id>`), the zip as `Eval pack rendered to <zip>`; the old single `includeTranscript` flag is now two schema keys, `includeRawTranscript` (default `false`) and `includeRenderedTranscript` (default `true`), each settable in `.eval-pack.json` and, for standalone renders without a resolved config, as a `CLAUDE_PLUGIN_OPTION_<key>` env flag. Below is the final plan.
 
 ---
 
@@ -687,9 +687,14 @@ done
 **Expected:** all intended secrets masked; document if a broad earlier rule consumes text a later rule expected (rules apply sequentially over prior `[REDACTED]` substitutions).
 **Pass/Fail:** PASS iff all targets masked. Log any order-sensitivity surprise.
 
-### SC-SEC-06 — Empty rules & transcript-bundling flag (P1)
+### SC-SEC-06 — Empty rules & transcript-bundling flags (P1)
 
-> Clarification: there is **no `includeTranscript` config key** among the schema keys. Raw-transcript bundling is controlled by the generate-time env flag `CLAUDE_PLUGIN_OPTION_includeTranscript` (default `true`), read directly by `render_html.py`. Test it as an env flag, not as `.eval-pack.json` config.
+> Clarification: transcript bundling is controlled by **two** schema keys — `includeRawTranscript`
+> (default `false`: bundle the raw machine-readable `transcript.jsonl`; off unless opted in) and
+> `includeRenderedTranscript` (default `true`: render/bundle the human-readable `transcript.html`
+> and its Transcript artifact link). Both are settable in `.eval-pack.json` and, for standalone
+> renders without a resolved config, as `CLAUDE_PLUGIN_OPTION_includeRawTranscript` /
+> `CLAUDE_PLUGIN_OPTION_includeRenderedTranscript` env flags.
 
 **Setup/Steps:**
 
@@ -710,20 +715,50 @@ diff /tmp/t1.jsonl "$O2/transcript.jsonl" && echo "jsonl identical" || echo "!! 
 ```
 Expected: `redaction: []` produces `transcript.html`/`jsonl` byte-identical to the no-redaction run (no accidental masking/truncation). *Note:* this comparison is only valid if the two runs share the same transcript; if the harness cannot replay the identical transcript, restrict the check to "no `[REDACTED]` token appears and length is unchanged".
 
-(b) **Bundling flag drops the raw jsonl:**
+(b) **`includeRawTranscript` default (`false`) keeps the raw jsonl out; opting in bundles it:**
 ```bash
 uat_reset
-CLAUDE_PLUGIN_OPTION_includeTranscript=false /eval-pack:generate 2>&1 | tee /tmp/g3.log
+# default: includeRawTranscript unset -> false
+/eval-pack:generate 2>&1 | tee /tmp/g3.log
 Z3=$(grep -oE 'Eval pack rendered to \S+' /tmp/g3.log | awk '{print $NF}')
 O3=$(grep -oE 'Open: file://\S+/index.html' /tmp/g3.log | sed -E 's#Open: file://##; s#/index.html##')
 rm -rf /tmp/uz3 && unzip -o "$Z3" -d /tmp/uz3 >/dev/null
-echo "jsonl in zip:";     find /tmp/uz3 -name '*.jsonl'
-echo "jsonl in openable:"; find "$O3"   -name '*.jsonl'
-echo "html in openable:";  find "$O3"   -name 'transcript.html'
-```
-Expected: with `includeTranscript=false`, raw `*.jsonl` is **absent** from both the zip and the openable copy, while the redacted `transcript.html` is still present.
+echo "jsonl in zip (expect none):";     find /tmp/uz3 -name '*.jsonl'
+echo "jsonl in openable (expect none):"; find "$O3"   -name '*.jsonl'
 
-**Pass/Fail:** PASS iff (a) empty rules leave transcripts unaltered AND (b) the bundling flag drops raw jsonl from both outputs while keeping `transcript.html`.
+uat_reset
+echo '{ "includeRawTranscript": true }' > .eval-pack.json
+/eval-pack:generate 2>&1 | tee /tmp/g4.log
+Z4=$(grep -oE 'Eval pack rendered to \S+' /tmp/g4.log | awk '{print $NF}')
+O4=$(grep -oE 'Open: file://\S+/index.html' /tmp/g4.log | sed -E 's#Open: file://##; s#/index.html##')
+rm -rf /tmp/uz4 && unzip -o "$Z4" -d /tmp/uz4 >/dev/null
+echo "jsonl in zip (expect present):";     find /tmp/uz4 -name '*.jsonl'
+echo "jsonl in openable (expect present):"; find "$O4"   -name '*.jsonl'
+```
+Expected: with `includeRawTranscript` at its default (`false`), raw `*.jsonl` is **absent** from
+both the zip and the openable copy. With `includeRawTranscript: true`, raw `*.jsonl` is **present**
+in both.
+
+(c) **`includeRenderedTranscript` default (`true`) bundles `transcript.html`; opting out drops it:**
+```bash
+uat_reset
+# default: includeRenderedTranscript unset -> true
+/eval-pack:generate 2>&1 | tee /tmp/g5.log
+O5=$(grep -oE 'Open: file://\S+/index.html' /tmp/g5.log | sed -E 's#Open: file://##; s#/index.html##')
+echo "html in openable (expect present):"; find "$O5" -name 'transcript.html'
+
+uat_reset
+echo '{ "includeRenderedTranscript": false }' > .eval-pack.json
+/eval-pack:generate 2>&1 | tee /tmp/g6.log
+O6=$(grep -oE 'Open: file://\S+/index.html' /tmp/g6.log | sed -E 's#Open: file://##; s#/index.html##')
+echo "html in openable (expect none):"; find "$O6" -name 'transcript.html'
+```
+Expected: with `includeRenderedTranscript` at its default (`true`), `transcript.html` is
+**present**. With `includeRenderedTranscript: false`, `transcript.html` is **absent**.
+
+**Pass/Fail:** PASS iff (a) empty rules leave transcripts unaltered, (b) `includeRawTranscript`
+defaults to excluding raw jsonl and `true` bundles it, AND (c) `includeRenderedTranscript`
+defaults to bundling `transcript.html` and `false` drops it.
 
 ---
 
