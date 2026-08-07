@@ -183,6 +183,10 @@ Guarantees, enforced by code: a configured lens that produces no output becomes 
 verdict banner and confidence card only through your declared aggregation rule; a failing lens
 never crashes the eval. Bundled examples: `requirement-drift`, `verification-rigor`.
 
+A lens may also carry a `version` (shown in the report, so results are only comparable within a
+version); first-party lens versions come from the `agents/lenses/lens-versions.json` lockfile,
+guarded by `tests/test_lens_versions.py`. See `docs/configuration.md` for details.
+
 #### Custom rendering for a lens
 
 By default a lens renders as a generic card (meta line, rationale, findings list). To control

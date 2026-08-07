@@ -94,7 +94,7 @@ violation halts the pipeline before the report renders.
 
 | Key | Type | Default | Notes |
 |-----|------|---------|-------|
-| `analysisLenses` | list of objects | the 7 bundled lenses | Each: `{ "skill": str, "role": "contributor"\|"scorer", "display"?: "card"\|"tab"\|"both", "template"?: str }`. |
+| `analysisLenses` | list of objects | the 7 bundled lenses | Each: `{ "skill": str, "role": "contributor"\|"scorer", "display"?: "card"\|"tab"\|"both", "template"?: str, "version"?: str }`. |
 
 - `role`: **scorer** returns a 0–100 `score` that reaches the verdict only through
   `verdictAggregation`; **contributor** adds an attributed report section and never touches the score.
@@ -108,6 +108,23 @@ A configured lens that writes no output becomes a red "Lens failed" flag (it can
 a failing lens never crashes the eval. Default lenses:
 `review`, `business-risk`, `friction`, `repo-improvements`, `user-improvements` (contributors),
 `requirement-drift`, `verification-rigor` (scorers). See the README for the full lens authoring guide.
+
+### Lens versioning
+
+Every lens carries a `version`, shown in the report (meta line, failure cards, header cards) —
+scores and findings are only comparable across runs that used the same version.
+
+First-party lenses get their version from `agents/lenses/lens-versions.json`, a checked-in
+lockfile that pairs each lens's `version` with the sha256 of its `.md` file. `tests/test_lens_versions.py`
+recomputes those hashes and fails if a lens `.md` changed without a matching lockfile update — so a
+rubric or scoring change cannot merge green without being versioned. To edit a lens `.md`, bump its
+`version` and update its `sha256` in the lockfile in the same change. Bump the **major** version when
+the change makes old and new scores non-comparable (e.g. a rubric or scoring change); minor/patch
+bumps are for wording or clarity that don't affect comparability.
+
+A `version` set directly on an `analysisLenses` config entry overrides the lockfile. Use this to pin
+a first-party lens to a specific version, or to version a third-party lens whose `.md` doesn't live
+under `agents/lenses/` and so has no lockfile entry.
 
 ### Heuristics, detectors & flags
 
