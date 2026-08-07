@@ -930,11 +930,14 @@ function renderVerdictStatement(analysis) {
   }
 }
 
-function renderTranscript(transcript) {
+function renderTranscript(transcript, evalConfig) {
   const container = document.getElementById('transcript-container');
   if (!container) return;
+  const renderedIncluded = !evalConfig || evalConfig.includeRenderedTranscript !== false;
   if (!transcript || transcript.length === 0) {
-    container.innerHTML = '<p class="empty-state"><a href="transcript.html" target="_blank">Open transcript →</a></p>';
+    container.innerHTML = renderedIncluded
+      ? '<p class="empty-state"><a href="transcript.html" target="_blank">Open transcript →</a></p>'
+      : '<p class="empty-state">Transcript excluded from this pack.</p>';
     return;
   }
 
@@ -1428,7 +1431,7 @@ function renderSession(data) {
 function init(data) {
   renderSession(data);
   renderVisualEvidence(data);
-  renderTranscript(data.transcript);
+  renderTranscript(data.transcript, data.evalConfig);
 
   // Tab navigation
   document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -1492,5 +1495,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom, lensCardsFrom, lensContributorBody, lensCardMarkup, lensHasDetail, renderLenses };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom, lensCardsFrom, lensContributorBody, lensCardMarkup, lensHasDetail, renderLenses, renderTranscript };
 }

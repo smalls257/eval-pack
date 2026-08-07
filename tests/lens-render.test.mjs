@@ -22,7 +22,7 @@ const { effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lens
   repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom,
   deliveredFrom, unmetFrom, provenFrom, unprovenFrom,
   testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom,
-  lensCardsFrom, lensContributorBody, lensCardMarkup, lensHasDetail } = require('../templates/html/scripts.js');
+  lensCardsFrom, lensContributorBody, lensCardMarkup, lensHasDetail, renderTranscript } = require('../templates/html/scripts.js');
 
 test('effectiveConfidence uses finalScore when a non-core rule ran scorers', () => {
   const analysis = { highlights: { confidencePercent: 90 } };
@@ -643,4 +643,21 @@ test('a display:"card" contributor tab (auto-surfaced) omits the note (card owns
   assert.ok(!body.includes('ONE LINER'));
   assert.ok(body.includes('gate it'));
   assert.ok(body.includes('rollback'));
+});
+
+test('renderTranscript shows an excluded note (not a dead link) when rendered transcript is off', () => {
+  const el = { innerHTML: '' };
+  const fakeDoc = { getElementById: id => id === 'transcript-container' ? el : null };
+  const prev = global.document; global.document = fakeDoc;
+  try {
+    renderTranscript([], { includeRenderedTranscript: false });
+    assert.ok(el.innerHTML.includes('excluded'));
+    assert.ok(!el.innerHTML.includes('transcript.html'));
+    el.innerHTML = '';
+    renderTranscript([], { includeRenderedTranscript: true });
+    assert.ok(el.innerHTML.includes('transcript.html'));
+    el.innerHTML = '';
+    renderTranscript([], undefined);   // backward-safe: no evalConfig => link present
+    assert.ok(el.innerHTML.includes('transcript.html'));
+  } finally { global.document = prev; }
 });
