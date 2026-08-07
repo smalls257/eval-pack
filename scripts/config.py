@@ -86,7 +86,8 @@ DEFAULTS = {
     # CLAUDE_PLUGIN_OPTION_* env layer keeps old plugin-option settings working.
     "outputDir": ".eval-packs",
     "analysis": True,
-    "includeTranscript": True,
+    "includeRawTranscript": False,
+    "includeRenderedTranscript": True,
     "ticketBaseUrl": "",
     # Declarative policy checks: {id, level, label, scope, pattern, threshold?} — deterministic
     # regex checks over the recorded session, feeding the flags/verdict pipeline. No code exec.
@@ -130,7 +131,8 @@ _TYPES = {
     "flagSeverities": dict,
     "outputDir": str,
     "analysis": bool,
-    "includeTranscript": bool,
+    "includeRawTranscript": bool,
+    "includeRenderedTranscript": bool,
     "ticketBaseUrl": str,
     "customDetectors": list,
     "detectorScripts": list,

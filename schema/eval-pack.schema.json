@@ -273,10 +273,15 @@
       "default": true,
       "description": "Dispatch the AI evaluator; false emits heuristic flags only."
     },
-    "includeTranscript": {
+    "includeRawTranscript": {
+      "type": "boolean",
+      "default": false,
+      "description": "Bundle the raw machine-readable transcript.jsonl in the pack (zip + openable). Default false — the raw conversation is not shipped unless opted in."
+    },
+    "includeRenderedTranscript": {
       "type": "boolean",
       "default": true,
-      "description": "Bundle the raw transcript.jsonl in the pack."
+      "description": "Render and bundle the human-readable transcript.html and its Transcript artifact link. Default true."
     },
     "ticketBaseUrl": {
       "type": "string",

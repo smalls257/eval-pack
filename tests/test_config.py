@@ -329,13 +329,25 @@ class TestUnifiedKeys(unittest.TestCase):
             cfg = config.load_config(d, env={})
             self.assertEqual(cfg["outputDir"], ".eval-packs")
             self.assertIs(cfg["analysis"], True)
-            self.assertIs(cfg["includeTranscript"], True)
             self.assertEqual(cfg["ticketBaseUrl"], "")
 
-    def test_legacy_env_layer_still_wins(self):
+    def test_transcript_defaults_split(self):
         with tempfile.TemporaryDirectory() as d:
-            cfg = config.load_config(d, env={"CLAUDE_PLUGIN_OPTION_includeTranscript": "false"})
-            self.assertIs(cfg["includeTranscript"], False)
+            cfg = config.load_config(d, env={})
+        self.assertIs(cfg["includeRawTranscript"], False)
+        self.assertIs(cfg["includeRenderedTranscript"], True)
+        self.assertNotIn("includeTranscript", cfg)
+
+    def test_old_includeTranscript_key_is_rejected(self):
+        errs = config.validate({"includeTranscript": True})
+        self.assertTrue(any("includeTranscript" in e and "unknown" in e for e in errs))
+
+    def test_transcript_env_layer(self):
+        with tempfile.TemporaryDirectory() as d:
+            raw_on = config.load_config(d, env={"CLAUDE_PLUGIN_OPTION_includeRawTranscript": "true"})
+            rendered_off = config.load_config(d, env={"CLAUDE_PLUGIN_OPTION_includeRenderedTranscript": "false"})
+        self.assertIs(raw_on["includeRawTranscript"], True)
+        self.assertIs(rendered_off["includeRenderedTranscript"], False)
 
 
 if __name__ == "__main__":

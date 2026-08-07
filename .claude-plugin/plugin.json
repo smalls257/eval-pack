@@ -39,10 +39,16 @@
       "description": "Directory where eval packs are written, relative to project root",
       "default": ".eval-packs"
     },
-    "includeTranscript": {
+    "includeRawTranscript": {
       "type": "boolean",
-      "title": "Include transcript",
-      "description": "Include full conversation transcript in eval pack",
+      "title": "Include raw transcript",
+      "description": "Bundle the raw machine-readable transcript.jsonl in the eval pack. Default off.",
+      "default": false
+    },
+    "includeRenderedTranscript": {
+      "type": "boolean",
+      "title": "Include rendered transcript",
+      "description": "Bundle the human-readable rendered transcript (transcript.html) and its link. Default on.",
       "default": true
     },
     "analysis": {
