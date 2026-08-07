@@ -839,11 +839,17 @@ function userImprovementsFrom(lenses) {
   return contributors.find(c => c.skill === 'user-improvements') || null;
 }
 
-// One improvement item — a plain string or a {title, detail} record. Shared by both the
-// repo and user improvement lists so the string-vs-record handling lives in one place.
+// One improvement item — a plain string or a {title, detail} record. Shared by the repo and
+// user improvement lists. A user-improvements item may carry kind: 'strength'|'improvement',
+// which renders a chip; repo items (no kind) render exactly as before.
 function improvementItem(item) {
   if (typeof item === 'string') return html`<li>${safe(renderMarkdown(item))}</li>`;
-  return html`<li><strong>${item.title || ''}</strong>${safe(item.detail ? `<br><span class="improvement-detail">${renderMarkdown(item.detail)}</span>` : '')}</li>`;
+  const badge = item.kind === 'strength'
+    ? html`<span class="improve-badge strength">Strength</span> `
+    : item.kind === 'improvement'
+      ? html`<span class="improve-badge improve">Improve</span> `
+      : '';
+  return html`<li>${safe(badge)}<strong>${item.title || ''}</strong>${safe(item.detail ? `<br><span class="improvement-detail">${renderMarkdown(item.detail)}</span>` : '')}</li>`;
 }
 
 function improvementList(items) {
@@ -1504,5 +1510,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom, lensCardsFrom, lensContributorBody, lensCardMarkup, lensVersionSuffix, lensHasDetail, renderLenses, renderTranscript };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom, lensCardsFrom, lensContributorBody, lensCardMarkup, lensVersionSuffix, lensHasDetail, renderLenses, renderTranscript, improvementItem };
 }

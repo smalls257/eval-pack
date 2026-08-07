@@ -22,7 +22,8 @@ const { effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lens
   repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom,
   deliveredFrom, unmetFrom, provenFrom, unprovenFrom,
   testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom,
-  lensCardsFrom, lensContributorBody, lensCardMarkup, lensVersionSuffix, lensHasDetail, renderTranscript } = require('../templates/html/scripts.js');
+  lensCardsFrom, lensContributorBody, lensCardMarkup, lensVersionSuffix, lensHasDetail, renderTranscript,
+  improvementItem } = require('../templates/html/scripts.js');
 
 test('effectiveConfidence uses finalScore when a non-core rule ran scorers', () => {
   const analysis = { highlights: { confidencePercent: 90 } };
@@ -678,4 +679,21 @@ test('renderTranscript shows an excluded note (not a dead link) when rendered tr
     renderTranscript([], undefined);   // backward-safe: no evalConfig => link present
     assert.ok(el.innerHTML.includes('transcript.html'));
   } finally { global.document = prev; }
+});
+
+test('improvementItem badges strengths and improvements; plain items (repo) get no badge', () => {
+  const strength = improvementItem({ kind: 'strength', title: 'Owned the schema call', detail: 'You set constraints.' });
+  assert.match(strength, /improve-badge strength/);
+  assert.ok(strength.includes('Strength'));
+  const improve = improvementItem({ kind: 'improvement', title: 'Rubber-stamped the plan', detail: 'You replied only "looks good".' });
+  assert.match(improve, /improve-badge improve/);
+  assert.ok(improve.includes('Improve'));
+  const plain = improvementItem({ title: 'Add a Makefile', detail: 'No unified runner.' });
+  assert.ok(!plain.includes('improve-badge'));
+});
+
+test('improvementItem escapes untrusted title/detail', () => {
+  const out = improvementItem({ kind: 'improvement', title: '<script>x</script>', detail: '<img src=x>' });
+  assert.ok(!out.includes('<script>x</script>'));
+  assert.ok(out.includes('&lt;script&gt;'));
 });

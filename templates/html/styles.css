@@ -704,6 +704,20 @@ main.container {
   color: var(--text-secondary);
 }
 
+.improve-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+.improve-badge.strength { background: rgba(23, 177, 105, 0.12); color: var(--green); border: 1px solid rgba(23, 177, 105, 0.25); }
+.improve-badge.improve  { background: rgba(245, 166, 35, 0.12); color: var(--amber); border: 1px solid rgba(245, 166, 35, 0.25); }
+
 /* ===== Session Artifacts ===== */
 .session-artifacts-list {
   list-style: none;
