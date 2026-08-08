@@ -19,6 +19,10 @@
     "sha256": "5a5c73a2d0b2ada805132e098679a3ca4fb456fcf0b52d848e5f5e4e396fa9d3",
     "version": "1.0.0"
   },
+  "sycophancy": {
+    "version": "1.0.0",
+    "sha256": "175938dd397d0b166cf768adc71ec6e689d7840f7230b3ed6698ef8e197a5a53"
+  },
   "user-improvements": {
     "sha256": "73c23f041c246bc469a3d588085d58f5a52a16803121192c54fa9d8dbeb306a2",
     "version": "2.1.0"

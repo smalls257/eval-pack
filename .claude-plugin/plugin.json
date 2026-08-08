@@ -24,7 +24,8 @@
     "./agents/lenses/business-risk.md",
     "./agents/lenses/friction.md",
     "./agents/lenses/repo-improvements.md",
-    "./agents/lenses/user-improvements.md"
+    "./agents/lenses/user-improvements.md",
+    "./agents/lenses/sycophancy.md"
   ],
   "userConfig": {
     "pythonExecutable": {

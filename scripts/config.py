@@ -52,6 +52,7 @@ DEFAULTS = {
         {"skill": "friction", "role": "contributor"},
         {"skill": "repo-improvements", "role": "contributor"},
         {"skill": "user-improvements", "role": "contributor"},
+        {"skill": "sycophancy", "role": "contributor", "display": "both"},
         {"skill": "requirement-drift", "role": "scorer"},
         {"skill": "verification-rigor", "role": "scorer"},
     ],

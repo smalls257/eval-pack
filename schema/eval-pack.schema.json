@@ -159,6 +159,11 @@
           "role": "contributor"
         },
         {
+          "skill": "sycophancy",
+          "role": "contributor",
+          "display": "both"
+        },
+        {
           "skill": "requirement-drift",
           "role": "scorer"
         },
