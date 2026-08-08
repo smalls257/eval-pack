@@ -129,6 +129,16 @@
           "version": {
             "type": "string",
             "description": "Version label for this lens, shown in the report. For first-party lenses it defaults from agents/lenses/lens-versions.json; set it here to pin/override or to version a third-party lens."
+          },
+          "model": {
+            "type": "string",
+            "enum": [
+              "opus",
+              "sonnet",
+              "haiku",
+              "fable"
+            ],
+            "description": "Optional model tier for THIS lens's subagent (cost/quality tuning). Omit to inherit the session model. Put judgment-heavy lenses on 'opus' and mechanical ones on 'haiku'/'sonnet' to cut cost."
           }
         },
         "required": [

@@ -153,6 +153,10 @@ AGGREGATION_RULES = ("core", "min", "mean")
 THEMES = ("dark", "light", "system")
 DISPLAY_MODES = ("card", "tab", "both")
 
+# Model tiers a lens's subagent may be pinned to (cost/quality tuning). Mirrors the Agent
+# tool's model aliases; a lens with no model inherits the session model.
+LENS_MODELS = ("opus", "sonnet", "haiku", "fable")
+
 # Allowed per-flag severity overrides.
 FLAG_LEVELS = ("red", "amber", "green", "off")
 
@@ -380,6 +384,9 @@ def validate(cfg):
             if isinstance(lens, dict) and "display" in lens and lens.get("display") not in DISPLAY_MODES:
                 errors.append("analysisLenses[{}]: display must be one of: {}".format(
                     i, ", ".join(repr(m) for m in DISPLAY_MODES)))
+            if isinstance(lens, dict) and "model" in lens and lens.get("model") not in LENS_MODELS:
+                errors.append("analysisLenses[{}]: model must be one of: {}".format(
+                    i, ", ".join(repr(m) for m in LENS_MODELS)))
     theme = cfg.get("defaultTheme")
     if theme is not None and theme not in THEMES:
         errors.append("defaultTheme: {!r} is not one of {}".format(theme, list(THEMES)))

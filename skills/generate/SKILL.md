@@ -305,10 +305,16 @@ Compute the diff base the same way as Step 0:
 - `REPO_ROOT=$(git rev-parse --show-toplevel)`
 - If `HEAD~1` exists, `DIFF_BASE=HEAD~1`; otherwise `DIFF_BASE=4b825dc642cb6eb9a060e54bf8d69288fbee4904` (empty tree).
 
-Create the lens output dir: `mkdir -p "${PACK_DIR}/lenses"`. Then for each lens `{skill, role}`,
-dispatch it as a SEPARATE subagent over the read-only artifacts. Each lens WRITES its result to
-`${PACK_DIR}/lenses/<id>.json` (the assembler collects these). Pass only artifact locations —
-never your own reasoning.
+Create the lens output dir: `mkdir -p "${PACK_DIR}/lenses"`. Then for each lens
+`{skill, role, model?}`, dispatch it as a SEPARATE subagent over the read-only artifacts. Each
+lens WRITES its result to `${PACK_DIR}/lenses/<id>.json` (the assembler collects these). Pass only
+artifact locations — never your own reasoning.
+
+**Per-lens model (cost/quality tuning):** if a lens entry has a `model` (`opus`|`sonnet`|`haiku`|
+`fable`), pass it as the `Agent` tool's `model` argument for THAT lens's dispatch. If `model` is
+absent, omit the argument so the lens inherits the session model. This lets you run judgment-heavy
+lenses on `opus` and mechanical ones on `haiku`/`sonnet` — a large cost lever when the transcript
+is big (each lens reads it).
 
 **First-party lenses** ship with eval-pack; dispatch each with the `Agent` tool using the matching
 `subagent_type`, passing `PACK_DIR` (absolute), `REPO_ROOT`, and `DIFF_BASE`:

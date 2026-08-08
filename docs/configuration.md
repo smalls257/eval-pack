@@ -94,7 +94,7 @@ violation halts the pipeline before the report renders.
 
 | Key | Type | Default | Notes |
 |-----|------|---------|-------|
-| `analysisLenses` | list of objects | the 8 bundled lenses | Each: `{ "skill": str, "role": "contributor"\|"scorer", "display"?: "card"\|"tab"\|"both", "template"?: str, "version"?: str }`. |
+| `analysisLenses` | list of objects | the 8 bundled lenses | Each: `{ "skill": str, "role": "contributor"\|"scorer", "display"?: "card"\|"tab"\|"both", "template"?: str, "version"?: str, "model"?: "opus"\|"sonnet"\|"haiku"\|"fable" }`. |
 
 - `role`: **scorer** returns a 0–100 `score` that reaches the verdict only through
   `verdictAggregation`; **contributor** adds an attributed report section and never touches the score.
@@ -103,6 +103,12 @@ violation halts the pipeline before the report renders.
   detail (findings/mitigation/main-risk) still gets a tab so nothing is silently dropped.
 - `template`: repo-relative HTML (mustache-lite) controlling how the lens renders. Markup is
   trusted (resolved from your repo, no `../` escape); every interpolated value is always HTML-escaped.
+- `model` (cost/quality tuning): the model tier that runs THIS lens's subagent — `opus` | `sonnet` |
+  `haiku` | `fable`. Omit to inherit the session model. Each lens reads the transcript, so on a large
+  transcript the model choice is a big cost lever: keep judgment-heavy lenses (e.g. `sycophancy`,
+  `user-improvements`, `review`) on `opus` and mechanical ones (`friction`, `requirement-drift`,
+  `verification-rigor`) on `haiku`/`sonnet`. (Lens dispatch is skill-orchestrated, so the model is
+  honored by the generate skill obeying the config — same trust level as the rest of lens dispatch.)
 
 A configured lens that writes no output becomes a red "Lens failed" flag (it can't silently vanish);
 a failing lens never crashes the eval. Default lenses:

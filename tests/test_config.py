@@ -240,6 +240,17 @@ class TestLensKeys(unittest.TestCase):
         self.assertEqual(config.validate({"analysisLenses": [
             {"skill": "x", "role": "scorer"}]}), [])
 
+    def test_lens_model_must_be_valid_tier(self):
+        for m in ("opus", "sonnet", "haiku", "fable"):
+            self.assertEqual(config.validate({"analysisLenses": [
+                {"skill": "x", "role": "scorer", "model": m}]}), [])
+        errs = config.validate({"analysisLenses": [
+            {"skill": "x", "role": "scorer", "model": "gpt-4"}]})
+        self.assertTrue(any("model" in e for e in errs))
+        # omitted model is valid (lens inherits the session model)
+        self.assertEqual(config.validate({"analysisLenses": [
+            {"skill": "x", "role": "scorer"}]}), [])
+
 
 class TestCosmeticKeys(unittest.TestCase):
     def test_new_defaults(self):
