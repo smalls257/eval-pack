@@ -1382,8 +1382,29 @@ function renderLensCards(lenses) {
   });
 }
 
+// The user-improvements lens judges developer ownership; surface its overall level as an
+// at-a-glance header card. It is a DEDICATED_CONTRIBUTOR (own tab), so it isn't scanned by
+// lensCardsFrom — render its card here. Colors INVERT vs risk cards: high ownership is GOOD.
+function renderOwnershipCard(data) {
+  const row = document.getElementById('highlights-row');
+  if (!row) return;
+  const ui = userImprovementsFrom(data && data.lenses);
+  const lvl = ui && typeof ui.level === 'string' && /^(low|medium|high)$/i.test(ui.level)
+    ? ui.level.toLowerCase() : null;
+  if (!lvl) return;
+  const card = document.createElement('div');
+  card.className = 'highlight-card ownership-' + lvl;
+  const value = lvl.charAt(0).toUpperCase() + lvl.slice(1);
+  card.innerHTML =
+    html`<div class="highlight-card-label">Developer Ownership</div>` +
+    html`<div class="highlight-card-value">${value}</div>` +
+    html`<div class="highlight-card-notes">${ui.levelNote || ''}</div>`;
+  row.appendChild(card);
+}
+
 function renderLenses(data) {
   renderLensCards(data.lenses);  // card lenses land in the highlights row (before any tabs)
+  renderOwnershipCard(data);     // ownership card lands after the risk cards (inverted colors)
   // Aggregation transparency — the core X → final Y math must stay auditable independent of
   // whether any lens renders as a tab (all lenses could be display:'card', leaving zero tabs).
   // Render it into the always-present #lens-agg-line so it never depends on tab existence.
@@ -1513,5 +1534,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom, lensCardsFrom, lensContributorBody, lensCardMarkup, lensVersionSuffix, lensHasDetail, renderLenses, renderTranscript, improvementItem };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom, lensCardsFrom, lensContributorBody, lensCardMarkup, lensVersionSuffix, lensHasDetail, renderLenses, renderOwnershipCard, renderTranscript, improvementItem };
 }

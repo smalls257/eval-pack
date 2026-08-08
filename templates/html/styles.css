@@ -221,6 +221,11 @@ main.container {
 .biz-risk-medium .highlight-card-value { color: var(--amber, #f5a623); }
 .biz-risk-high   .highlight-card-value { color: var(--red, #e5484d); }
 
+/* Developer Ownership card — INVERTED vs the risk cards: high ownership is GOOD (green). */
+.ownership-high   .highlight-card-value { color: var(--green, #17b169); }
+.ownership-medium .highlight-card-value { color: var(--amber, #f5a623); }
+.ownership-low    .highlight-card-value { color: var(--red, #e5484d); }
+
 /* Card-lens item list (e.g. business-risk mitigation steps + main risk). */
 .mitigation-list {
   list-style: none;

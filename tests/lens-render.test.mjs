@@ -23,7 +23,7 @@ const { effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lens
   deliveredFrom, unmetFrom, provenFrom, unprovenFrom,
   testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom,
   lensCardsFrom, lensContributorBody, lensCardMarkup, lensVersionSuffix, lensHasDetail, renderTranscript,
-  improvementItem } = require('../templates/html/scripts.js');
+  improvementItem, renderOwnershipCard } = require('../templates/html/scripts.js');
 
 test('effectiveConfidence uses finalScore when a non-core rule ran scorers', () => {
   const analysis = { highlights: { confidencePercent: 90 } };
@@ -400,6 +400,92 @@ test('renderLenses injects card lenses into the highlights row and escapes their
     // Card is at-a-glance only: no mitigation list, no main-risk line (those live in the tab).
     assert.ok(!card.innerHTML.includes('flag it'), card.innerHTML);
     assert.ok(!card.innerHTML.includes('main risk: boom'), card.innerHTML);
+  } finally {
+    global.document = restore;
+  }
+});
+
+// Render-level: the user-improvements ownership level is surfaced as a header card whose class
+// INVERTS the risk cards (high ownership = good = green). It is a DEDICATED_CONTRIBUTOR (own tab),
+// so it is rendered by renderOwnershipCard, not the generic lensCardsFrom scan.
+function ownershipFakeDoc(row) {
+  return {
+    getElementById(id) { return id === 'highlights-row' ? row : null; },
+    createElement() { return { className: '', innerHTML: '', appendChild() {} }; },
+  };
+}
+
+test('renderOwnershipCard injects an ownership-<level> card (high) with label/value/note', () => {
+  const row = { children: [], appendChild(el) { this.children.push(el); } };
+  const restore = global.document;
+  global.document = ownershipFakeDoc(row);
+  try {
+    renderOwnershipCard({ lenses: { contributors: [
+      { skill: 'user-improvements', role: 'contributor', level: 'high', levelNote: 'Owned it.' },
+    ] } });
+    assert.strictEqual(row.children.length, 1);
+    const card = row.children[0];
+    assert.match(card.className, /ownership-high/);
+    assert.match(card.innerHTML, /Developer Ownership/);
+    assert.match(card.innerHTML, /High/);
+    assert.match(card.innerHTML, /Owned it\./);
+  } finally {
+    global.document = restore;
+  }
+});
+
+test('renderOwnershipCard uses ownership-low for a low level', () => {
+  const row = { children: [], appendChild(el) { this.children.push(el); } };
+  const restore = global.document;
+  global.document = ownershipFakeDoc(row);
+  try {
+    renderOwnershipCard({ lenses: { contributors: [
+      { skill: 'user-improvements', role: 'contributor', level: 'low', levelNote: '' },
+    ] } });
+    assert.strictEqual(row.children.length, 1);
+    assert.match(row.children[0].className, /ownership-low/);
+  } finally {
+    global.document = restore;
+  }
+});
+
+test('renderOwnershipCard injects nothing when there is no level', () => {
+  const row = { children: [], appendChild(el) { this.children.push(el); } };
+  const restore = global.document;
+  global.document = ownershipFakeDoc(row);
+  try {
+    renderOwnershipCard({ lenses: { contributors: [
+      { skill: 'user-improvements', role: 'contributor' },
+    ] } });
+    assert.strictEqual(row.children.length, 0);
+  } finally {
+    global.document = restore;
+  }
+});
+
+test('renderOwnershipCard injects nothing when there is no user-improvements lens', () => {
+  const row = { children: [], appendChild(el) { this.children.push(el); } };
+  const restore = global.document;
+  global.document = ownershipFakeDoc(row);
+  try {
+    renderOwnershipCard({ lenses: { contributors: [
+      { skill: 'business-risk', role: 'contributor', level: 'high' },
+    ] } });
+    assert.strictEqual(row.children.length, 0);
+  } finally {
+    global.document = restore;
+  }
+});
+
+test('renderOwnershipCard whitelists the level BEFORE it reaches the class attribute (no card for a malicious level)', () => {
+  const row = { children: [], appendChild(el) { this.children.push(el); } };
+  const restore = global.document;
+  global.document = ownershipFakeDoc(row);
+  try {
+    renderOwnershipCard({ lenses: { contributors: [
+      { skill: 'user-improvements', role: 'contributor', level: 'high"><img>', levelNote: 'x' },
+    ] } });
+    assert.strictEqual(row.children.length, 0);
   } finally {
     global.document = restore;
   }
