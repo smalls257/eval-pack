@@ -335,8 +335,14 @@ is big (each lens reads it).
   `type` is not in `frictionCategories`.
 - `repo-improvements` (contributor) — how the repo/codebase could be improved: tooling,
   structure, or docs gaps the session surfaced. Default-on in `analysisLenses`.
-- `user-improvements` (contributor) — how the user could improve their prompting/interaction,
-  plus an example better prompt (`promptPattern`). Default-on in `analysisLenses`.
+- `user-improvements` (contributor) — how well the developer OWNED the work: intent, engineering
+  decisions, and the review/due-diligence the risk warranted (vs. offloading judgment to the AI —
+  vibecoding, incl. letting the AI decide whether a check was even needed). Calls out strengths and
+  improvements, each cited, plus an example better prompt (`promptPattern`). Default-on in
+  `analysisLenses`.
+- `sycophancy` (contributor) — how sycophantic the assistant was toward the developer: flattery,
+  agreement, or answer-changes decoupled from evidence, as a low/medium/high level with cited
+  moments. Grounded in the sycophancy literature. Default-on in `analysisLenses`.
 
 > Dispatch any other lens present in `analysisLenses` the same way, using its `skill` as the
 > `subagent_type` suffix.
