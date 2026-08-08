@@ -17,7 +17,7 @@ The single source of truth in code is `scripts/config.py` (`DEFAULTS` + `validat
 | `.eval-pack.local.json` | no (gitignore it) | Per-developer overrides. |
 | `CLAUDE_PLUGIN_OPTION_*` env | n/a | Plugin-option layer (from `.claude/settings.json` `pluginConfigs`). |
 
-Run **`/eval-pack:setup`** (or `/eval-pack-next:setup`) for a guided start that detects sane
+Run **`/eval-pack:setup`** for a guided start that detects sane
 defaults, asks only what it can't infer, writes `.eval-pack.json`, and validates it.
 
 Add `"$schema": "./.eval-pack.schema.json"` at the top of your file for editor autocomplete.

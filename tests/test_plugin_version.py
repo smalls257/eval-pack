@@ -21,7 +21,7 @@ class ReadPluginVersionTests(unittest.TestCase):
 
     def test_reads_version_from_manifest(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = self._root_with_manifest(tmp, {"name": "eval-pack-next", "version": "0.4.0-rc.8"})
+            root = self._root_with_manifest(tmp, {"name": "eval-pack", "version": "0.4.0-rc.8"})
             self.assertEqual(render_html.read_plugin_version(root), "0.4.0-rc.8")
 
     def test_missing_manifest_is_empty(self):
@@ -37,7 +37,7 @@ class ReadPluginVersionTests(unittest.TestCase):
 
     def test_version_absent_from_manifest_is_empty(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = self._root_with_manifest(tmp, {"name": "eval-pack-next"})
+            root = self._root_with_manifest(tmp, {"name": "eval-pack"})
             self.assertEqual(render_html.read_plugin_version(root), "")
 
 
