@@ -663,13 +663,6 @@ main.container {
   margin-bottom: 8px;
 }
 
-.prompt-pattern {
-  border-left: 3px solid var(--accent);
-  border-radius: 0 4px 4px 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
 /* ===== Improvements List ===== */
 .improvements-list {
   list-style: none;

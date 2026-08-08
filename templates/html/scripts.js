@@ -831,9 +831,8 @@ function repoImprovementsFrom(lenses) {
 
 // Pure lookup: the user-improvements lens is a contributor named "user-improvements" in
 // data.lenses.contributors. Returns the whole contributor record (or null) rather than
-// just `.items`, because `promptPattern` lives on the SAME record and both the User
-// Improvements list and the prompt-pattern block read from this one lookup (Airplane
-// Test: an absent lens must yield null, not throw).
+// just `.items`, so the User Feedback list reads from this one lookup (Airplane Test:
+// an absent lens must yield null, not throw).
 function userImprovementsFrom(lenses) {
   const contributors = (lenses && lenses.contributors) || [];
   return contributors.find(c => c.skill === 'user-improvements') || null;
@@ -870,19 +869,6 @@ function renderImprovements(data) {
   if (userEl) {
     const userLens = userImprovementsFrom(data && data.lenses);
     userEl.innerHTML = improvementList((userLens && userLens.items) || []);
-  }
-}
-
-function renderPromptPattern(data) {
-  const area = document.getElementById('prompt-pattern-area');
-  const pre = document.getElementById('prompt-pattern');
-  const userLens = userImprovementsFrom(data && data.lenses);
-  const pattern = userLens && userLens.promptPattern;
-  if (area && pattern) {
-    area.style.display = 'block';
-    if (pre) pre.textContent = pattern;
-  } else if (area) {
-    area.style.display = 'none';
   }
 }
 
@@ -1460,7 +1446,6 @@ function renderSession(data) {
   renderDiff(data);
   renderTools(data.tools);
   renderImprovements(data);
-  renderPromptPattern(data);
   renderSessionArtifacts(data);
   renderVerdictStatement(analysis);
   renderTimeline(analysis);
@@ -1534,5 +1519,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderPromptPattern, renderDiff, lensTabsFrom, lensCardsFrom, lensContributorBody, lensCardMarkup, lensVersionSuffix, lensHasDetail, renderLenses, renderOwnershipCard, renderTranscript, improvementItem };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderDiff, lensTabsFrom, lensCardsFrom, lensContributorBody, lensCardMarkup, lensVersionSuffix, lensHasDetail, renderLenses, renderOwnershipCard, renderTranscript, improvementItem };
 }

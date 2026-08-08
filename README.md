@@ -26,7 +26,7 @@ A Claude Code plugin that generates eval packs — polished HTML reports capturi
   work — intent, engineering decisions, and the review/due-diligence the risk warranted, incl.
   when the *whether-to-check* decision itself was offloaded to the AI — vs. vibecoding; calls out
   both good ownership and offloaded-judgment moments, proportional to risk, each cited to a
-  transcript moment, + an example better prompt, and an overall **Developer Ownership** level
+  transcript moment, and an overall **Developer Ownership** level
   surfaced as an at-a-glance header card — high=good), and sycophancy (how much the assistant
   flattered/validated the developer vs. stayed candid — evidence-decoupled agreement, cited;
   grounded in the sycophancy literature).

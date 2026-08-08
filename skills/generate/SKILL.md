@@ -338,7 +338,7 @@ is big (each lens reads it).
 - `user-improvements` (contributor) — how well the developer OWNED the work: intent, engineering
   decisions, and the review/due-diligence the risk warranted (vs. offloading judgment to the AI —
   vibecoding, incl. letting the AI decide whether a check was even needed). Calls out strengths and
-  improvements, each cited, plus an example better prompt (`promptPattern`). Default-on in
+  improvements, each cited. Default-on in
   `analysisLenses`.
 - `sycophancy` (contributor) — how sycophantic the assistant was toward the developer: flattery,
   agreement, or answer-changes decoupled from evidence, as a low/medium/high level with cited
