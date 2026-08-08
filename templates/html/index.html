@@ -55,7 +55,8 @@
       </div>
     </section>
 
-    <!-- Highlights: completion status + main risk -->
+    <!-- Highlights: completion status + confidence. display:'card' lenses (e.g. business-risk)
+         are injected here at render time by renderLensCards. -->
     <div class="highlights-row" id="highlights-row">
       <div class="highlight-card completion-card" id="completion-card">
         <div class="highlight-card-label">Completion</div>
@@ -67,20 +68,12 @@
         <div class="highlight-card-value" id="confidence-value"></div>
         <div class="highlight-card-notes" id="confidence-notes"></div>
       </div>
-      <div class="highlight-card biz-risk-card" id="biz-risk-card" style="display:none">
-        <div class="highlight-card-label">Business Risk</div>
-        <div class="highlight-card-value" id="biz-risk-value"></div>
-        <div class="highlight-card-notes" id="biz-risk-notes"></div>
-      </div>
-      <div class="highlight-card mitigation-card" id="mitigation-card" style="display:none">
-        <div class="highlight-card-label">Risk Mitigation</div>
-        <div class="highlight-card-value" id="mitigation-value"></div>
-      </div>
-      <div class="highlight-card risk-card" id="risk-card">
-        <div class="highlight-card-label">Main Risk</div>
-        <div class="highlight-card-value" id="risk-value"></div>
-      </div>
     </div>
+
+    <!-- Verdict-aggregation transparency line (core → final). Rendered here — after the
+         always-present highlights row — so the aggregation math is auditable even when every
+         lens is configured display:'card' and no lens tabs exist. -->
+    <div id="lens-agg-line"></div>
 
     <!-- Verdict Banner -->
     <section class="verdict-banner" id="verdict-banner">
@@ -119,13 +112,12 @@
       <nav class="tab-nav" id="tab-nav" role="tablist">
         <button class="tab-btn active" data-panel="summary" role="tab" aria-selected="true">Summary</button>
         <button class="tab-btn" data-panel="proof" role="tab" aria-selected="false">Proof</button>
-        <button class="tab-btn" data-panel="tests-existing" role="tab" aria-selected="false">Tests: Existing</button>
-        <button class="tab-btn" data-panel="tests-new" role="tab" aria-selected="false">Tests: New</button>
+        <button class="tab-btn" data-panel="tests" role="tab" aria-selected="false">Tests</button>
         <button class="tab-btn" data-panel="friction" role="tab" aria-selected="false">Friction</button>
         <button class="tab-btn" data-panel="review-findings" role="tab" aria-selected="false">Review Findings</button>
         <button class="tab-btn" data-panel="diff" role="tab" aria-selected="false">Diff</button>
         <button class="tab-btn" data-panel="repo-improvements" role="tab" aria-selected="false">Repo Improvements</button>
-        <button class="tab-btn" data-panel="user-improvements" role="tab" aria-selected="false">User Improvements</button>
+        <button class="tab-btn" data-panel="user-improvements" role="tab" aria-selected="false">User Feedback</button>
         <button class="tab-btn" data-panel="tools" role="tab" aria-selected="false">Tools</button>
         <div class="tab-nav-actions">
           <button class="tab-action-btn" id="btn-show-all">Show all</button>
@@ -154,29 +146,15 @@
       </div>
     </section>
 
-    <!-- Proof: left content + right sidebar artifact inventory -->
+    <!-- Proof: artifact inventory (deterministic). Detailed evidence assessment now
+         lives in the verification-rigor lens — see Summary tab. -->
     <section class="tab-panel card" id="panel-proof" role="tabpanel" style="display:none;">
       <div class="proof-layout">
         <div class="proof-main">
           <!-- Screenshots / video artifacts in proof context -->
           <div id="proof-screenshots-area"></div>
-
-          <!-- Evidence table -->
-          <h3 class="section-subheading">Evidence</h3>
-          <table class="data-table" id="proof-evidence-table">
-            <thead>
-              <tr>
-                <th>Evidence Point</th>
-                <th>Where It Appeared</th>
-                <th>Why It Matters</th>
-              </tr>
-            </thead>
-            <tbody id="proof-evidence-tbody"></tbody>
-          </table>
-
-          <!-- High-signal transcript excerpts -->
-          <h3 class="section-subheading">High-Signal Transcript Excerpts</h3>
-          <ul class="excerpt-list" id="proof-excerpts"></ul>
+          <p class="empty-state">Detailed evidence assessment (what's proven / not proven)
+            lives in the verification-rigor lens — see the Summary tab.</p>
         </div>
         <aside class="proof-sidebar">
           <h3 class="sidebar-heading">Artifact Inventory</h3>
@@ -185,38 +163,9 @@
       </div>
     </section>
 
-    <!-- Tests: Existing -->
-    <section class="tab-panel card" id="panel-tests-existing" role="tabpanel" style="display:none;">
-      <p class="narrative" id="tests-existing-narrative"></p>
-
-      <h3 class="section-subheading">Validation</h3>
-      <table class="data-table" id="tests-existing-table">
-        <thead>
-          <tr>
-            <th>Validation</th>
-            <th>Observed Result</th>
-            <th>Interpretation</th>
-          </tr>
-        </thead>
-        <tbody id="tests-existing-tbody"></tbody>
-      </table>
-
-      <div class="two-col-grid">
-        <div class="two-col-item">
-          <h3 class="two-col-heading covered-heading">What covered well</h3>
-          <ul class="bullet-list" id="tests-covered-well"></ul>
-        </div>
-        <div class="two-col-item">
-          <h3 class="two-col-heading gap-heading">What not covered</h3>
-          <ul class="bullet-list" id="tests-not-covered"></ul>
-        </div>
-      </div>
-    </section>
-
-    <!-- Tests: New -->
-    <section class="tab-panel card" id="panel-tests-new" role="tabpanel" style="display:none;">
-      <p class="narrative" id="tests-new-narrative"></p>
-      <ul class="bullet-list" id="tests-new-list"></ul>
+    <!-- Tests: deterministic verdict + per-test results from test-results.json -->
+    <section class="tab-panel card" id="panel-tests" role="tabpanel" style="display:none;">
+      <div id="tests-body"></div>
     </section>
 
     <!-- Review Findings -->
@@ -228,7 +177,6 @@
             <th>Severity</th>
             <th>Found In</th>
             <th>Resolution</th>
-            <th>Commit</th>
           </tr>
         </thead>
         <tbody id="review-findings-tbody"></tbody>
@@ -241,9 +189,8 @@
         <thead>
           <tr>
             <th>Friction</th>
-            <th>Evidence</th>
+            <th>Impact</th>
             <th>Type</th>
-            <th>Resolution / Impact</th>
           </tr>
         </thead>
         <tbody id="friction-tbody"></tbody>
@@ -252,25 +199,7 @@
 
     <!-- Diff -->
     <section class="tab-panel card" id="panel-diff" role="tabpanel" style="display:none;">
-      <div class="diff-artifact-status" id="diff-artifact-status"></div>
-
-      <h3 class="section-subheading">Files Evidenced as Changed</h3>
-      <ul class="files-changed-list" id="diff-files-changed"></ul>
-
-      <h3 class="section-subheading">Change Evidence</h3>
-      <table class="data-table" id="diff-change-table">
-        <thead>
-          <tr>
-            <th>Area</th>
-            <th>Evidence in Transcript</th>
-            <th>Observed Effect</th>
-          </tr>
-        </thead>
-        <tbody id="diff-change-tbody"></tbody>
-      </table>
-
-      <h3 class="section-subheading">Representative Commands</h3>
-      <pre class="code-block" id="diff-commands"></pre>
+      <div id="diff-body"></div>
     </section>
 
     <!-- Repo Improvements -->
@@ -281,10 +210,6 @@
     <!-- User Improvements -->
     <section class="tab-panel card" id="panel-user-improvements" role="tabpanel" style="display:none;">
       <ol class="improvements-list" id="user-improvements-list"></ol>
-      <div id="prompt-pattern-area" style="display:none;">
-        <h3 class="section-subheading">Prompt pattern that would have reduced friction</h3>
-        <pre class="code-block prompt-pattern" id="prompt-pattern"></pre>
-      </div>
     </section>
 
     <!-- Tools -->
@@ -296,6 +221,9 @@
       <h3 class="section-subheading">Skills Leveraged</h3>
       <ul class="tools-skills-list" id="tools-skills-list"></ul>
     </section>
+
+    <!-- Per-lens tabs + panels are injected dynamically by renderLenses (scripts.js),
+         one <section id="panel-lens-*"> per surfaced lens, inserted before this comment. -->
 
     <!-- Session Artifacts (always visible, below all panels) -->
     <section class="card" id="session-artifacts">
@@ -320,8 +248,9 @@
   </main>
 
   <footer class="footer">
-    <span>Generated by <strong>eval-pack</strong></span>
+    <span id="footer-brand">Generated by <strong>eval-pack</strong></span>
     <span id="generated-at"></span>
+    <span id="eval-pack-version"></span>
   </footer>
 
   <script src="scripts.js"></script>

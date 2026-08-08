@@ -6,6 +6,10 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+# Agent results report usage as `subagent_tokens: N`; older/other formats may
+# use `total_tokens: N`. Accept either.
+DEFAULT_TOKEN_FIELD_RE = re.compile(r"(?:subagent_tokens|total_tokens):\s*(\d+)")
+
 
 def load_jsonl(path):
     entries = []
@@ -34,7 +38,7 @@ def get_model(entry):
     return msg.get("model") or entry.get("model")
 
 
-def extract_subagent_tokens(entries):
+def extract_subagent_tokens(entries, token_field_re=DEFAULT_TOKEN_FIELD_RE):
     tool_model = {}
     for entry in entries:
         content = (entry.get("message") or {}).get("content") or entry.get("content") or []
@@ -66,15 +70,13 @@ def extract_subagent_tokens(entries):
                 inner = block.get("content", "")
                 if isinstance(inner, list):
                     inner = " ".join(b.get("text", "") for b in inner if isinstance(b, dict))
-                # Agent results report usage as `subagent_tokens: N`; older/other
-                # formats may use `total_tokens: N`. Accept either.
-                m = re.search(r"(?:subagent_tokens|total_tokens):\s*(\d+)", str(inner))
+                m = token_field_re.search(str(inner))
                 if m:
                     model_tokens[model] += int(m.group(1))
                 else:
                     print(
-                        f"Warning: could not parse subagent_tokens from Agent tool_result "
-                        f"(tool_use_id={tid!r}); subagent cost for this call will be 0",
+                        f"Warning: could not parse subagent token usage from Agent tool_result "
+                        f"(tool_use_id={tid!r}); subagent token usage for this call will be 0",
                         file=sys.stderr,
                     )
 
@@ -93,6 +95,11 @@ def main():
     parser.add_argument(
         "--changed-files", default="[]", dest="changed_files_json",
         help="JSON array of changed file paths",
+    )
+    parser.add_argument(
+        "--config", default=None,
+        help="Path to resolved eval-config.json (accepted for CLI/pipeline "
+             "compatibility; extraction no longer reads config-driven options)",
     )
     args = parser.parse_args()
 

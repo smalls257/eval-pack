@@ -123,6 +123,14 @@ cat > "$TEST_DIR/$SESSION_ID/test-results.json" << 'JSON'
 JSON
 echo "  PASS"
 
+# Step 3.5: Create mock repo diffs (exercises the deterministic Diff path)
+echo ""
+echo "--- Step 3.5: Mock repo diffs ---"
+cat > "$TEST_DIR/$SESSION_ID/repo-diffs.json" << 'JSON'
+{"repos":[{"repoRoot":"/tmp/x","branch":"main","base":"HEAD~1","baseResolved":"abc1234","insertions":1,"deletions":0,"filesChanged":1,"files":["a.txt"],"stat":" a.txt | 1 +"}],"skipped":[],"errors":[]}
+JSON
+echo "  PASS"
+
 # Step 4: Create mock analysis
 echo ""
 echo "--- Step 4: Mock analysis ---"
@@ -131,55 +139,14 @@ cat > "$TEST_DIR/$SESSION_ID/analysis.json" << 'JSON'
   "title": "Fix auth token expiry edge case in login.ts",
   "highlights": {
     "completionStatus": { "label": "Complete", "color": "green", "notes": "Bug fixed and all tests pass including midnight edge case" },
-    "bestProof": { "badges": ["Passing Tests"], "note": "All 8 tests in auth.test.ts passed after fix" },
-    "strongestEvidence": "Test suite output showing 8/8 pass after boundary condition fix",
-    "mainRisk": "No integration test covering the token refresh path under load"
-  },
-  "summary": {
-    "whatChanged": ["Fixed < to <= in token expiry comparison in login.ts", "Added boundary condition handling for midnight edge case"],
-    "whatTranscriptProves": ["Agent identified root cause correctly on first read", "False completion detected — agent claimed done before edge case was fixed"],
-    "whatStillNotProven": ["No load test for concurrent token refresh", "Only unit tests run, no e2e auth flow"]
-  },
-  "proof": {
-    "artifactInventory": [
-      {"name": "Transcript", "path": "transcript.jsonl", "type": "transcript", "description": "Primary source for commands, failures, and outputs"}
-    ],
-    "evidenceTable": [
-      {"point": "Bug root cause identified", "where": "turn 4: agent identifies < vs <= comparison", "whyItMatters": "Shows agent understood the problem correctly"},
-      {"point": "False completion", "where": "turn 5: agent said Done but edge case still failed", "whyItMatters": "Demonstrates need for edge case tests in spec"}
-    ],
-    "transcriptExcerpts": ["Found it. The comparison uses < instead of <=.", "Fixed. All tests pass including the midnight edge case."]
-  },
-  "testsExisting": {
-    "narrative": "auth.test.ts covered the main token expiry path but lacked a boundary test for midnight. The edge case test was identified by the user, not the agent.",
-    "validationTable": [
-      {"validation": "auth.test.ts", "observedResult": "8 passed", "interpretation": "All existing tests plus new edge case pass"}
-    ],
-    "coveredWell": ["Standard token expiry", "Invalid token rejection"],
-    "notCovered": ["Concurrent refresh", "Token refresh under network failure"]
-  },
-  "testsNew": {
-    "narrative": "No new test files were added. The midnight edge case was covered by an existing parameterized test that was previously skipped.",
-    "newTests": []
-  },
-  "frictionLog": [
-    {"friction": "Missing boundary test for midnight edge case", "evidence": "User had to point out the failing edge case after agent claimed completion", "type": "docs", "resolution": "Edge case fixed, but test was user-identified not agent-identified"}
-  ],
-  "diff": {
-    "artifactStatus": { "hasDiffStat": false, "hasDiffPatch": false, "note": "No diff artifacts captured in this test run" },
-    "filesChanged": [{"file": "login.ts", "description": "Fixed token expiry comparison operator"}],
-    "changeTable": [{"area": "Token expiry logic", "evidenceInTranscript": "The comparison uses < instead of <=", "observedEffect": "Tokens expiring exactly at boundary are now correctly rejected"}],
-    "representativeCommands": []
+    "confidencePercent": 90,
+    "confidenceNotes": "Test suite output showing 8/8 pass after boundary condition fix; no integration test covering the token refresh path under load"
   },
   "repoImprovements": [
     {"title": "Add boundary tests to auth module", "detail": "The auth.test.ts file lacks explicit boundary tests for token expiry timestamps. Add parameterized tests covering exactly-at-expiry, one-second-before, and one-second-after cases."}
   ],
   "userImprovements": [
     {"title": "Front-load edge case context in prompts", "detail": "The developer knew about the midnight edge case but did not mention it in the initial prompt. Including known edge cases upfront would have prevented the false completion."}
-  ],
-  "promptPattern": "Fix the token expiry check in login.ts — the < vs <= comparison is wrong. Known edge case: tokens expiring exactly at midnight should be rejected. Run auth.test.ts to verify.",
-  "sessionArtifacts": [
-    {"name": "Transcript", "path": "transcript.jsonl", "description": "Full session conversation in JSONL format"}
   ],
   "verdictStatement": "The auth token boundary fix is correctly implemented and verified by the test suite, though the false completion pattern indicates the agent should run edge case tests proactively before claiming completion."
 }
@@ -242,6 +209,21 @@ print(f"  Tools in data.json: {len(tools)} tool types")
 print("  PASS")
 PYEOF
 
+# Step 5a: pack dir PERSISTS after a successful render (gitignored working cache for `tune`).
+# The zip is the deliverable, but the on-disk pack dir must survive so a later single-lens
+# re-run can reuse the prior round's outputs instead of reconstructing them from the zip.
+echo ""
+echo "--- Step 5a: Pack dir persists after render ---"
+if [[ ! -d "$TEST_DIR/$SESSION_ID" ]]; then
+  echo "FAIL: pack dir $TEST_DIR/$SESSION_ID was removed after render (should persist)" >&2
+  exit 1
+fi
+if [[ ! -f "$TEST_DIR/$SESSION_ID/metrics.json" ]]; then
+  echo "FAIL: persisted pack dir missing metrics.json artifact" >&2
+  exit 1
+fi
+echo "  PASS"
+
 # Step 5b: openable copy exists outside repo, zip still present, jsonl excluded
 echo ""
 echo "--- Step 5b: Openable dashboard copy ---"
@@ -254,15 +236,24 @@ if ! grep -q "__EVAL_PACK_DATA__" "$OPEN_DIR/index.html"; then
   echo "FAIL: openable index.html missing embedded data" >&2
   exit 1
 fi
-# includeTranscript defaults to true -> the raw transcript.jsonl is bundled
-if [[ ! -f "$OPEN_DIR/transcript.jsonl" ]]; then
-  echo "FAIL: transcript.jsonl should be included in openable copy (includeTranscript default true)" >&2
+# Defaults: includeRawTranscript=false -> raw transcript.jsonl is NOT bundled;
+# includeRenderedTranscript=true -> the rendered transcript.html IS bundled.
+if [[ -f "$OPEN_DIR/transcript.jsonl" ]]; then
+  echo "FAIL: transcript.jsonl should be excluded from openable copy (includeRawTranscript default false)" >&2
+  exit 1
+fi
+if [[ ! -f "$OPEN_DIR/transcript.html" ]]; then
+  echo "FAIL: transcript.html should be included in openable copy (includeRenderedTranscript default true)" >&2
   exit 1
 fi
 # Capture first (avoid SIGPIPE: grep -q closing the pipe early would fail unzip under pipefail)
 ZIP_LIST=$(unzip -Z1 "$ZIP_PATH")
-if ! printf '%s\n' "$ZIP_LIST" | grep -q "transcript.jsonl"; then
-  echo "FAIL: transcript.jsonl should be bundled in the zip (includeTranscript default true)" >&2
+if printf '%s\n' "$ZIP_LIST" | grep -q "transcript.jsonl"; then
+  echo "FAIL: transcript.jsonl should NOT be bundled in the zip (includeRawTranscript default false)" >&2
+  exit 1
+fi
+if ! printf '%s\n' "$ZIP_LIST" | grep -q "transcript.html"; then
+  echo "FAIL: transcript.html should be bundled in the zip (includeRenderedTranscript default true)" >&2
   exit 1
 fi
 if [[ ! -f "$ZIP_PATH" ]]; then
@@ -274,8 +265,9 @@ echo "  PASS"
 # Step 6: Test regeneration (round 2)
 echo ""
 echo "--- Step 6: Test regeneration (round 2) ---"
-# Regeneration re-runs the full pipeline — pack_dir was cleaned up after Step 5.
-# Recreate metrics (validation gate requires it) and analysis before rendering.
+# Regeneration re-runs the full pipeline. The pack dir now PERSISTS after Step 5, but a
+# real round-2 still re-derives metrics and restores analysis before rendering; do the same
+# so this step exercises the regeneration path rather than silently reusing round-1 artifacts.
 mkdir -p "$TEST_DIR/$SESSION_ID"
 python3 "$PLUGIN_ROOT/scripts/extract_metrics.py" "$TEST_DIR/transcript.jsonl" "$TEST_DIR/$SESSION_ID"
 cp "$TEST_DIR/analysis_backup.json" "$TEST_DIR/$SESSION_ID/analysis.json"

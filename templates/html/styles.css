@@ -33,7 +33,7 @@
 }
 
 /* ===== Base ===== */
-html { height: 100%; }
+html { height: 100%; scrollbar-gutter: stable; }
 body {
   background: var(--bg);
   color: var(--text);
@@ -182,6 +182,10 @@ main.container {
   line-height: 1.4;
 }
 
+.highlight-card-version { font-size: 0.7rem; color: var(--text-secondary); margin-top: 2px; }
+
+.lens-version-line { font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 10px; font-family: var(--font-mono); }
+
 .completion-dot {
   width: 10px;
   height: 10px;
@@ -195,13 +199,6 @@ main.container {
 .completion-amber .completion-dot       { background: var(--amber, #f5a623); }
 .completion-red .highlight-card-value   { color: var(--red, #e5484d); }
 .completion-red .completion-dot         { background: var(--red, #e5484d); }
-
-.risk-card .highlight-card-value {
-  font-size: 13px;
-  font-weight: 400;
-  color: var(--text);
-  line-height: 1.5;
-}
 
 .confidence-bar {
   height: 6px;
@@ -226,19 +223,28 @@ main.container {
 .biz-risk-medium .highlight-card-value { color: var(--amber, #f5a623); }
 .biz-risk-high   .highlight-card-value { color: var(--red, #e5484d); }
 
-.mitigation-card .highlight-card-value {
+/* Developer Ownership card — INVERTED vs the risk cards: high ownership is GOOD (green). */
+.ownership-high   .highlight-card-value { color: var(--green, #17b169); }
+.ownership-medium .highlight-card-value { color: var(--amber, #f5a623); }
+.ownership-low    .highlight-card-value { color: var(--red, #e5484d); }
+
+/* Card-lens item list (e.g. business-risk mitigation steps + main risk). */
+.mitigation-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
   font-size: 12px;
   font-weight: 400;
+  display: flex;
   flex-direction: column;
-  align-items: flex-start;
   gap: 4px;
 }
-.mitigation-step {
+.mitigation-list li {
   display: flex;
   gap: 6px;
   line-height: 1.4;
 }
-.mitigation-step::before {
+.mitigation-list li::before {
   content: '→';
   color: var(--text-secondary);
   flex-shrink: 0;
@@ -303,7 +309,6 @@ main.container {
 .stat-item { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .stat-value { font-size: 14px; font-weight: 700; font-family: var(--font-mono); }
 .stat-label { font-size: 11px; color: var(--text-secondary); }
-.cost-note { font-size: 11px; color: var(--text-secondary); margin-top: 12px; }
 
 /* ===== Session Timeline ===== */
 .session-timeline {
@@ -384,9 +389,7 @@ main.container {
   display: flex;
   align-items: center;
   gap: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  flex-wrap: wrap; /* 11 tabs: wrap to a second row so the action buttons never truncate */
 }
 
 .tab-nav::-webkit-scrollbar { display: none; }
@@ -582,47 +585,18 @@ main.container {
   background: var(--bg-card-hover);
 }
 
-/* ===== Excerpt List ===== */
-.excerpt-list {
-  list-style: none;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.excerpt-list li {
-  font-size: 13px;
-  font-family: var(--font-mono);
-  background: var(--bg-code);
-  border-left: 3px solid var(--accent);
+/* ===== Tests tab: deterministic verdict ===== */
+.tests-verdict {
+  font-size: 14px;
   padding: 10px 14px;
-  border-radius: 0 4px 4px 0;
-  color: var(--text);
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
+  border-radius: var(--radius);
+  border-left: 4px solid var(--border);
+  margin-bottom: 16px;
 }
 
-/* ===== Two-column grid (tests covered / not covered) ===== */
-.two-col-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  margin-top: 20px;
-}
-
-.two-col-heading {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  margin-bottom: 10px;
-}
-
-.covered-heading { color: var(--green); }
-.gap-heading { color: var(--amber); }
+.tests-verdict-green { border-left-color: var(--green); }
+.tests-verdict-red { border-left-color: var(--red); }
+.tests-verdict-amber { border-left-color: var(--amber); }
 
 /* ===== Narrative ===== */
 .narrative {
@@ -633,25 +607,12 @@ main.container {
 }
 
 /* ===== Diff Section ===== */
-.diff-artifact-status {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-}
-
-.diff-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 11px;
-  border-radius: 20px;
+.diff-repo + .diff-repo { margin-top: 24px; }
+.diff-repo-meta {
   font-size: 12px;
-  font-weight: 500;
+  color: var(--text-secondary);
+  margin: 4px 0 10px;
 }
-
-.diff-badge.present { background: rgba(23, 177, 105, 0.12); color: var(--green); border: 1px solid rgba(23, 177, 105, 0.25); }
-.diff-badge.absent { background: rgba(136, 136, 136, 0.1); color: var(--text-secondary); border: 1px solid var(--border); }
 
 .review-severity {
   display: inline-block;
@@ -665,8 +626,7 @@ main.container {
 }
 .review-severity-critical { background: rgba(229, 72, 77, 0.12); color: var(--red); border: 1px solid rgba(229, 72, 77, 0.25); }
 .review-severity-important { background: rgba(245, 166, 35, 0.12); color: var(--amber); border: 1px solid rgba(245, 166, 35, 0.25); }
-.review-severity-suggestion { background: rgba(136, 136, 136, 0.1); color: var(--text-secondary); border: 1px solid var(--border); }
-.review-commit { font-family: var(--font-mono); font-size: 12px; }
+.review-severity-minor { background: rgba(136, 136, 136, 0.1); color: var(--text-secondary); border: 1px solid var(--border); }
 
 .files-changed-list {
   list-style: none;
@@ -705,13 +665,6 @@ main.container {
   margin-bottom: 8px;
 }
 
-.prompt-pattern {
-  border-left: 3px solid var(--accent);
-  border-radius: 0 4px 4px 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
 /* ===== Improvements List ===== */
 .improvements-list {
   list-style: none;
@@ -745,11 +698,27 @@ main.container {
   margin-bottom: 6px;
 }
 
+.improvement-body { min-width: 0; }
+
 .improvement-detail {
   font-size: 14px;
   line-height: 1.6;
   color: var(--text-secondary);
 }
+
+.improve-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+.improve-badge.strength { background: rgba(23, 177, 105, 0.12); color: var(--green); border: 1px solid rgba(23, 177, 105, 0.25); }
+.improve-badge.improve  { background: rgba(245, 166, 35, 0.12); color: var(--amber); border: 1px solid rgba(245, 166, 35, 0.25); }
 
 /* ===== Session Artifacts ===== */
 .session-artifacts-list {
@@ -881,7 +850,11 @@ details[open] .collapsible-trigger::before { content: '▾ '; }
   cursor: pointer;
 }
 
-.modal-overlay img {
+.modal-overlay img:not(.lightbox-img) {
+  /* Generic single-image modal (not the lightbox, which lays its img out at natural
+     raster size — see .modal-overlay .lightbox-img below — and would otherwise have
+     its backing bitmap downsampled by this max-width/height before zoom scale()
+     upscales it, causing blur). */
   max-width: 90vw;
   max-height: 90vh;
   border-radius: var(--radius);
@@ -928,15 +901,26 @@ details[open] .collapsible-trigger::before { content: '▾ '; }
   align-items: center;
   gap: 8px;
   min-height: 0;
+  width: 82vw;
+  height: 72vh;
+  position: relative;  /* containing block for the absolutely-positioned img + nav */
   overflow: hidden;   /* clip a zoomed image to the stage, not the whole screen */
 }
 
 .modal-overlay .lightbox-img {
-  max-width: 82vw;
-  max-height: 72vh;
+  /* Laid out at NATURAL raster size (no width/height/object-fit) so the browser never
+     downsamples the bitmap before scale() is applied — that downsample-then-upscale is
+     what made zoomed screenshots blurry. The "fit-to-stage" factor that used to come
+     from the fixed box is instead baked into the JS transform (baseFit * scale), so the
+     zoom-1 baseline is still consistent across differently-shaped screenshots. Absolute
+     + centered so a natural-size (possibly huge) box doesn't disturb the stage's layout. */
+  position: absolute;
+  top: 50%;
+  left: 50%;
   border-radius: var(--radius);
   display: block;
   transform-origin: center center;
+  transform: translate(-50%, -50%);  /* overwritten by JS applyZoom() once loaded */
   will-change: transform;
 }
 
@@ -951,9 +935,13 @@ details[open] .collapsible-trigger::before { content: '▾ '; }
   cursor: pointer;
   opacity: 0.55;
   transition: opacity 0.12s ease;
-  position: relative;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
   z-index: 2;         /* stay above a zoomed image */
 }
+.lightbox-prev { left: 4px; }
+.lightbox-next { right: 4px; }
 .lightbox-nav:hover { opacity: 1; }
 
 /* ===== Lightbox zoom controls ===== */
@@ -1146,7 +1134,6 @@ details[open] .collapsible-trigger::before { content: '▾ '; }
   .stats-row { grid-template-columns: repeat(2, 1fr); }
   .verdict-banner { flex-wrap: wrap; }
   .verdict-detail { margin-left: 0; width: 100%; }
-  .two-col-grid { grid-template-columns: 1fr; }
   .header-stats { grid-template-columns: repeat(2, 1fr); }
   .tab-nav-wrapper { margin: 0 -12px; padding: 0 12px; }
 }
@@ -1176,3 +1163,87 @@ details[open] .collapsible-trigger::before { content: '▾ '; }
 .badge-agent { background: #2e7d32; }
 .badge-test { background: #1565c0; }
 .badge-unknown { background: #616161; }
+
+/* ── Lenses tab ─────────────────────────────────────────────────────────────── */
+.lens-agg {
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+.lens-agg code { color: var(--accent); }
+.lens-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+}
+.lens-card.lens-fail { border-color: rgba(229, 72, 77, 0.4); }
+div.lens-fail {
+  border: 1px solid rgba(229, 72, 77, 0.4);
+  border-radius: 4px;
+  padding: 10px 14px;
+  margin-top: 12px;
+  color: var(--red);
+  font-size: 13px;
+}
+.lens-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.lens-meta {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.lens-fail .lens-meta { color: var(--red); }
+.lens-score {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.lens-card h4 { margin: 0 0 8px; font-size: 15px; color: var(--text); }
+.lens-rationale {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+.lens-findings {
+  margin: 0;
+  padding-left: 18px;
+}
+.lens-findings li {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 6px;
+}
+.lens-level {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+.lens-level.biz-risk-low    { background: rgba(23, 177, 105, 0.12); color: var(--green); border: 1px solid rgba(23, 177, 105, 0.25); }
+.lens-level.biz-risk-medium { background: rgba(245, 166, 35, 0.12); color: var(--amber); border: 1px solid rgba(245, 166, 35, 0.25); }
+.lens-level.biz-risk-high   { background: rgba(229, 72, 77, 0.12);  color: var(--red);   border: 1px solid rgba(229, 72, 77, 0.25); }
+.lens-subhead {
+  margin: 12px 0 4px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+.lens-mainrisk { margin-top: 12px; }

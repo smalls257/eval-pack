@@ -2,10 +2,11 @@
 import argparse
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))  # noqa: E402
-from constants import SCOPE_DRIFT_FILE_THRESHOLD, RETRY_AMBER_THRESHOLD  # noqa: E402
+from config import read_config, BUILTIN_FLAG_IDS  # noqa: E402
 
 
 def load_jsonl(path):
@@ -48,30 +49,63 @@ def is_human(entry):
     return entry.get("type") in ("user", "human")
 
 
-DONE_RE = re.compile(r"(?i)(done|complete|finished|all set|that should|looks good now)")
-CORRECTION_RE = re.compile(r"(?i)(no|not|wrong|still|actually|but|fix|fail|error|broken|issue)")
-RETRY_RE = re.compile(r"(?i)(try again|retry|let me try|another approach|different approach)")
+# Defaults mirror config.DEFAULTS["detectionPatterns"]; kept here so the module works standalone.
+DEFAULT_PATTERNS = {
+    "done": [r"(?i)(done|complete|finished|all set|that should|looks good now)"],
+    "correction": [r"(?i)(no|not|wrong|still|actually|but|fix|fail|error|broken|issue)"],
+    "retry": [r"(?i)(try again|retry|let me try|another approach|different approach)"],
+}
+
+# Tools whose input.file_path the "files" detector scope observes.
+FILE_TOOLS = ("Read", "Edit", "Write", "NotebookEdit", "MultiEdit")
 
 
-def detect_false_completions(entries):
+# A leading global flag group like (?i)… must be rewritten to a scoped (?i:…)
+# before OR-joining: Python 3.11+ rejects global flags anywhere but position 0.
+_GLOBAL_FLAGS_RE = re.compile(r"^\(\?([aiLmsux]+)\)")
+
+
+def _scoped(pat):
+    m = _GLOBAL_FLAGS_RE.match(pat)
+    if m:
+        return "(?{}:{})".format(m.group(1), pat[m.end():])
+    return "(?:{})".format(pat)
+
+
+def compile_patterns(patterns):
+    """OR-combine each group's regex list into one compiled pattern per group."""
+    return {
+        group: re.compile("|".join(_scoped(p) for p in pats))
+        for group, pats in patterns.items()
+    }
+
+
+def detect_false_completions(entries, rx, window, trunc):
     result = []
     for i in range(len(entries) - 1):
-        if entries[i].get("type") == "assistant" and is_human(entries[i + 1]):
-            agent_text = entry_text(entries[i])
-            user_text = entry_text(entries[i + 1])
-            if DONE_RE.search(agent_text) and CORRECTION_RE.search(user_text):
+        if entries[i].get("type") != "assistant":
+            continue
+        agent_text = entry_text(entries[i])
+        if not rx["done"].search(agent_text):
+            continue
+        for j in range(i + 1, min(i + 1 + window, len(entries))):
+            if not is_human(entries[j]):
+                continue
+            user_text = entry_text(entries[j])
+            if rx["correction"].search(user_text):
                 result.append({
                     "turn": i,
-                    "agentClaim": agent_text[:120],
-                    "userResponse": user_text[:120],
+                    "agentClaim": agent_text[:trunc],
+                    "userResponse": user_text[:trunc],
                 })
+            break  # judge only the first human reply in the window
     return result
 
 
-def detect_retries(entries):
+def detect_retries(entries, retry_re):
     return sum(
         1 for e in entries
-        if e.get("type") == "assistant" and RETRY_RE.search(entry_text(e))
+        if e.get("type") == "assistant" and retry_re.search(entry_text(e))
     )
 
 
@@ -125,7 +159,7 @@ def read_test_verdict(output_dir):
     return data.get("verdict")
 
 
-def check_scope_drift(output_dir):
+def check_scope_drift(output_dir, threshold):
     metrics_path = Path(output_dir) / "metrics.json"
     if not metrics_path.is_file():
         print(
@@ -135,7 +169,7 @@ def check_scope_drift(output_dir):
         return False
     try:
         data = json.loads(metrics_path.read_text(encoding="utf-8"))
-        return (data.get("filesChanged") or 0) > SCOPE_DRIFT_FILE_THRESHOLD
+        return (data.get("filesChanged") or 0) > threshold
     except json.JSONDecodeError as exc:
         print(f"Warning: could not parse metrics.json — scope drift unknown: {exc}", file=sys.stderr)
         return False
@@ -144,11 +178,94 @@ def check_scope_drift(output_dir):
         return False
 
 
+def collect_scope_strings(entries):
+    """Extract the scannable strings per detector scope from the transcript."""
+    scopes = {"bash": [], "files": [], "text": [], "user": []}
+    for e in entries:
+        etype = e.get("type")
+        msg = e.get("message") or e
+        content = msg.get("content")
+        if isinstance(content, str):
+            if etype == "assistant":
+                scopes["text"].append(content)
+            elif etype in ("user", "human"):
+                scopes["user"].append(content)
+            continue
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "text":
+                target = "text" if etype == "assistant" else "user"
+                scopes[target].append(block.get("text", ""))
+            elif block.get("type") == "tool_use":
+                inp = block.get("input") or {}
+                if block.get("name") == "Bash":
+                    scopes["bash"].append(str(inp.get("command", "")))
+                elif block.get("name") in FILE_TOOLS:
+                    scopes["files"].append(str(inp.get("file_path", "")))
+    return scopes
+
+
+def run_custom_detectors(detectors, scope_strings):
+    """Deterministic policy checks: returns [(id, level, label, count)] for fired detectors."""
+    fired = []
+    for det in detectors:
+        try:
+            rx = re.compile(det["pattern"])
+        except re.error as exc:
+            # Sensor: a policy check that silently doesn't run reads as "clean" — warn loudly.
+            # (Resolve-time validation catches this in the pipeline; this guards standalone runs.)
+            print(
+                "Warning: customDetector {!r} pattern failed to compile ({}); skipped".format(
+                    det.get("id"), exc),
+                file=sys.stderr,
+            )
+            continue
+        count = sum(1 for s in scope_strings.get(det["scope"], []) if rx.search(s))
+        if count >= det.get("threshold", 1):
+            fired.append((det["id"], det["level"], det["label"], count))
+    return fired
+
+
+def run_detector_scripts(scripts, transcript_path, output_dir):
+    """Run repo detector scripts; validate their output by code. A failing or malformed
+    script becomes a visible red flag — never a crash, never a silent absence."""
+    ok_flags, failures = [], []
+    for script in scripts:
+        name = Path(script).name
+        try:
+            proc = subprocess.run(
+                [sys.executable, str(script), str(transcript_path), str(output_dir)],
+                capture_output=True, text=True, timeout=120)
+            if proc.returncode != 0:
+                failures.append((name, "exit {}".format(proc.returncode)))
+                continue
+            data = json.loads(proc.stdout)
+            flags = data.get("flags")
+            if not isinstance(flags, list):
+                raise ValueError("no flags list")
+            for f in flags:
+                if (not isinstance(f, dict) or not f.get("id") or not f.get("label")
+                        or f.get("level") not in ("red", "amber", "green")):
+                    raise ValueError("bad flag shape: {!r}".format(f))
+                if f.get("id") in BUILTIN_FLAG_IDS:
+                    raise ValueError("script flag id {!r} collides with a built-in".format(f.get("id")))
+            ok_flags.extend(flags)
+        except (subprocess.TimeoutExpired, json.JSONDecodeError, ValueError, OSError) as exc:
+            failures.append((name, str(exc)))
+    return ok_flags, failures
+
+
 def main():
     parser = argparse.ArgumentParser(description="Detect heuristic patterns in transcript")
     parser.add_argument("transcript", help="Path to transcript.jsonl")
     parser.add_argument("output_dir", help="Directory to write pattern output")
+    parser.add_argument("--config", default=None, help="Path to resolved eval-config.json")
     args = parser.parse_args()
+    cfg = read_config(args.config)
+    rx = compile_patterns(cfg.get("detectionPatterns") or DEFAULT_PATTERNS)
 
     transcript_file = Path(args.transcript)
     output_dir = Path(args.output_dir)
@@ -160,31 +277,79 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
     entries = load_jsonl(transcript_file)
 
-    false_completions = detect_false_completions(entries)
-    retry_count = detect_retries(entries)
-    scope_drift = check_scope_drift(output_dir)
+    false_completions = detect_false_completions(
+        entries, rx, cfg["falseCompletionWindow"], cfg["claimTruncLen"]
+    )
+    retry_count = detect_retries(entries, rx["retry"])
+    scope_drift = check_scope_drift(output_dir, cfg["scopeDriftFileThreshold"])
     partial_session = detect_partial_session(entries)
 
     test_verdict = read_test_verdict(output_dir)
 
+    # Built-in flags carry a stable id so users can retune severity per-flag.
+    sev = cfg.get("flagSeverities") or {}
+    suppressed = []
+    suppressed_red = []
+
+    def add_flag(fid, default_level, label, **extra):
+        level = sev.get(fid, default_level)
+        if level == "off":
+            suppressed.append(fid)
+            if default_level == "red":
+                suppressed_red.append(fid)
+            return
+        flags.append(dict({"id": fid, "level": level, "label": label}, **extra))
+
     flags = []
     if test_verdict == "fail":
-        flags.append({"level": "red", "label": "Tests failing at completion"})
+        add_flag("testsFailing", "red", "Tests failing at completion")
     elif test_verdict == "pass":
-        flags.append({"level": "green", "label": "Tests passing at completion"})
+        add_flag("testsPassing", "green", "Tests passing at completion")
+    elif test_verdict not in ("", None, "none"):
+        # An unrecognized verdict must be visible, not silently identical to a clean run.
+        add_flag("unknownVerdict", "amber", f"Unknown test verdict: {test_verdict!r}")
     if false_completions:
-        flags.append({"level": "amber", "label": "False completions", "count": len(false_completions)})
-    if retry_count >= RETRY_AMBER_THRESHOLD:
-        flags.append({"level": "amber", "label": "High retry count", "count": retry_count})
+        add_flag("falseCompletions", "amber", "False completions", count=len(false_completions))
+    if retry_count >= cfg["retryAmberThreshold"]:
+        add_flag("highRetry", "amber", "High retry count", count=retry_count)
     if scope_drift:
-        flags.append({"level": "amber", "label": "Scope drift — many files changed"})
+        add_flag("scopeDrift", "amber", "Scope drift — many files changed")
     if partial_session:
-        flags.append({
-            "level": "amber",
-            "label": "Partial session — earlier turns may be missing",
-        })
+        add_flag("partialSession", "amber", "Partial session — earlier turns may be missing")
+    custom = cfg.get("customDetectors") or []
+    if custom:
+        scope_strings = collect_scope_strings(entries)
+        for fid, level, label, count in run_custom_detectors(custom, scope_strings):
+            add_flag(fid, level, label, count=count)
+    scripts = cfg.get("detectorScripts") or []
+    if scripts:
+        script_flags, script_failures = run_detector_scripts(scripts, transcript_file, output_dir)
+        for f in script_flags:
+            add_flag(f["id"], f["level"], f["label"],
+                     **({"count": f["count"]} if isinstance(f.get("count"), int) else {}))
+        for name, err in script_failures:
+            # detectorFailed is intentionally NOT suppressible via flagSeverities: it is the
+            # can't-vanish gate for detector scripts — a config that could turn it off would
+            # recreate the silent-absence hole it exists to close (mirrors lensFailed).
+            flags.append({"id": "detectorFailed", "level": "red",
+                          "label": "Detector script failed: {} ({})".format(name, err)})
     if not flags:
-        flags.append({"level": "green", "label": "Clean first-pass implementation"})
+        if suppressed:
+            # Suppression must not masquerade as a clean pass — say what was hidden.
+            # No `count` field: the renderer appends " (count)" and the label already says it.
+            flags.append({
+                "id": "flagsSuppressed", "level": "amber",
+                "label": f"No flags shown — {len(suppressed)} suppressed by flagSeverities",
+            })
+        else:
+            flags.append({"id": "cleanPass", "level": "green", "label": "Clean first-pass implementation"})
+    elif suppressed_red:
+        # A suppressed RED must not silently downgrade the banner to the surviving flags'
+        # level — say which red(s) were turned off (Sensor: no invisible downgrades).
+        flags.append({
+            "id": "flagsSuppressed", "level": "amber",
+            "label": "Red flag(s) suppressed by flagSeverities: {}".format(", ".join(suppressed_red)),
+        })
 
     result = {
         "falseCompletions": false_completions,
@@ -192,6 +357,7 @@ def main():
         "scopeDrift": scope_drift,
         "partialSession": partial_session or False,
         "flags": flags,
+        "suppressedFlags": suppressed,
     }
 
     out_path = output_dir / "patterns.json"

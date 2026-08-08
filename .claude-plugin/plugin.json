@@ -1,17 +1,32 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "eval-pack",
-  "version": "0.3.3",
-  "description": "Generate eval packs — polished HTML reports capturing how code was produced, with metrics, heuristics, and AI-driven analysis",
+  "version": "0.4.0",
+  "description": "Generate eval packs \u2014 polished HTML reports capturing how AI-assisted code was produced, with deterministic gates, lenses, detectors, and a tune loop.",
   "author": {
     "name": "Jason Smith",
     "email": "wallawalla1337@gmail.com"
   },
   "repository": "https://github.com/smalls257/eval-pack",
   "license": "MIT",
-  "keywords": ["eval", "review", "metrics", "reporting"],
+  "keywords": [
+    "eval",
+    "review",
+    "metrics",
+    "reporting"
+  ],
   "skills": "./skills/",
-  "agents": ["./agents/eval-pack-evaluator.md"],
+  "agents": [
+    "./agents/eval-pack-evaluator.md",
+    "./agents/lenses/requirement-drift.md",
+    "./agents/lenses/verification-rigor.md",
+    "./agents/lenses/review.md",
+    "./agents/lenses/business-risk.md",
+    "./agents/lenses/friction.md",
+    "./agents/lenses/repo-improvements.md",
+    "./agents/lenses/user-improvements.md",
+    "./agents/lenses/sycophancy.md"
+  ],
   "userConfig": {
     "pythonExecutable": {
       "type": "string",
@@ -25,10 +40,16 @@
       "description": "Directory where eval packs are written, relative to project root",
       "default": ".eval-packs"
     },
-    "includeTranscript": {
+    "includeRawTranscript": {
       "type": "boolean",
-      "title": "Include transcript",
-      "description": "Include full conversation transcript in eval pack",
+      "title": "Include raw transcript",
+      "description": "Bundle the raw machine-readable transcript.jsonl in the eval pack. Default off.",
+      "default": false
+    },
+    "includeRenderedTranscript": {
+      "type": "boolean",
+      "title": "Include rendered transcript",
+      "description": "Bundle the human-readable rendered transcript (transcript.html) and its link. Default on.",
       "default": true
     },
     "analysis": {
@@ -40,7 +61,7 @@
     "ticketBaseUrl": {
       "type": "string",
       "title": "Ticket base URL",
-      "description": "Prefix used to turn a bare ticket key into a link in PR bodies, e.g. https://YOURORG.atlassian.net/browse/ — leave empty to render bare keys as plain text.",
+      "description": "Prefix used to turn a bare ticket key into a link in PR bodies, e.g. https://YOURORG.atlassian.net/browse/ \u2014 leave empty to render bare keys as plain text.",
       "default": ""
     }
   }

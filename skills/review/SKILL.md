@@ -43,14 +43,25 @@ If no PR exists, first discover the work ticket, then create the PR.
 ### Discover the ticket
 
 A PR with no ticket link forces the reviewer to leave the PR and hunt the tracker for
-the *why*. Find the ticket key in this order, stopping at the first hit:
+the *why*. Resolve the ticket pattern from config first — repos configure their own key
+shape via `ticketPattern` in `.eval-pack.json`:
 
-1. **Branch name** — match the default ticket pattern `[A-Z][A-Z0-9]+-[0-9]+` against the
-   current branch:
+```bash
+PYTHON="${CLAUDE_PLUGIN_OPTION_pythonExecutable:-python3}"
+TICKET_PATTERN=$("$PYTHON" -c "
+import sys; sys.path.insert(0, '${CLAUDE_PLUGIN_ROOT}/scripts')
+from config import load_config
+print(load_config('$(pwd)')['ticketPattern'])
+" 2>/dev/null || echo '[A-Z][A-Z0-9]+-[0-9]+')
+```
+
+Find the ticket key in this order, stopping at the first hit:
+
+1. **Branch name** — match `$TICKET_PATTERN` against the current branch:
 
    ```bash
    BRANCH=$(git branch --show-current)
-   TICKET=$(printf '%s' "$BRANCH" | grep -oE '[A-Z][A-Z0-9]+-[0-9]+' | head -1)
+   TICKET=$(printf '%s' "$BRANCH" | grep -oE "$TICKET_PATTERN" | head -1)
    ```
 
 2. **Commit messages** — if `TICKET` is empty, scan this branch's commits for the same
@@ -60,7 +71,7 @@ the *why*. Find the ticket key in this order, stopping at the first hit:
    if [ -z "$TICKET" ]; then
      BASE=$(git merge-base HEAD main 2>/dev/null || git merge-base HEAD master 2>/dev/null || echo "")
      RANGE=${BASE:+$BASE..HEAD}
-     TICKET=$(git log $RANGE --format='%B' 2>/dev/null | grep -oE '[A-Z][A-Z0-9]+-[0-9]+' | head -1)
+     TICKET=$(git log $RANGE --format='%B' 2>/dev/null | grep -oE "$TICKET_PATTERN" | head -1)
    fi
    ```
 
@@ -73,7 +84,7 @@ the *why*. Find the ticket key in this order, stopping at the first hit:
 ### Build the ticket line
 
 - If you have a full `TICKET_URL` (user pasted a URL): the line is `Ticket: <TICKET_URL>`.
-- Else if you have a bare `TICKET` key AND the plugin config `ticketBaseUrl` is non-empty:
+- Else if you have a bare `TICKET` key AND `ticketBaseUrl` from the resolved config (`.eval-pack.json` or legacy plugin option) is non-empty:
   the line is `Ticket: [<TICKET>](<ticketBaseUrl><TICKET>)`.
 - Else if you have a bare `TICKET` key and no `ticketBaseUrl`: the line is `Ticket: <TICKET>`.
 - Else (no ticket): omit the entire `## Ticket` section from the body.

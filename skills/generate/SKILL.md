@@ -70,7 +70,7 @@ This prints a JSON array; each item has `sessionId`, `transcriptPath`, `source`
 Assemble the merged transcript (current + confirmed selections + their sub-agent transcripts):
 
 Write it to `${PACK_DIR}/transcript.jsonl` — the canonical name every later step reads (extraction,
-the Step 4 evaluator, and Step 5 render):
+the lenses, the Step 4.5 evaluator, and Step 5 render):
 
 ```bash
 mkdir -p "${PACK_DIR}"
@@ -80,8 +80,81 @@ mkdir -p "${PACK_DIR}"
 
 If `${PACK_DIR}/transcript.jsonl` was written (`1` or more sessions), set
 `TRANSCRIPT_PATH="${PACK_DIR}/transcript.jsonl"` and use it for every remaining step (Steps 1, 2,
-2.5, the Step 4 analysis input, and Step 5 render) — this guarantees the evaluator has a transcript
-to read. Otherwise keep the original `TRANSCRIPT_PATH`.
+2.5, the lens dispatches, the Step 4.5 analysis input, and Step 5 render) — this guarantees the
+evaluator has a transcript to read. Otherwise keep the original `TRANSCRIPT_PATH`.
+
+## Step 0.65: Discover Repos Touched (multi-repo coverage)
+
+Today's diff step (Step 0 / Step 4.5) only diffs the cwd's repo. If a sub-agent did real work in a
+different repo or worktree during this session, that change surface is invisible and the eval
+scores a partial diff without saying so. This step restores that visibility. This step is also
+ENFORCED deterministically: render re-derives which repos the session edited (via
+Edit/Write/MultiEdit/NotebookEdit) from the transcript and REFUSES to render if ≥2 such repos
+aren't all accounted. Limitation: a second repo modified ONLY through Bash file writes (e.g.
+`cat >`, `sed -i`, `git commit` — not the edit tools) has no write signal and is not detected —
+prefer the edit tools, or explicitly cover such repos in the selection.
+
+Run the discovery script against the assembled transcript and save its stdout — a JSON array —
+verbatim:
+
+```bash
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/discover_repos.py" "${PACK_DIR}/transcript.jsonl" \
+  > "${PACK_DIR}/discovered-repos.json"
+```
+
+Partition the discovered repos:
+
+- **Auto-skip obvious non-project repos** — any `repoRoot` under `~/.claude/plugins`,
+  `site-packages`, `/tmp`, or another dependency/cache directory. These are tooling the session
+  incidentally touched, not session work; record them as `{"repoRoot": ..., "skip": true}` with
+  reason `"tooling/library, not session work"`. Do NOT prompt the user about these.
+- **Remaining project repos:**
+  - If there is exactly **one**, and it is the cwd repo, auto-select it with
+    `base = ${DIFF_BASE}` (the Step 0 value) — no prompt, same behavior as before this step
+    existed.
+  - If there is **more than one**, this is the multi-repo case — **stop and ask the user**. We do
+    NOT guess a base; the user chooses, every time. For each such repo, present its `repoRoot`,
+    `branch`, `touchCount`, and `signals`, then offer candidate bases:
+    - Run `git -C <repoRoot> branch --format='%(refname:short)'` and list the branches.
+    - Also offer "the empty-tree sha (everything new)" — `4b825dc642cb6eb9a060e54bf8d69288fbee4904`.
+    - Also offer "type a specific commit SHA".
+    - Also offer "skip this repo".
+
+    Collect the user's choice per repo.
+
+Write every discovered repo's disposition — auto-skipped, auto-selected, and user-chosen — to
+`${PACK_DIR}/repo-selection.json`. When writing it, copy each `repoRoot` BYTE-FOR-BYTE from
+discovered-repos.json — do not retype, expand, or add a trailing slash. (The coverage gate
+canonicalizes paths, but a verbatim copy avoids any ambiguity.)
+
+```json
+{"repos": [
+  {"repoRoot": "/path/to/repo", "base": "main"},
+  {"repoRoot": "/path/to/other-repo", "skip": true}
+]}
+```
+
+Then compute the diffs:
+
+```bash
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/repo_diffs.py" "${PACK_DIR}" \
+  --selection "${PACK_DIR}/repo-selection.json"
+```
+
+This writes `${PACK_DIR}/repo-diffs.json`. Coverage backstop: render refuses if a discovered repo
+is left neither diffed nor skipped (Step 4.5's contract gate and render both enforce it), so
+account for every one — don't leave a repo out of `repo-selection.json`.
+
+## Step 0.7: Resolve Configuration
+
+Resolve the layered eval-pack config into the pack directory. This validates
+`.eval-pack.json` (and any `.eval-pack.local.json` / `extends` presets) and writes the single
+`eval-config.json` that every downstream step reads. If it exits non-zero, STOP and show the user
+the stderr verbatim — a config error must halt the run, not silently fall back to defaults.
+
+```bash
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/resolve_config.py" "$(pwd)" "${PACK_DIR}"
+```
 
 ## Step 1: Extract Metrics
 
@@ -92,12 +165,13 @@ Run the extract-metrics script against the current session transcript:
   --insertions "${INSERTIONS}" \
   --deletions "${DELETIONS}" \
   --files-changed "${FILES_CHANGED}" \
-  --changed-files "${CHANGED_FILES}"
+  --changed-files "${CHANGED_FILES}" \
+  --config "${PACK_DIR}/eval-config.json"
 ```
 
 Where:
 - `TRANSCRIPT_PATH` is the transcript file for this session
-- `PACK_DIR` is `<outputDir>/<session-id>` (outputDir from plugin config, default `.eval-packs`; session-id from current session)
+- `PACK_DIR` is `<outputDir>/<session-id>` (`outputDir` from the resolved `eval-config.json`, default `.eval-packs` — legacy plugin option still works via the env layer; session-id from current session)
 
 If the transcript path is not available, read the conversation history from context and write it to `${PACK_DIR}/transcript.jsonl` in JSONL format with fields: `type` (human/assistant), `timestamp`, `content`, and for assistant turns: `model`, `usage.input_tokens`, `usage.output_tokens`.
 
@@ -106,7 +180,7 @@ If the transcript path is not available, read the conversation history from cont
 Run the detect-patterns script:
 
 ```bash
-"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/detect_patterns.py" "${TRANSCRIPT_PATH}" "${PACK_DIR}"
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/detect_patterns.py" "${TRANSCRIPT_PATH}" "${PACK_DIR}" --config "${PACK_DIR}/eval-config.json"
 ```
 
 ## Step 2.5: Extract Tool Usage
@@ -114,12 +188,33 @@ Run the detect-patterns script:
 Run the extract-tools script:
 
 ```bash
-"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/extract_tools.py" "${TRANSCRIPT_PATH}" "${PACK_DIR}"
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/extract_tools.py" "${TRANSCRIPT_PATH}" "${PACK_DIR}" --config "${PACK_DIR}/eval-config.json"
 ```
 
 If the transcript path is not available or the script fails, continue — `render_html.py` will fall back to `{}` automatically.
 
 ## Step 3: Run Tests
+
+First read `testCommands` from `${PACK_DIR}/eval-config.json`. **If it is non-empty, run EXACTLY
+those commands** (in order, from the repo root), capture each command's real exit code and output,
+and base the test verdict on those real exit codes — do not guess at runners. Only when
+`testCommands` is empty fall back to the detection heuristics below:
+
+When `testCommands` ran, `test-results.json` MUST record the proof — one entry per configured
+command, verbatim, with its real exit code — and the verdict MUST follow the exit codes
+(all zero → `pass`, any nonzero → `fail`). A validator enforces this mechanically:
+
+```json
+{
+  "verdict": "fail",
+  "summary": "1 of 2 configured commands failed",
+  "commands": [
+    {"command": "<verbatim from testCommands>", "exitCode": 0},
+    {"command": "<verbatim from testCommands>", "exitCode": 1}
+  ],
+  "testsRun": [ {"name": "…", "passed": false, "output": "…"} ]
+}
+```
 
 Identify and run appropriate tests for the changes made in this session:
 
@@ -192,37 +287,144 @@ Identify and run appropriate tests for the changes made in this session:
 }
 ```
 
-## Step 4: Analyze (independent evaluator)
+## Step 4: Extension Lenses (optional)
+
+The evaluator (Step 4.5) is a synthesizer — it reads lens findings rather than re-deriving them.
+That only works if the lenses have already run, so this step comes BEFORE the evaluator dispatch.
+
+Read `analysisLenses` from `${PACK_DIR}/eval-config.json`. If it is empty, SKIP this entire
+step — the core eval never depends on a lens being present (the Airplane Test). The
+configuration was validated at resolve time, so every lens already has a `skill` and a valid
+`role`.
+
+Resolve `PACK_DIR` to an absolute path and capture the repo root before dispatching, so
+sub-agents (which may run from a different working directory) resolve files and git correctly.
+Compute the diff base the same way as Step 0:
+
+- `ABS_PACK_DIR=$(cd "${PACK_DIR}" && pwd)`
+- `REPO_ROOT=$(git rev-parse --show-toplevel)`
+- If `HEAD~1` exists, `DIFF_BASE=HEAD~1`; otherwise `DIFF_BASE=4b825dc642cb6eb9a060e54bf8d69288fbee4904` (empty tree).
+
+Create the lens output dir: `mkdir -p "${PACK_DIR}/lenses"`. Then for each lens
+`{skill, role, model?}`, dispatch it as a SEPARATE subagent over the read-only artifacts. Each
+lens WRITES its result to `${PACK_DIR}/lenses/<id>.json` (the assembler collects these). Pass only
+artifact locations — never your own reasoning.
+
+**Per-lens model (cost/quality tuning):** if a lens entry has a `model` (`opus`|`sonnet`|`haiku`|
+`fable`), pass it as the `Agent` tool's `model` argument for THAT lens's dispatch. If `model` is
+absent, omit the argument so the lens inherits the session model. This lets you run judgment-heavy
+lenses on `opus` and mechanical ones on `haiku`/`sonnet` — a large cost lever when the transcript
+is big (each lens reads it).
+
+**First-party lenses** ship with eval-pack; dispatch each with the `Agent` tool using the matching
+`subagent_type`, passing `PACK_DIR` (absolute), `REPO_ROOT`, and `DIFF_BASE`:
+
+- `requirement-drift` (scorer) — did the delivered work match what the user originally asked?
+  Default-on in `analysisLenses`. Its `delivered`/`unmet` arrays feed the Summary tab's
+  "What changed" / "not proven" columns.
+- `verification-rigor` (scorer) — were success claims backed by observed evidence?
+  Default-on in `analysisLenses`. Its `proven`/`unproven` arrays feed the Summary tab's
+  "What the transcript proves" / "not proven" columns.
+- `review` (contributor) — adversarial review findings: bugs/risks in the delivered work,
+  most-severe-first. Default-on in `analysisLenses` (see the config defaults).
+- `business-risk` (contributor) — business/stakeholder risk of the delivered work: level,
+  mitigation steps, and the biggest remaining uncertainty. Default-on in `analysisLenses`.
+- `friction` (contributor) — developer-experience friction encountered during the session,
+  classified into the configured `frictionCategories`. Default-on in `analysisLenses`. A
+  deterministic gate (`validate_contracts.py`, run again at render time) rejects any entry whose
+  `type` is not in `frictionCategories`.
+- `repo-improvements` (contributor) — how the repo/codebase could be improved: tooling,
+  structure, or docs gaps the session surfaced. Default-on in `analysisLenses`.
+- `user-improvements` (contributor) — how well the developer OWNED the work: intent, engineering
+  decisions, and the review/due-diligence the risk warranted (vs. offloading judgment to the AI —
+  vibecoding, incl. letting the AI decide whether a check was even needed). Calls out strengths and
+  improvements, each cited. Default-on in
+  `analysisLenses`.
+- `sycophancy` (contributor) — how sycophantic the assistant was toward the developer: flattery,
+  agreement, or answer-changes decoupled from evidence, as a low/medium/high level with cited
+  moments. Grounded in the sycophancy literature. Default-on in `analysisLenses`.
+
+> Dispatch any other lens present in `analysisLenses` the same way, using its `skill` as the
+> `subagent_type` suffix.
+
+> Run the `<skill>` lens. PACK_DIR is `${ABS_PACK_DIR}`. REPO_ROOT is `${REPO_ROOT}`. DIFF_BASE is
+> `${DIFF_BASE}`. Read the artifacts, then write your result to
+> `${ABS_PACK_DIR}/lenses/<skill>.json` per your schema.
+
+A **third-party** lens is dispatched as its named skill/agent; instruct it to write the same
+`{skill, role, score|title, rationale|findings}` shape to `lenses/<skill>.json`. A `contributor`
+adds an attributed section and MUST NOT touch the verdict; a `scorer` returns a 0–100 `score` that
+reaches the verdict only through the declared `verdictAggregation` rule. If a lens errors or writes
+malformed output, leave a note in `lenses/<skill>.json` — the assembler quarantines it as a
+failure and the eval continues (never crashes, never silently vanishes).
+
+Then assemble the results and compute the aggregated verdict with the tested script (the math is
+not done by hand — that keeps the verdict auditable):
+
+```bash
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/assemble_lenses.py" "${PACK_DIR}"
+```
+
+This writes `${PACK_DIR}/lenses.json` — contributors, scorers, failures, `coreScore`, and the
+aggregated `finalScore` — the evaluator (next step) reads this to synthesize confidence, and
+the report's Lenses tab renders it.
+
+Guards: rules come from config set before the run sees results (G1, pre-committed); every result is
+attributed and the aggregation math is written to lenses.json (G2, transparent); the rule was
+bounded to a known, can-still-fail rule at resolve time (G3); lenses are config-listed only,
+failures degrade to quarantined notes, and the core ran without them (G4, isolated).
+
+## Step 4.5: Analyze (independent evaluator synthesizes lens findings)
 
 The analysis must NOT be written by you — you did the work, and a self-graded
 evaluation is not trustworthy evidence. Dispatch an independent evaluator instead.
 
-First compute the diff base (same logic as Step 0):
+By this point Step 4 has already run: `${PACK_DIR}/lenses.json` and `${PACK_DIR}/lenses/*.json`
+exist (or `analysisLenses` was empty and neither exists — the Airplane Test). The evaluator is a
+SYNTHESIZER: it does not re-derive a verdict a lens already owns (requirement drift, verification
+rigor, review findings, business risk, friction) — it reads those findings plus `patterns.json`
+flags and synthesizes `completionStatus` / `confidencePercent` / `confidenceNotes` from them.
 
-- If `HEAD~1` exists, `DIFF_BASE=HEAD~1`; otherwise `DIFF_BASE=4b825dc642cb6eb9a060e54bf8d69288fbee4904` (empty tree).
+**If analysis is enabled** (`analysis` in the resolved `eval-config.json`, default true):
 
-**If analysis is enabled** (plugin config `analysis` option, default true):
-
-Resolve `PACK_DIR` to an absolute path and capture the repo root before dispatching, so
-the sub-agent (which may run from a different working directory) resolves files and git
-correctly:
-
-- `ABS_PACK_DIR=$(cd "${PACK_DIR}" && pwd)`
-- `REPO_ROOT=$(git rev-parse --show-toplevel)`
+Resolve `PACK_DIR` to an absolute path and capture the repo root before dispatching (reuse
+`ABS_PACK_DIR`, `REPO_ROOT`, `DIFF_BASE` from Step 4 if this is the same run).
 
 Dispatch the `eval-pack-evaluator` agent with the `Agent` tool, `subagent_type:
 eval-pack-evaluator`. Pass it only the artifact location — not your own reasoning:
 
 > Write the eval-pack analysis. PACK_DIR is `${ABS_PACK_DIR}` (absolute). REPO_ROOT is
 > `${REPO_ROOT}`. DIFF_BASE is `${DIFF_BASE}`.
-> Read transcript.jsonl, metrics.json, patterns.json, and test-results.json from PACK_DIR,
-> run git from REPO_ROOT to inspect the diff against DIFF_BASE, and write
-> `${ABS_PACK_DIR}/analysis.json` per your schema.
+> Read eval-config.json (your configuration), transcript.jsonl, metrics.json, patterns.json,
+> test-results.json, `lenses.json`, and `lenses/*.json` from PACK_DIR — the lens findings are
+> already computed; ingest them, do not re-derive their verdicts — run git from REPO_ROOT to
+> inspect the diff against DIFF_BASE, and write `${ABS_PACK_DIR}/analysis.json` per your schema.
 
 Wait for the agent to finish. Confirm `${ABS_PACK_DIR}/analysis.json` exists and has a
 `title`. If it is missing or empty, the evaluator failed — re-dispatch once; if it
 fails again, stop and tell the user the analysis step failed. Do NOT write the
 analysis yourself as a fallback — that reintroduces the bias this step exists to remove.
+
+Then run the deterministic contract gate — it checks the analysis and test results against the
+resolved config (retrospective answers, rubric band, test-command proof, and — now that lenses
+have already run — the friction taxonomy check against `lenses/friction.json`):
+
+```bash
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/validate_contracts.py" "${ABS_PACK_DIR}"
+```
+
+If it exits non-zero, route each `CONTRACT:` line to its owner:
+- **Analysis violations** (retrospectiveAnswers / rubricApplied): re-dispatch the evaluator ONCE,
+  passing those lines as corrections.
+- **Test violations** (test-results.commands / verdict): the evaluator cannot fix these — redo
+  Step 3 so `test-results.json` records every configured command with its real exit code and a
+  verdict consistent with them.
+- **Friction taxonomy violations** (`lenses/friction.json` entry type not in `frictionCategories`):
+  re-dispatch the `friction` lens ONCE, passing the violation as a correction, then re-run
+  `assemble_lenses.py`.
+Re-run the gate. If it still fails, STOP and show the user the violations — do not render.
+(render_html enforces the same gate again as the code-level backstop; skipping this step cannot
+ship a non-conforming pack.)
 
 **If analysis is disabled** (`analysis` option is false):
 

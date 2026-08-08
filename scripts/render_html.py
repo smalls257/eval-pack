@@ -11,6 +11,13 @@ import tempfile
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
+from urllib.request import url2pathname
+
+sys.path.insert(0, str(Path(__file__).parent))  # noqa: E402
+import redact  # noqa: E402
+import validate_contracts  # noqa: E402
+from config import coerce_env_bool, read_config  # noqa: E402
 
 
 def run_script(script_path, args):
@@ -49,7 +56,7 @@ def load_jsonl(path):
     return entries
 
 
-def render_transcript_html(transcript_path, pack_dir, screenshots_dir):
+def render_transcript_html(transcript_path, pack_dir, screenshots_dir, rules=()):
     """Render transcript HTML and collect browser screenshots in a single pass."""
     rows = []
     copied = 0
@@ -74,10 +81,19 @@ def render_transcript_html(transcript_path, pack_dir, screenshots_dir):
                 if text.strip():
                     rows.append(
                         f'<div class="turn user"><div class="meta">USER {htmllib.escape(ts)}</div>'
-                        f"<pre>{htmllib.escape(text)}</pre></div>"
+                        f"<pre>{htmllib.escape(redact.redact(text, rules))}</pre></div>"
                     )
             elif role == "assistant":
-                if isinstance(content, list):
+                if isinstance(content, str):
+                    text = content.strip()
+                    if text:
+                        model = (msg.get("model") or "").upper()
+                        rows.append(
+                            f'<div class="turn assistant"><div class="meta">'
+                            f'{htmllib.escape(model or "ASSISTANT")} {htmllib.escape(ts)}</div>'
+                            f"<pre>{htmllib.escape(redact.redact(text, rules))}</pre></div>"
+                        )
+                elif isinstance(content, list):
                     for block in content:
                         if not isinstance(block, dict):
                             continue
@@ -88,7 +104,7 @@ def render_transcript_html(transcript_path, pack_dir, screenshots_dir):
                                 rows.append(
                                     f'<div class="turn assistant"><div class="meta">'
                                     f'{htmllib.escape(model or "ASSISTANT")} {htmllib.escape(ts)}</div>'
-                                    f"<pre>{htmllib.escape(text)}</pre></div>"
+                                    f"<pre>{htmllib.escape(redact.redact(text, rules))}</pre></div>"
                                 )
                         elif block.get("type") == "tool_use" and block.get("name") == "Agent":
                             desc = (block.get("input") or {}).get("description", "")
@@ -97,7 +113,7 @@ def render_transcript_html(transcript_path, pack_dir, screenshots_dir):
                                 label = f"[{model_tag}] {desc}" if model_tag else desc
                                 rows.append(
                                     f'<div class="turn subagent"><div class="meta">→ SUBAGENT {htmllib.escape(ts)}</div>'
-                                    f"<pre>{htmllib.escape(label)}</pre></div>"
+                                    f"<pre>{htmllib.escape(redact.redact(label, rules))}</pre></div>"
                                 )
 
             # Collect browser screenshots from ALL tool_use blocks (any role)
@@ -147,14 +163,165 @@ def render_transcript_html(transcript_path, pack_dir, screenshots_dir):
     return agent_screenshot_names
 
 
-def build_directory_structure(pack_dir, template_dir):
-    """Create pack directory layout and copy static templates."""
+def redact_pack(pack_dir, rules):
+    """Mask secrets in the on-disk JSON artifacts at the string-VALUE level, so masking
+    happens BEFORE JSON re-escaping — a plaintext rule can't be defeated by escaping (e.g. a
+    secret containing a quote surviving as `\\"`). Covers analysis.json (evaluator quotes),
+    tools.json (skill args / agent descriptions), metrics/patterns/test-results/lenses/data.json,
+    and the raw transcript.jsonl. transcript.html is redacted at its render source; index.html and
+    data.json are clean because the `data` dict is redacted before injection. Runs after all
+    artifacts are written, before zip/publish."""
+    if not rules:
+        return
+    for path in Path(pack_dir).rglob("*"):
+        if not path.is_file():
+            continue
+        # eval-config.json IS redacted too: a redaction rule can itself be the sensitive value
+        # (e.g. a home-path prefix), so the bundled config shows "[REDACTED]" rather than leak it.
+        if path.suffix == ".json":
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                continue
+            path.write_text(
+                json.dumps(redact.redact_value(data, rules), indent=2), encoding="utf-8"
+            )
+        elif path.suffix == ".jsonl":
+            out = []
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    out.append(line)
+                    continue
+                try:
+                    out.append(json.dumps(redact.redact_value(json.loads(line), rules)))
+                except json.JSONDecodeError:
+                    out.append(redact.redact(line, rules))  # fallback: plaintext line
+            path.write_text("\n".join(out) + "\n", encoding="utf-8")
+
+
+def _is_within(child, parent):
+    """True if child resolves to parent or a path inside it."""
+    child, parent = Path(child).resolve(), Path(parent).resolve()
+    return child == parent or parent in child.parents
+
+
+# Config keys the report template (templates/html/scripts.js) reads off data.evalConfig.
+# A key the template consumes but this omits is a silent dead knob — keep in sync with the
+# EVAL_CONFIG / pathLink / applySections reads in scripts.js.
+_REPORT_CONFIG_KEYS = (
+    "brandName", "reportTitle", "footerText", "subjectNoun", "defaultTheme", "messages",
+    "repoBaseUrl", "sections", "includeRenderedTranscript",
+)
+
+
+def read_plugin_version(plugin_root):
+    """The eval-pack version from the plugin manifest, stamped into the report footer.
+    Empty string when the manifest is missing/unreadable — a version stamp is informational,
+    so its absence must not fail the render (Buffer: the report is the durable artifact)."""
+    try:
+        manifest = json.loads(
+            (Path(plugin_root) / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
+        return manifest.get("version", "")
+    except (OSError, json.JSONDecodeError):
+        return ""
+
+
+def report_config(cfg):
+    """The subset of resolved config surfaced to the report template."""
+    return {k: cfg[k] for k in _REPORT_CONFIG_KEYS}
+
+
+# Deterministic metadata for known single-file artifacts: filename -> {name, type, description}.
+# "list the pack's files with a type" is mechanical fact-gathering, not judgment — it belongs
+# in code, not in the evaluator's LLM dispatch (Filter: the evaluator's prose should not be
+# doing a script's job).
+_KNOWN_ARTIFACT_FILES = {
+    "test-results.json": {
+        "name": "Test Results", "type": "tests",
+        "description": "Recorded test commands and verdict",
+    },
+    "metrics.json": {
+        "name": "Metrics", "type": "data",
+        "description": "Token, turn, and file-change statistics for the session",
+    },
+    "patterns.json": {
+        "name": "Patterns", "type": "data",
+        "description": "Heuristic flags — false completions, retries, scope drift",
+    },
+    "tools.json": {
+        "name": "Tools", "type": "data",
+        "description": "Tools and skills invoked during the session",
+    },
+    "lenses.json": {
+        "name": "Lenses", "type": "data",
+        "description": "Scorer and contributor lens outputs",
+    },
+}
+
+
+def build_artifact_inventory(pack_dir, include_rendered=True):
+    """Enumerate the pack's actual evidence files and return `[{name, path, type,
+    description}]` — deterministically, from what is on disk. Replaces the evaluator's
+    former `artifactInventory` (an LLM was being asked to do a directory listing's job;
+    Filter: judgment prose belongs to the evaluator, mechanical facts belong to code).
+
+    Paths are relative to the pack root, matching the template's existing convention
+    (e.g. "transcript.html", "screenshots/foo.png").
+    """
+    pack_dir = Path(pack_dir)
+    items = []
+
+    transcript_html = pack_dir / "transcript.html"
+    if include_rendered and transcript_html.is_file():
+        items.append({
+            "name": "Transcript",
+            "path": "transcript.html",
+            "type": "transcript",
+            "description": "Rendered conversation — commands, outputs, failures",
+        })
+
+    screenshots_dir = pack_dir / "screenshots"
+    if screenshots_dir.is_dir():
+        for f in sorted(screenshots_dir.glob("*.png")):
+            items.append({
+                "name": f.name,
+                "path": f"screenshots/{f.name}",
+                "type": "screenshot",
+                "description": "Browser screenshot captured during the session",
+            })
+
+    logs_dir = pack_dir / "logs"
+    if logs_dir.is_dir():
+        for f in sorted(logs_dir.glob("*.log")):
+            items.append({
+                "name": f.name,
+                "path": f"logs/{f.name}",
+                "type": "log",
+                "description": "Captured command/build output",
+            })
+
+    for filename, meta in _KNOWN_ARTIFACT_FILES.items():
+        if (pack_dir / filename).is_file():
+            items.append({
+                "name": meta["name"],
+                "path": filename,
+                "type": meta["type"],
+                "description": meta["description"],
+            })
+
+    return items
+
+
+def build_directory_structure(pack_dir, template_dir, user_template_dir=None):
+    """Create pack layout; copy templates project-first (user file wins, bundled fills gaps)."""
     pack_dir.mkdir(parents=True, exist_ok=True)
     (pack_dir / "screenshots").mkdir(exist_ok=True)
     (pack_dir / "logs").mkdir(exist_ok=True)
-    shutil.copy(template_dir / "index.html", pack_dir / "index.html")
-    shutil.copy(template_dir / "styles.css", pack_dir / "styles.css")
-    shutil.copy(template_dir / "scripts.js", pack_dir / "scripts.js")
+    for name in ("index.html", "styles.css", "scripts.js"):
+        src = template_dir / name
+        if user_template_dir is not None and (Path(user_template_dir) / name).is_file():
+            src = Path(user_template_dir) / name
+        shutil.copy(src, pack_dir / name)
 
 
 def load_round_inputs(pack_dir, transcript_file, scripts_dir):
@@ -165,7 +332,11 @@ def load_round_inputs(pack_dir, transcript_file, scripts_dir):
         # merged transcript). Copying a file onto itself raises SameFileError.
         if transcript_file.resolve() != dest.resolve():
             shutil.copy(transcript_file, dest)
-        ok = run_script(scripts_dir / "extract_tools.py", [transcript_file, pack_dir])
+        tools_args = [transcript_file, pack_dir]
+        cfg_file = Path(pack_dir) / "eval-config.json"
+        if cfg_file.is_file():
+            tools_args += ["--config", cfg_file]
+        ok = run_script(scripts_dir / "extract_tools.py", tools_args)
         if not ok:
             print("Warning: extract_tools.py failed; tool data will be empty", file=sys.stderr)
 
@@ -304,35 +475,122 @@ def inject_into_template(pack_dir, data):
     )
 
 
-def write_zip(pack_dir, zip_path, session_id, include_transcript=True):
-    """Write zip from pack_dir contents. The raw transcript.jsonl is bundled
-    only when include_transcript (the `includeTranscript` userConfig)."""
+def write_zip(pack_dir, zip_path, session_id, include_raw=False, include_rendered=True):
+    """Write zip from pack_dir contents. The raw transcript.jsonl is bundled only when
+    include_raw (`includeRawTranscript`); the rendered transcript.html only when
+    include_rendered (`includeRenderedTranscript`)."""
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for f in pack_dir.rglob("*"):
-            if f.is_file() and (include_transcript or f.suffix != ".jsonl"):
-                zf.write(f, f"{session_id}/{f.relative_to(pack_dir)}")
+            if not f.is_file():
+                continue
+            if f.suffix == ".jsonl" and not include_raw:
+                continue
+            if f.name == "transcript.html" and not include_rendered:
+                continue
+            zf.write(f, f"{session_id}/{f.relative_to(pack_dir)}")
 
 
-def publish_openable(pack_dir, session_id, open_base, include_transcript=True):
+def publish_openable(pack_dir, session_id, open_base, include_raw=False, include_rendered=True):
     """Copy rendered pack to an openable dir outside the repo; return that dir.
 
-    Sensor: the dashboard must be readable without a decompress step. The copy
-    lives outside the repo (system temp by default) so it is never pushed.
-    The raw .jsonl is included only when include_transcript.
+    Sensor: the dashboard must be readable without a decompress step. The copy lives outside
+    the repo (system temp by default) so it is never pushed. The raw .jsonl ships only when
+    include_raw; the rendered transcript.html only when include_rendered.
     """
     open_base.mkdir(parents=True, exist_ok=True)
     open_dir = open_base / f"eval-pack-{session_id}"
     if open_dir.exists():
         shutil.rmtree(open_dir)
-    ignore = None if include_transcript else shutil.ignore_patterns("*.jsonl")
+    patterns = []
+    if not include_raw:
+        patterns.append("*.jsonl")
+    if not include_rendered:
+        patterns.append("transcript.html")
+    ignore = shutil.ignore_patterns(*patterns) if patterns else None
     shutil.copytree(pack_dir, open_dir, ignore=ignore)
     return open_dir
 
 
-def _include_transcript():
-    """Read the includeTranscript userConfig (env). Default true."""
-    val = os.environ.get("CLAUDE_PLUGIN_OPTION_includeTranscript", "true")
-    return str(val).strip().lower() not in ("false", "0", "no")
+def verify_zip_integrity(zip_path, session_id):
+    """Deterministic gate: the written zip must reopen clean and contain the report's
+    index.html. A corrupt or incomplete zip is a real failure — the durable artifact
+    is broken, so we must NOT report success. Returns None on success, else an error string."""
+    index_member = f"{session_id}/index.html"
+    try:
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            bad = zf.testzip()               # None => all CRCs good
+            if bad is not None:
+                return f"corrupt member in zip: {bad}"
+            if index_member not in set(zf.namelist()):
+                return f"zip missing {index_member}"
+            zf.read(index_member)            # prove the report member itself reads (CRC/decompress ok)
+    except Exception as exc:
+        # This function's whole job is to convert ANY way the zip is broken into a
+        # deterministic error string. A narrow except list is a Leaky Narrative: the caller
+        # would have to know which decompressor exceptions (zlib.error — NOT an OSError) leak.
+        # zlib.error from a corrupt deflate stream must not escape as an uncaught traceback,
+        # or the gate's unlink/rmtree cleanup is skipped and the broken zip survives.
+        return f"zip unreadable: {type(exc).__name__}: {exc}"
+    return None
+
+
+def verify_openable(open_dir):
+    """Deterministic gate: only advertise an openable report whose index.html actually
+    exists AND whose file:// URI round-trips back to that real file — so we never print a
+    link that doesn't open. Returns the verified URI string, or None if unverifiable."""
+    index = Path(open_dir) / "index.html"
+    if not index.is_file():
+        return None
+    uri = index.as_uri()
+    decoded = Path(url2pathname(urlparse(uri).path))
+    if not decoded.is_file():
+        return None
+    return uri
+
+
+def clickable_link(uri, label=None, env=None):
+    """Render `uri` as a clickable terminal hyperlink (OSC 8), unless colour is disabled.
+
+    Neither Claude Code nor most terminals auto-linkify file:// (they linkify http at
+    best), so a bare file URI prints as dead text the user must copy. An OSC 8 hyperlink
+    makes the text itself clickable — Claude Code honours OSC 8 in tool output, as do
+    iTerm2/WezTerm/kitty/VS Code. NOTE: we do NOT gate on isatty — Claude Code pipes tool
+    stdout (never a TTY), so an isatty gate would suppress the link in the exact path that
+    matters. Instead honour the NO_COLOR convention (https://no-color.org) and TERM=dumb so
+    logs/CI can opt out to the plain URL; the label defaults to the URI, and the adjacent
+    'Openable report folder:' line always prints the plain path as a copy-paste fallback.
+    """
+    env = os.environ if env is None else env
+    label = label if label is not None else uri
+    if env.get("NO_COLOR") or env.get("TERM", "") in ("", "dumb"):
+        return label
+    # OSC 8: ESC ] 8 ; ; <uri> ST <label> ESC ] 8 ; ; ST   (ST = ESC \)
+    return f"\033]8;;{uri}\033\\{label}\033]8;;\033\\"
+
+
+def _env_bool(key, default):
+    """Legacy env shim (standalone renders + direct tests): read CLAUDE_PLUGIN_OPTION_<key>,
+    canonical coercion, else `default`. The pipeline path reads the resolved eval-config.json,
+    where env was applied at resolve time."""
+    raw = os.environ.get("CLAUDE_PLUGIN_OPTION_" + key)
+    if raw in (None, ""):
+        return default
+    return coerce_env_bool(raw, key)
+
+
+def _resolve_render_config(cfg_path):
+    """Return the render-time config: the resolved eval-config.json, or defaults.
+
+    Standalone render without a resolved config: honor the legacy env var so a
+    transcript the user asked to exclude is never silently bundled (Sensor —
+    read_config(None) returns fresh DEFAULTS and ignores env by design).
+    """
+    if cfg_path.is_file():
+        return read_config(cfg_path)
+    cfg = read_config(None)
+    cfg["includeRawTranscript"] = _env_bool("includeRawTranscript", False)
+    cfg["includeRenderedTranscript"] = _env_bool("includeRenderedTranscript", True)
+    return cfg
 
 
 def validate_pack(pack_dir):
@@ -386,10 +644,25 @@ def main():
         sys.exit(1)
 
     pack_dir = args.output_dir / args.session_id
+    cfg_path = pack_dir / "eval-config.json"
+    cfg = _resolve_render_config(cfg_path)
+    redaction_rules = cfg["redaction"]
+    user_template_dir = None
+    if cfg["templateDir"]:
+        # templateDir is deliberately NOT repo-confined (unlike extends/evaluatorPromptFile/
+        # detectorScripts): it only sources static template files copied INTO the pack, from a
+        # path the repo's own committed config names — same trust class as testCommands. A
+        # confinement gate here would block legitimate shared-theme dirs without closing any
+        # attack a repo config couldn't already perform via detectorScripts.
+        user_template_dir = Path.cwd() / cfg["templateDir"]
+        if not user_template_dir.is_dir():
+            # Fail loud: a configured override that doesn't exist must not silently use bundled.
+            print(f"Error: templateDir {user_template_dir} does not exist", file=sys.stderr)
+            sys.exit(1)
     template_dir = args.plugin_root / "templates" / "html"
     scripts_dir = args.plugin_root / "scripts"
 
-    build_directory_structure(pack_dir, template_dir)
+    build_directory_structure(pack_dir, template_dir, user_template_dir)
     load_round_inputs(pack_dir, args.transcript_file, scripts_dir)
 
     gaps = validate_pack(pack_dir)
@@ -401,14 +674,33 @@ def main():
         shutil.rmtree(pack_dir, ignore_errors=True)
         sys.exit(1)
 
+    # Deterministic backstop: even if the orchestrating skill skipped the contract gate,
+    # a non-conforming pack must not render. Contract gaps PRESERVE the pack dir —
+    # analysis.json/test-results.json are the evidence needed to fix the violation.
+    contract_gaps = validate_contracts.collect_gaps(pack_dir)
+    if contract_gaps:
+        print("Refusing to render — contract violations (pack dir preserved for inspection):",
+              file=sys.stderr)
+        for g in contract_gaps:
+            print(f"  CONTRACT: {g}", file=sys.stderr)
+        sys.exit(1)
+
     agent_screenshot_names = set()
     if args.transcript_file and args.transcript_file.is_file():
         agent_screenshot_names = render_transcript_html(
-            args.transcript_file, pack_dir, pack_dir / "screenshots"
+            args.transcript_file, pack_dir, pack_dir / "screenshots", redaction_rules
         )
 
     git_branch = args.branch
-    zip_name = slugify(git_branch) if git_branch else args.session_id
+    zip_template = cfg.get("zipNameTemplate", "")
+    if zip_template:
+        zip_name = slugify(
+            zip_template.replace("{branch}", git_branch or "")
+            .replace("{session}", args.session_id)
+            .replace("{date}", datetime.now(timezone.utc).strftime("%Y%m%d"))
+        )
+    else:
+        zip_name = slugify(git_branch) if git_branch else args.session_id
     zip_path = args.output_dir / f"{zip_name}.zip"
     prev_data, prev_screenshot_names = load_prior_rounds(zip_path)
     screenshots = collect_new_screenshots(
@@ -422,6 +714,8 @@ def main():
     }
 
     transcript_jsonl = pack_dir / "transcript.jsonl"
+    include_raw = bool(cfg["includeRawTranscript"])
+    include_rendered = bool(cfg["includeRenderedTranscript"])
     data = {
         "sessionId": args.session_id,
         "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -430,26 +724,87 @@ def main():
         "patterns": read_json(pack_dir / "patterns.json"),
         "testResults": read_json(pack_dir / "test-results.json"),
         "tools": read_json(pack_dir / "tools.json"),
+        "lenses": read_json(pack_dir / "lenses.json"),
+        "repoDiffs": read_json(
+            pack_dir / "repo-diffs.json",
+            {"repos": [], "skipped": [], "errors": []},
+        ),
+        "artifactInventory": build_artifact_inventory(pack_dir, include_rendered),
         "rounds": list(prev_data.get("rounds") or []) + [new_round],
         "transcript": load_jsonl(transcript_jsonl) if transcript_jsonl.is_file() else [],
+        "evalConfig": report_config(cfg),
+        "evalPackVersion": read_plugin_version(args.plugin_root),
     }
 
+    # Redact the data dict at the value level BEFORE it is serialized into index.html /
+    # data.json, so escaping happens after masking (no escape-defeats-rule leak).
+    data = redact.redact_value(data, redaction_rules)
     inject_into_template(pack_dir, data)
 
-    include_transcript = _include_transcript()
-    write_zip(pack_dir, zip_path, args.session_id, include_transcript)
+    # Value-level pass over the standalone on-disk JSON/JSONL artifacts (analysis.json,
+    # tools.json, transcript.jsonl, …) before zip/publish. transcript.html was masked at source.
+    redact_pack(pack_dir, redaction_rules)
+
+    write_zip(pack_dir, zip_path, args.session_id, include_raw, include_rendered)
+
+    # Gate 1 (halts): the zip is the durable artifact. If it doesn't reopen clean and
+    # contain the report's index.html, the render must NOT report success.
+    zip_err = verify_zip_integrity(zip_path, args.session_id)
+    if zip_err:
+        print(f"Error: eval pack zip failed verification ({zip_err}).", file=sys.stderr)
+        try:
+            zip_path.unlink()  # don't leave a broken zip masquerading as a pack
+        except OSError:
+            pass
+        shutil.rmtree(pack_dir, ignore_errors=True)
+        sys.exit(1)
     print(f"Eval pack rendered to {zip_path}")
 
-    open_base = Path(args.open_base) if args.open_base else Path(tempfile.gettempdir())
-    try:
-        open_dir = publish_openable(pack_dir, args.session_id, open_base, include_transcript)
-        print(f"Open: file://{open_dir}/index.html")
-    except Exception as ex:
-        # Buffer: the zip is the durable artifact; the openable copy is a
-        # convenience. Degrade loudly, never silently.
-        print(f"Warning: could not write openable copy: {ex}", file=sys.stderr)
+    if cfg["publishOpenable"]:
+        open_base = (
+            Path(cfg["openableDir"]) if cfg["openableDir"]
+            else (Path(args.open_base) if args.open_base else Path(tempfile.gettempdir()))
+        ).resolve()  # absolute so as_uri() can't raise on a relative path (and the note can't misattribute)
+        if cfg["openableDir"] and _is_within(open_base, Path.cwd()):
+            # Refuse to drop the openable copy inside the repo — it could be committed/pushed.
+            print(
+                f"Warning: openableDir {open_base} is inside the repo — skipping the openable "
+                f"copy so pack artifacts can't be committed. Choose a dir outside the repo.",
+                file=sys.stderr,
+            )
+        else:
+            try:
+                open_dir = publish_openable(pack_dir, args.session_id, open_base, include_raw, include_rendered)
+                # Gate 2 (non-fatal): only advertise the link when index.html actually
+                # exists AND its file:// URI round-trips back to that real file — so we
+                # never print a link that doesn't open. The zip above is already durable.
+                uri = verify_openable(open_dir)
+                if uri:
+                    # Print BOTH the clickable URI and the plain folder path: the URI opens
+                    # the report directly; the folder path lets the user navigate there in
+                    # Explorer/Finder when the terminal doesn't linkify (common on Windows).
+                    print(f"Open: {clickable_link(uri)}")
+                    print(f"Openable report folder: {open_dir}")
+                else:
+                    print(
+                        f"Note: openable copy at {open_dir} could not be verified "
+                        f"(index.html missing) — the zip above is complete; "
+                        f"unzip it and open index.html.",
+                    )
+            except Exception as ex:
+                # Buffer: the zip is the durable artifact, so we don't fail the render.
+                # Sensor: but say so LOUDLY on stdout (not a swallowed stderr warning) with
+                # the target and reason, so a failed openable copy is never silently missing.
+                print(
+                    f"Note: could not write the openable copy under {open_base} "
+                    f"({type(ex).__name__}: {ex}). The zip above is complete — "
+                    f"unzip it and open index.html.",
+                )
 
-    shutil.rmtree(pack_dir)
+    # The pack dir persists as a gitignored working cache (.eval-packs/<sid>/) — the zip and the
+    # openable copy are the deliverables, but keeping the dir lets `tune` re-run a single lens
+    # against the prior round's on-disk outputs without reconstructing them from the zip.
+    # (Error paths above still rmtree a partial pack.)
 
 
 if __name__ == "__main__":

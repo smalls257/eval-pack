@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 
 const require = createRequire(import.meta.url);
-const { screenshotBadge, wrapIndex, zoomAt, artifactHref, artifactLinkable } = require(
+const { screenshotBadge, wrapIndex, zoomAt, artifactHref, artifactLinkable, computeBaseFit } = require(
   path.join(import.meta.dirname, '..', 'templates', 'html', 'scripts.js')
 );
 
@@ -68,4 +68,28 @@ test('artifactLinkable: transcript ok, other .jsonl not, normal files ok', () =>
   assert.equal(artifactLinkable('metrics.json'), true);
   assert.equal(artifactLinkable('screenshots/x.png'), true);
   assert.equal(artifactLinkable('//evil'), false);            // unsafe path
+});
+
+// computeBaseFit: the zoom=1 display factor that fits a NATURAL-size image into the
+// stage box (letterboxing, aspect preserved) — the factor baked into the transform
+// alongside the user's zoom `scale` so the backing raster never gets downsampled by
+// layout before scale() is applied.
+test('computeBaseFit: wide image (4:1) constrained by stage width', () => {
+  // natural 4000x1000, stage 1000x1000 -> width ratio 0.25, height ratio 1.0 -> min is width
+  assert.equal(computeBaseFit(4000, 1000, 1000, 1000), 0.25);
+});
+
+test('computeBaseFit: tall image (1:4) constrained by stage height', () => {
+  // natural 1000x4000, stage 1000x1000 -> width ratio 1.0, height ratio 0.25 -> min is height
+  assert.equal(computeBaseFit(1000, 4000, 1000, 1000), 0.25);
+});
+
+test('computeBaseFit: image smaller than stage still scales (up or down) to fit exactly', () => {
+  assert.equal(computeBaseFit(500, 500, 1000, 1000), 2);
+});
+
+test('computeBaseFit: falls back to 1 when natural dimensions are not yet known (0/NaN)', () => {
+  assert.equal(computeBaseFit(0, 0, 1000, 1000), 1);
+  assert.equal(computeBaseFit(NaN, 500, 1000, 1000), 1);
+  assert.equal(computeBaseFit(500, 500, 0, 0), 1);
 });

@@ -81,13 +81,109 @@ class WriteZipTranscriptTests(unittest.TestCase):
             self.assertFalse(any(n.endswith("transcript.jsonl") for n in names))
             self.assertTrue(any(n.endswith("index.html") for n in names))
 
-    def test_include_transcript_env(self):
+    def test_env_bool_defaults_and_override(self):
         import os
-        os.environ.pop("CLAUDE_PLUGIN_OPTION_includeTranscript", None)
-        self.assertTrue(render_html._include_transcript())       # default true
-        os.environ["CLAUDE_PLUGIN_OPTION_includeTranscript"] = "false"
-        self.assertFalse(render_html._include_transcript())
-        os.environ.pop("CLAUDE_PLUGIN_OPTION_includeTranscript", None)
+        os.environ.pop("CLAUDE_PLUGIN_OPTION_includeRawTranscript", None)
+        self.assertFalse(render_html._env_bool("includeRawTranscript", False))
+        self.assertTrue(render_html._env_bool("includeRenderedTranscript", True))
+        os.environ["CLAUDE_PLUGIN_OPTION_includeRawTranscript"] = "true"
+        self.assertTrue(render_html._env_bool("includeRawTranscript", False))
+        os.environ.pop("CLAUDE_PLUGIN_OPTION_includeRawTranscript", None)
+
+    def test_write_zip_transcript_gating(self):
+        import zipfile, tempfile, pathlib
+        with tempfile.TemporaryDirectory() as d:
+            pack = pathlib.Path(d) / "pack"; pack.mkdir()
+            (pack / "transcript.jsonl").write_text("{}\n")
+            (pack / "transcript.html").write_text("<html>convo</html>")
+            (pack / "index.html").write_text("<html></html>")
+            def names(raw, rendered):
+                zp = pathlib.Path(d) / f"o-{raw}-{rendered}.zip"
+                render_html.write_zip(pack, zp, "sid", raw, rendered)
+                with zipfile.ZipFile(zp) as z: return set(n.split("/",1)[1] for n in z.namelist())
+            default = names(False, True)
+            self.assertIn("transcript.html", default)
+            self.assertNotIn("transcript.jsonl", default)
+            self.assertIn("transcript.jsonl", names(True, True))
+            self.assertNotIn("transcript.html", names(False, False))
+
+
+class StandaloneConfigFallbackTests(unittest.TestCase):
+    """Standalone render (no eval-config.json) must honor the legacy env vars.
+
+    read_config(None) ignores env by design (fresh DEFAULTS), so without the
+    fallback a user-requested transcript exclusion would be silently dropped —
+    a privacy-adjacent Silent Fallback. Raw and rendered are gated independently.
+    """
+
+    _KEYS = ("CLAUDE_PLUGIN_OPTION_includeRawTranscript",
+             "CLAUDE_PLUGIN_OPTION_includeRenderedTranscript")
+
+    def _with_env(self, values, fn):
+        import os
+        old = {k: os.environ.get(k) for k in self._KEYS}
+        for k in self._KEYS:
+            v = values.get(k)
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        try:
+            return fn()
+        finally:
+            for k in self._KEYS:
+                if old[k] is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = old[k]
+
+    def test_standalone_defaults_raw_off_rendered_on(self):
+        with tempfile.TemporaryDirectory() as d:
+            missing = Path(d) / "eval-config.json"  # main()'s no-config branch
+            cfg = self._with_env({}, lambda: render_html._resolve_render_config(missing))
+            self.assertIs(cfg["includeRawTranscript"], False)
+            self.assertIs(cfg["includeRenderedTranscript"], True)
+
+    def test_standalone_raw_env_overrides_independently(self):
+        with tempfile.TemporaryDirectory() as d:
+            missing = Path(d) / "eval-config.json"
+            cfg = self._with_env(
+                {"CLAUDE_PLUGIN_OPTION_includeRawTranscript": "true"},
+                lambda: render_html._resolve_render_config(missing))
+            self.assertIs(cfg["includeRawTranscript"], True)
+            self.assertIs(cfg["includeRenderedTranscript"], True)  # unchanged
+
+    def test_standalone_rendered_env_overrides_independently(self):
+        with tempfile.TemporaryDirectory() as d:
+            missing = Path(d) / "eval-config.json"
+            cfg = self._with_env(
+                {"CLAUDE_PLUGIN_OPTION_includeRenderedTranscript": "off"},
+                lambda: render_html._resolve_render_config(missing))
+            self.assertIs(cfg["includeRenderedTranscript"], False)
+            self.assertIs(cfg["includeRawTranscript"], False)  # unchanged
+
+    def test_standalone_env_garbage_raises(self):
+        # Garbage must fail loud (ConfigError), never silently bundle.
+        import config as _config
+        with tempfile.TemporaryDirectory() as d:
+            missing = Path(d) / "eval-config.json"
+            with self.assertRaises(_config.ConfigError):
+                self._with_env(
+                    {"CLAUDE_PLUGIN_OPTION_includeRawTranscript": "maybe"},
+                    lambda: render_html._resolve_render_config(missing))
+
+    def test_resolved_config_file_wins_over_env(self):
+        # Pipeline path: env was already layered at resolve time — the resolved
+        # file is authoritative, so render must NOT re-apply the raw env var.
+        with tempfile.TemporaryDirectory() as d:
+            cfg_path = Path(d) / "eval-config.json"
+            resolved = render_html.read_config(None)
+            resolved["includeRawTranscript"] = False
+            cfg_path.write_text(json.dumps(resolved), encoding="utf-8")
+            cfg = self._with_env(
+                {"CLAUDE_PLUGIN_OPTION_includeRawTranscript": "true"},
+                lambda: render_html._resolve_render_config(cfg_path))
+            self.assertIs(cfg["includeRawTranscript"], False)
 
 
 if __name__ == "__main__":

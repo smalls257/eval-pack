@@ -38,60 +38,6 @@ function renderMarkdown(text) {
     .replace(/\n/g, '<br>');
 }
 
-const COST_RATES_DATE = '2026-05-11';
-
-function modelRates(model) {
-  const m = (model || '').toLowerCase();
-  if (m.includes('opus'))  return { inRate: 15,   outRate: 75 };
-  if (m.includes('haiku')) return { inRate: 0.80, outRate: 4  };
-  return                          { inRate: 3,    outRate: 15 }; // sonnet
-}
-
-// Cache pricing (Anthropic, 5-minute ephemeral): cache WRITE = 1.25x base input,
-// cache READ = 0.10x base input. Agentic sessions are cache-read dominated, so
-// omitting these (as the old formula did) undercounts controller cost massively.
-function estimateCost(model, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens) {
-  const r = modelRates(model);
-  const cost = (
-    (inputTokens      || 0) * r.inRate +
-    (outputTokens     || 0) * r.outRate +
-    (cacheWriteTokens || 0) * r.inRate * 1.25 +
-    (cacheReadTokens  || 0) * r.inRate * 0.10
-  ) / 1_000_000;
-  return cost > 0 ? cost : null;
-}
-
-// Subagent usage tags only report total_tokens with no cache breakdown.
-// Assume 90% input / 10% output — agentic workloads are input-heavy.
-function estimateSubagentCost(model, totalTokens) {
-  if (!totalTokens) return null;
-  const r = modelRates(model);
-  const blended = r.inRate * 0.9 + r.outRate * 0.1;
-  return (totalTokens * blended) / 1_000_000;
-}
-
-// Total cost = the sum of the per-model rows actually shown. Computing it as a
-// single lastModel-on-aggregate estimate diverges from the displayed rows when
-// models differ (e.g. a cheap lastModel makes Total < the sum above it).
-function sumReportedCost(tokensByModel, subagentTokensByModel, fallbackCtrl, fallbackAgent) {
-  let total = null;
-  const add = (v) => { if (v != null) total = (total || 0) + v; };
-  if (tokensByModel.length > 0) {
-    for (const r of tokensByModel) {
-      add(estimateCost(r.model, r.inputTokens, r.outputTokens, r.cacheReadTokens, r.cacheWriteTokens));
-    }
-  } else { add(fallbackCtrl); }
-  if (subagentTokensByModel.length > 0) {
-    for (const r of subagentTokensByModel) add(estimateSubagentCost(r.model, r.totalTokens));
-  } else { add(fallbackAgent); }
-  return total;
-}
-
-function formatCost(n) {
-  if (n == null || n <= 0) return '—';
-  return (n >= 0.01 ? '$' + n.toFixed(2) : '$' + n.toFixed(4)) + '*';
-}
-
 function shortModelName(model) {
   if (!model) return 'unknown';
   const m = model.toLowerCase();
@@ -168,7 +114,7 @@ function renderPageHeader(data) {
   }
 }
 
-function renderHighlights(analysis) {
+function renderHighlights(analysis, lenses) {
   const h = (analysis || {}).highlights || {};
   const cs = h.completionStatus || {};
 
@@ -187,7 +133,8 @@ function renderHighlights(analysis) {
   const confCard = document.getElementById('confidence-card');
   const confVal = document.getElementById('confidence-value');
   const confNotes = document.getElementById('confidence-notes');
-  const pct = h.confidencePercent;
+  const eff = effectiveConfidence(analysis, lenses);
+  const pct = eff.value;
   if (confCard && pct != null) {
     const n = Math.max(0, Math.min(100, Number(pct) || 0));
     const tier = n >= 75 ? 'high' : n >= 40 ? 'mid' : 'low';
@@ -196,50 +143,13 @@ function renderHighlights(analysis) {
     if (confVal) confVal.innerHTML =
       html`${n}%<div class="confidence-bar"><div class="confidence-bar-fill" style="width:${n}%"></div></div>`;
     if (confNotes) confNotes.textContent = h.confidenceNotes || '';
+    if (confNotes && eff.note) confNotes.textContent =
+      (h.confidenceNotes ? h.confidenceNotes + ' — ' : '') + eff.note;
   } else if (confCard) {
     confCard.style.display = 'none';
   }
-
-  // Business risk card
-  const bizCard = document.getElementById('biz-risk-card');
-  const bizVal = document.getElementById('biz-risk-value');
-  const bizNotes = document.getElementById('biz-risk-notes');
-  const biz = h.businessRisk || {};
-  if (bizCard && biz.level) {
-    const lvl = /^(low|medium|high)$/.test(biz.level) ? biz.level : 'medium';
-    bizCard.className = `highlight-card biz-risk-card biz-risk-${lvl}`;
-    bizCard.style.display = '';
-    if (bizVal) bizVal.textContent = lvl.charAt(0).toUpperCase() + lvl.slice(1);
-    if (bizNotes) bizNotes.textContent = biz.notes || '';
-  } else if (bizCard) {
-    bizCard.style.display = 'none';
-  }
-
-  // Risk mitigation card
-  const mitCard = document.getElementById('mitigation-card');
-  const mitVal = document.getElementById('mitigation-value');
-  const steps = h.riskMitigation || [];
-  if (mitCard && steps.length > 0) {
-    mitCard.style.display = '';
-    if (mitVal) mitVal.innerHTML = steps.map(s =>
-      html`<div class="mitigation-step">${s}</div>`
-    ).join('');
-  } else if (mitCard) {
-    mitCard.style.display = 'none';
-  }
-
-  // Main risk card
-  const riskVal = document.getElementById('risk-value');
-  const riskCard = document.getElementById('risk-card');
-  if (riskVal) {
-    const risk = h.mainRisk || '';
-    if (risk) {
-      riskVal.textContent = risk;
-      if (riskCard) riskCard.style.display = '';
-    } else {
-      if (riskCard) riskCard.style.display = 'none';
-    }
-  }
+  // business-risk no longer special-cased here: it renders via the generic display:'card'
+  // mechanism (config analysisLenses → lensCardsFrom → renderLensCards into #highlights-row).
 }
 
 function renderVerdict(data) {
@@ -284,8 +194,7 @@ function renderVerdict(data) {
 
   const h = (data.analysis || {}).highlights || {};
   const highlightParts = [
-    h.strongestEvidence,
-    h.mainRisk ? 'Risk: ' + h.mainRisk : null
+    h.confidenceNotes,
   ].filter(Boolean);
   if (detail && highlightParts.length > 0) {
     detail.textContent = highlightParts.join(' · ');
@@ -298,8 +207,6 @@ function renderStats(data) {
   const m = data.metrics || {};
   const statsRow = document.getElementById('stats-row');
   if (!statsRow) return;
-  const ctrlCost = estimateCost(m.lastModel, m.inputTokens, m.outputTokens, m.cacheReadTokens, m.cacheWriteTokens);
-  const agentCost = estimateSubagentCost(m.lastModel, m.subagentTotalTokens);
 
   const tokensByModel = Array.isArray(m.tokensByModel) ? m.tokensByModel : [];
   const tokenItems = tokensByModel.length > 0
@@ -316,25 +223,9 @@ function renderStats(data) {
     ? subagentTokensByModel.map(r => ({ label: shortModelName(r.model), value: formatNumber(r.totalTokens) }))
     : [{ label: 'Total', value: formatNumber(m.subagentTotalTokens) }];
 
-  const ctrlCostItems = tokensByModel.length > 0
-    ? tokensByModel.map(r => ({
-        label: shortModelName(r.model),
-        value: formatCost(estimateCost(r.model, r.inputTokens, r.outputTokens, r.cacheReadTokens, r.cacheWriteTokens))
-      }))
-    : [{ label: 'Controller', value: formatCost(ctrlCost) }];
-  const subagentCostItems = subagentTokensByModel.length > 0
-    ? subagentTokensByModel.map(r => ({
-        label: shortModelName(r.model),
-        value: '~' + formatCost(estimateSubagentCost(r.model, r.totalTokens))
-      }))
-    : [{ label: 'Subagents', value: '~' + formatCost(agentCost) }];
-  const totalCost = sumReportedCost(tokensByModel, subagentTokensByModel, ctrlCost, agentCost);
-  const costItems = [...ctrlCostItems, ...subagentCostItems, { label: 'Total *', value: formatCost(totalCost) }];
-
   const groups = [
     { heading: 'Controller tokens', items: tokenItems },
     { heading: 'Subagent tokens',   items: subagentItems },
-    { heading: 'Cost',              items: costItems },
     {
       heading: 'Session',
       items: [
@@ -353,17 +244,6 @@ function renderStats(data) {
       ).join(''))}</div>
     </div>`
   ).join('');
-
-  const card = document.getElementById('stats-card');
-  if (card) {
-    let note = card.querySelector('.cost-note');
-    if (!note) {
-      note = document.createElement('p');
-      note.className = 'cost-note';
-      card.appendChild(note);
-    }
-    note.textContent = `* Claude API rates as of ${COST_RATES_DATE}. Controller cost includes input, output, and cache (write 1.25x, read 0.10x of base input). Subagent cost (~) assumes a 90/10 input/output split — only subagent_tokens is reported.`;
-  }
 }
 
 function renderTimeline(analysis) {
@@ -394,6 +274,17 @@ function wrapIndex(i, n) {
   return ((i % n) + n) % n;
 }
 
+// Pure fit math. The zoom=1 display factor that fits a NATURAL-size image into the
+// stage box (letterboxing, aspect preserved) — baked into the transform alongside the
+// user's zoom `scale` so the img can be laid out at its native raster size (crisp at
+// any zoom) while still presenting a consistent fit-to-stage baseline across
+// differently-shaped screenshots. Falls back to 1 (no scaling) when either dimension
+// is not yet known (0/NaN) — e.g. before the image has finished loading.
+function computeBaseFit(naturalW, naturalH, stageW, stageH) {
+  if (!(naturalW > 0) || !(naturalH > 0) || !(stageW > 0) || !(stageH > 0)) return 1;
+  return Math.min(stageW / naturalW, stageH / naturalH);
+}
+
 // Pure zoom math. Given current scale + pan and a cursor offset from the image's
 // (untransformed) centre, return the new scale (clamped to [1, maxScale]) and the
 // pan that keeps the point under the cursor fixed. cursor (0,0) zooms about the
@@ -421,6 +312,11 @@ const openLightbox = (() => {
   let scale = 1, panX = 0, panY = 0;
   let dragging = false, dragMoved = false;
   let dragX = 0, dragY = 0, panStartX = 0, panStartY = 0;
+  // baseFit: the zoom=1 "fit natural image to stage" factor (see computeBaseFit).
+  // Baked into the transform alongside the user's `scale` so the img can stay laid
+  // out at its native raster size (crisp) while presenting a consistent fit-to-stage
+  // baseline. Recomputed on image load, image change, and window resize.
+  let baseFit = 1;
 
   function shots() {
     return (rounds[roundIdx] && rounds[roundIdx].screenshots) || [];
@@ -468,14 +364,36 @@ const openLightbox = (() => {
     img.addEventListener('dblclick', resetZoom);
     img.addEventListener('wheel', onWheel, { passive: false });
     img.addEventListener('mousedown', onDragStart);
+    img.addEventListener('load', () => { recomputeBaseFit(); applyZoom(); });
     document.addEventListener('mousemove', onDragMove);
     document.addEventListener('mouseup', onDragEnd);
+    // The overlay is hidden (not destroyed) on close, and this window listener lives for
+    // the page's lifetime — early-return when closed so we don't recompute against a
+    // display:none stage (whose clientWidth is 0). Symmetric intent with keydown's removal.
+    window.addEventListener('resize', () => {
+      if (!overlay || overlay.style.display === 'none') return;
+      recomputeBaseFit(); applyZoom();
+    });
     document.body.appendChild(overlay);
+  }
+
+  // Recompute baseFit from the img's natural size (available once loaded) and the
+  // stage's current client box. Safe to call before the image has loaded — falls
+  // back to 1 (computeBaseFit's Airplane-Test guard against 0/NaN).
+  // Note: scale/pan intentionally persist across a resize; a rare resize while zoomed+panned
+  // can off-center the image, but overflow:hidden clips it and reset/dblclick recenters.
+  function recomputeBaseFit() {
+    const img = overlay.querySelector('.lightbox-img');
+    const stage = overlay.querySelector('.lightbox-stage');
+    baseFit = computeBaseFit(img.naturalWidth, img.naturalHeight, stage.clientWidth, stage.clientHeight);
   }
 
   function applyZoom() {
     const img = overlay.querySelector('.lightbox-img');
-    img.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+    // -50%,-50% recenters the natural-size box (CSS position:absolute;top/left:50%)
+    // before panning/scaling — see .modal-overlay .lightbox-img in styles.css.
+    img.style.transform =
+      `translate(-50%, -50%) translate(${panX}px, ${panY}px) scale(${baseFit * scale})`;
     img.style.cursor = scale > 1 ? (dragging ? 'grabbing' : 'grab') : '';
     overlay.querySelector('.lightbox-zoomlevel').textContent = Math.round(scale * 100) + '%';
     overlay.querySelector('.lightbox-zoomout').disabled = scale <= 1;
@@ -542,13 +460,21 @@ const openLightbox = (() => {
   }
 
   function render() {
-    resetZoom();  // each image opens at fit; nav/round-change start un-zoomed
+    scale = 1; panX = 0; panY = 0;  // each image opens at fit; nav/round-change start un-zoomed
     const list = shots();
     const s = list[imgIdx] || {};
     const badge = screenshotBadge(s.source);
     const img = overlay.querySelector('.lightbox-img');
     img.src = s.path || '';
     img.alt = s.label || '';
+    // The previous image's naturalWidth/Height is stale for this src until `load`
+    // fires (browsers fire `load` even for cache hits, which then recomputes and
+    // repaints via the `load` listener). Recompute+paint now too against whatever the
+    // img element currently reports (0 if not yet decoded, which computeBaseFit
+    // treats as "unknown" and falls back to 1) so there's no flash of the previous
+    // image's fit factor.
+    recomputeBaseFit();
+    applyZoom();
     const badgeEl = overlay.querySelector('.lightbox-details .screenshot-badge');
     badgeEl.textContent = badge.text;
     badgeEl.className = 'screenshot-badge ' + badge.cls;
@@ -683,8 +609,38 @@ function renderFlags(data) {
   }).join('');
 }
 
-function renderSummary(analysis) {
-  const s = analysis.summary || {};
+// Pure lookups: the Summary tab's 3-column narrative is sourced from the two SCORER lenses
+// that already judge these dimensions (requirement-drift, verification-rigor), not from
+// analysis.summary — the evaluator no longer emits that field. Scorers live in
+// data.lenses.scorers (not contributors). Kept separate from the DOM-touching renderer so
+// each is unit-testable without a document shim (Airplane Test: an absent lens must yield an
+// empty list, not throw — the Summary column then degrades to its empty-state).
+function deliveredFrom(lenses) {
+  const scorers = (lenses && lenses.scorers) || [];
+  const drift = scorers.find(s => s.skill === 'requirement-drift');
+  return (drift && drift.delivered) || [];
+}
+
+function unmetFrom(lenses) {
+  const scorers = (lenses && lenses.scorers) || [];
+  const drift = scorers.find(s => s.skill === 'requirement-drift');
+  return (drift && drift.unmet) || [];
+}
+
+function provenFrom(lenses) {
+  const scorers = (lenses && lenses.scorers) || [];
+  const rigor = scorers.find(s => s.skill === 'verification-rigor');
+  return (rigor && rigor.proven) || [];
+}
+
+function unprovenFrom(lenses) {
+  const scorers = (lenses && lenses.scorers) || [];
+  const rigor = scorers.find(s => s.skill === 'verification-rigor');
+  return (rigor && rigor.unproven) || [];
+}
+
+function renderSummary(data) {
+  const lenses = data && data.lenses;
 
   const whatChanged = document.getElementById('summary-what-changed');
   // index.html uses id="summary-what-proves" (not "summary-proves")
@@ -695,18 +651,19 @@ function renderSummary(analysis) {
     ? '<ul>' + arr.map(item => html`<li>${safe(renderMarkdown(item))}</li>`).join('') + '</ul>'
     : '<p class="empty-state">Nothing recorded.</p>';
 
-  if (whatChanged) whatChanged.innerHTML = makeList(s.whatChanged);
-  if (proves) proves.innerHTML = makeList(s.whatTranscriptProves);
-  if (notProven) notProven.innerHTML = makeList(s.whatStillNotProven);
+  if (whatChanged) whatChanged.innerHTML = makeList(deliveredFrom(lenses));
+  if (proves) proves.innerHTML = makeList(provenFrom(lenses));
+  if (notProven) notProven.innerHTML = makeList([...unprovenFrom(lenses), ...unmetFrom(lenses)]);
 }
 
-function renderProof(analysis) {
-  const proof = analysis.proof || {};
-
-  // Artifact inventory — index.html has <ul id="artifact-inventory">
+function renderProof(data) {
+  // Artifact inventory — deterministic (built by render_html.py from the pack's actual
+  // files, not the evaluator), so index.html reads it off data.artifactInventory. The
+  // detailed evidence assessment (evidence table / excerpts / proven vs unproven) now
+  // lives in the verification-rigor lens — see the Summary tab.
   const invEl = document.getElementById('artifact-inventory');
   if (invEl) {
-    const items = proof.artifactInventory || [];
+    const items = data.artifactInventory || [];
     if (items.length === 0) {
       invEl.innerHTML = '<li class="empty-state">No artifacts recorded.</li>';
     } else {
@@ -721,206 +678,238 @@ function renderProof(analysis) {
       ).join('');
     }
   }
-
-  // Evidence table
-  const tbody = document.getElementById('proof-evidence-tbody');
-  if (tbody) {
-    const rows = proof.evidenceTable || [];
-    if (rows.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No evidence recorded.</td></tr>';
-    } else {
-      tbody.innerHTML = rows.map(r =>
-        html`<tr><td>${safe(renderMarkdown(r.point))}</td><td>${safe(renderMarkdown(r.where))}</td><td>${safe(renderMarkdown(r.whyItMatters))}</td></tr>`
-      ).join('');
-    }
-  }
-
-  // High-signal excerpts — index.html has <ul id="proof-excerpts">
-  const excerpts = document.getElementById('proof-excerpts');
-  if (excerpts) {
-    const items = proof.transcriptExcerpts || [];
-    if (items.length === 0) {
-      excerpts.innerHTML = '<li class="empty-state">No excerpts recorded.</li>';
-    } else {
-      excerpts.innerHTML = items.map(ex =>
-        html`<li>${safe(renderMarkdown(ex))}</li>`
-      ).join('');
-    }
-  }
 }
 
-function renderTestsExisting(analysis) {
-  const t = analysis.testsExisting || {};
-  const narr = document.getElementById('tests-existing-narrative');
-  if (narr) narr.innerHTML = html`${safe(renderMarkdown(t.narrative || ''))}`;
-
-  const tbody = document.getElementById('tests-existing-tbody');
-  if (tbody) {
-    const rows = t.validationTable || [];
-    if (rows.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No validation data.</td></tr>';
-    } else {
-      tbody.innerHTML = rows.map(r =>
-        html`<tr><td>${safe(renderMarkdown(r.validation))}</td><td>${safe(renderMarkdown(r.observedResult))}</td><td>${safe(renderMarkdown(r.interpretation))}</td></tr>`
-      ).join('');
-    }
-  }
-
-  const coveredWell = document.getElementById('tests-covered-well');
-  const notCovered = document.getElementById('tests-not-covered');
-  const makeList = arr => (arr && arr.length > 0)
-    ? '<ul>' + arr.map(item => html`<li>${safe(renderMarkdown(item))}</li>`).join('') + '</ul>'
-    : '<p class="empty-state">Nothing recorded.</p>';
-
-  if (coveredWell) coveredWell.innerHTML = makeList(t.coveredWell);
-  if (notCovered) notCovered.innerHTML = makeList(t.notCovered);
+// Pure lookup: the deterministic test verdict + commands recorded in test-results.json
+// (data.testResults) — not LLM-authored. Returns null when the file is absent/empty so
+// the caller can render an empty-state instead of throwing (Airplane Test).
+function testResultsSummary(testResults) {
+  const t = testResults || {};
+  if (!t.verdict && !t.summary && !(t.testsRun || []).length) return null;
+  return {
+    verdict: t.verdict || 'none',
+    summary: t.summary || '',
+    testsRun: t.testsRun || [],
+  };
 }
 
-function renderTestsNew(analysis) {
-  const t = analysis.testsNew || {};
-  const narr = document.getElementById('tests-new-narrative');
-  if (narr) narr.innerHTML = html`${safe(renderMarkdown(t.narrative || ''))}`;
-
-  const list = document.getElementById('tests-new-list');
-  if (list) {
-    const items = t.newTests || [];
-    if (items.length === 0) {
-      list.innerHTML = '<li class="empty-state">No new tests recorded.</li>';
-    } else {
-      list.innerHTML = items.map(item => html`<li>${safe(renderMarkdown(item))}</li>`).join('');
-    }
+function renderTests(data) {
+  const container = document.getElementById('tests-body');
+  if (!container) return;
+  const t = testResultsSummary(data.testResults);
+  if (!t) {
+    container.innerHTML = '<p class="empty-state">No test results recorded.</p>';
+    return;
   }
+  const verdictCls = t.verdict === 'pass' ? 'green' : t.verdict === 'fail' ? 'red' : 'amber';
+  const rows = t.testsRun.map(r =>
+    html`<tr><td>${safe(renderMarkdown(r.name || ''))}</td><td>${r.passed ? '✓ pass' : '✗ fail'}</td><td>${safe(renderMarkdown(r.output || ''))}</td></tr>`
+  ).join('');
+  container.innerHTML = html`
+    <p class="tests-verdict tests-verdict-${verdictCls}">Verdict: <strong>${t.verdict}</strong>${safe(t.summary ? ' — ' + renderMarkdown(t.summary) : '')}</p>
+    ${safe(t.testsRun.length > 0
+      ? html`<table class="data-table" id="tests-run-table">
+          <thead><tr><th>Test</th><th>Result</th><th>Output</th></tr></thead>
+          <tbody>${safe(rows)}</tbody>
+        </table>`
+      : '<p class="empty-state">No individual test records.</p>')}`;
 }
 
-function renderReviewFindings(analysis) {
+// Pure lookup: the review lens is a contributor named "review" in data.lenses.contributors.
+// Kept separate from the DOM-touching renderer so it is unit-testable without a document shim
+// (Airplane Test for the render path: an absent/empty lens must yield an empty list, not throw).
+function reviewFindingsFrom(lenses) {
+  const contributors = (lenses && lenses.contributors) || [];
+  const review = contributors.find(c => c.skill === 'review');
+  return (review && review.findings) || [];
+}
+
+function renderReviewFindings(data) {
   const tbody = document.getElementById('review-findings-tbody');
   if (!tbody) return;
-  const rows = analysis.reviewFindings || [];
+  const rows = reviewFindingsFrom(data && data.lenses);
   if (rows.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No review findings recorded.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No review findings recorded.</td></tr>';
     return;
   }
   tbody.innerHTML = rows.map(r => {
-    const sev = r.severity || 'suggestion';
+    const sev = r.severity || 'minor';
     return html`<tr>
       <td>${safe(renderMarkdown(r.issue))}</td>
       <td><span class="review-severity review-severity-${sev}">${sev}</span></td>
       <td>${r.foundIn || '—'}</td>
       <td>${safe(renderMarkdown(r.resolution || '—'))}</td>
-      <td>${safe(r.commit ? html`<code class="review-commit">${r.commit}</code>` : '—')}</td>
     </tr>`;
   }).join('');
 }
 
-function renderFriction(analysis) {
+// Pure lookup: the friction lens is a contributor named "friction" in
+// data.lenses.contributors. Kept separate from the DOM-touching renderer so it is
+// unit-testable without a document shim (Airplane Test: an absent lens must yield an
+// empty list, not throw — the friction table then degrades to its empty-state).
+function frictionEntriesFrom(lenses) {
+  const contributors = (lenses && lenses.contributors) || [];
+  const friction = contributors.find(c => c.skill === 'friction');
+  return (friction && friction.entries) || [];
+}
+
+function renderFriction(data) {
   const tbody = document.getElementById('friction-tbody');
   if (!tbody) return;
-  const rows = analysis.frictionLog || [];
+  const rows = frictionEntriesFrom(data && data.lenses);
   if (rows.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No friction recorded.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No friction recorded.</td></tr>';
     return;
   }
   tbody.innerHTML = rows.map(r =>
     html`<tr>
       <td>${safe(renderMarkdown(r.friction))}</td>
-      <td>${safe(renderMarkdown(r.evidence))}</td>
+      <td>${safe(renderMarkdown(r.impact))}</td>
       <td><span class="friction-type friction-${r.type || ''}">${r.type || '—'}</span></td>
-      <td>${safe(renderMarkdown(r.resolution))}</td>
     </tr>`
   ).join('');
 }
 
-function renderDiff(analysis) {
-  const diff = analysis.diff || {};
-
-  // Artifact status badges
-  const statusEl = document.getElementById('diff-artifact-status');
-  if (statusEl) {
-    const st = diff.artifactStatus || {};
-    const badges = [
-      { label: 'Diff stat', key: 'hasDiffStat' },
-      { label: 'Diff patch', key: 'hasDiffPatch' }
-    ];
-    let badgeHtml = badges.map(b => {
-      const present = st[b.key];
-      return html`<span class="diff-badge ${present ? 'present' : 'absent'}">${b.label}: ${present ? 'Yes' : 'No'}</span>`;
-    }).join('');
-    if (st.note) badgeHtml += html`<p class="diff-note">${safe(renderMarkdown(st.note))}</p>`;
-    statusEl.innerHTML = badgeHtml;
-  }
-
-  // Files changed list
-  const filesEl = document.getElementById('diff-files-changed');
-  if (filesEl) {
-    const files = diff.filesChanged || [];
-    if (files.length === 0) {
-      filesEl.innerHTML = '<li class="empty-state">No files recorded.</li>';
-    } else {
-      filesEl.innerHTML = files.map(f => {
-        const path = typeof f === 'string' ? f : (f.file || '');
-        const desc = typeof f === 'object' ? (f.description || '') : '';
-        return html`<li><code>${path}</code>${safe(desc ? ` — ${renderMarkdown(desc)}` : '')}</li>`;
-      }).join('');
-    }
-  }
-
-  // Change table
-  const tbody = document.getElementById('diff-change-tbody');
-  if (tbody) {
-    const rows = diff.changeTable || [];
-    if (rows.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No changes recorded.</td></tr>';
-    } else {
-      tbody.innerHTML = rows.map(r =>
-        html`<tr><td>${safe(renderMarkdown(r.area))}</td><td>${safe(renderMarkdown(r.evidenceInTranscript))}</td><td>${safe(renderMarkdown(r.observedEffect))}</td></tr>`
-      ).join('');
-    }
-  }
-
-  // Representative commands
-  const cmds = document.getElementById('diff-commands');
-  if (cmds) {
-    const commands = diff.representativeCommands || [];
-    if (commands.length === 0) {
-      cmds.textContent = '# No commands recorded';
-    } else {
-      cmds.textContent = commands.join('\n');
-    }
-  }
+// Pure lookup: the deterministic repo diff surface lives in data.repoDiffs (loaded from
+// repo-diffs.json by render_html). Kept separate from the DOM renderer so it is unit-testable
+// without a document shim (Airplane Test: an absent artifact must yield empty buckets, not
+// throw — the Diff tab then degrades to its empty-state instead of blanking the report).
+function diffReposFrom(data) {
+  const rd = (data && data.repoDiffs) || {};
+  return { repos: rd.repos || [], skipped: rd.skipped || [], errors: rd.errors || [] };
 }
 
-function renderImprovements(analysis) {
+function renderDiff(data) {
+  const body = document.getElementById('diff-body');
+  if (!body) return;
+
+  const { repos, skipped, errors } = diffReposFrom(data);
+  if (repos.length === 0 && skipped.length === 0 && errors.length === 0) {
+    body.innerHTML = '<p class="empty-state">No repo diffs recorded.</p>';
+    return;
+  }
+
+  let out = '';
+
+  for (const repo of repos) {
+    const files = repo.files || [];
+    const filesHtml = files.length === 0
+      ? html`<li class="empty-state">No files recorded.</li>`
+      : files.map(f => html`<li>${safe(pathLink(f))}</li>`).join('');
+    const statHtml = repo.stat
+      ? html`<pre class="code-block">${repo.stat}</pre>`
+      : '';
+    out += html`<div class="diff-repo">
+      <h3 class="section-subheading">${repo.repoRoot} @ ${repo.branch}</h3>
+      <p class="diff-repo-meta">base ${repo.base} → ${repo.baseResolved ? repo.baseResolved.slice(0, 9) : '?'} · +${repo.insertions} −${repo.deletions} · ${repo.filesChanged} file(s)</p>
+      <ul class="files-changed-list">${safe(filesHtml)}</ul>
+      ${safe(statHtml)}
+    </div>`;
+  }
+
+  for (const s of skipped) {
+    out += html`<p class="empty-state">Skipped: ${s.repoRoot} — ${s.reason}</p>`;
+  }
+
+  // Never swallow a diff failure — surface it visibly (Sensor).
+  for (const e of errors) {
+    out += html`<div class="lens-fail">diff failed · ${e.repoRoot} — ${e.error}</div>`;
+  }
+
+  body.innerHTML = out;
+}
+
+// Pure lookup: the repo-improvements lens is a contributor named "repo-improvements" in
+// data.lenses.contributors. Kept separate from the DOM-touching renderer so it is
+// unit-testable without a document shim (Airplane Test: an absent lens must yield an
+// empty list, not throw — the Repo Improvements tab then degrades to its empty-state).
+function repoImprovementsFrom(lenses) {
+  const contributors = (lenses && lenses.contributors) || [];
+  const repo = contributors.find(c => c.skill === 'repo-improvements');
+  return (repo && repo.items) || [];
+}
+
+// Pure lookup: the user-improvements lens is a contributor named "user-improvements" in
+// data.lenses.contributors. Returns the whole contributor record (or null) rather than
+// just `.items`, so the User Feedback list reads from this one lookup (Airplane Test:
+// an absent lens must yield null, not throw).
+function userImprovementsFrom(lenses) {
+  const contributors = (lenses && lenses.contributors) || [];
+  return contributors.find(c => c.skill === 'user-improvements') || null;
+}
+
+// One improvement item — a plain string or a {title, detail} record. Shared by the repo and
+// user improvement lists. A user-improvements item may carry kind: 'strength'|'improvement',
+// which renders a chip; repo items (no kind) render exactly as before.
+function improvementItem(item) {
+  // Content lives in a single .improvement-body cell so the li's `28px 1fr` grid (counter +
+  // body) never fractures — multiple inline children would auto-place across both columns and
+  // collapse the text column to one word per line.
+  if (typeof item === 'string') return html`<li><div class="improvement-body">${safe(renderMarkdown(item))}</div></li>`;
+  const badge = item.kind === 'strength'
+    ? html`<span class="improve-badge strength">Strength</span> `
+    : item.kind === 'improvement'
+      ? html`<span class="improve-badge improve">Improve</span> `
+      : '';
+  return html`<li><div class="improvement-body">${safe(badge)}<strong>${item.title || ''}</strong>${safe(item.detail ? `<br><span class="improvement-detail">${renderMarkdown(item.detail)}</span>` : '')}</div></li>`;
+}
+
+function improvementList(items) {
+  return items.length > 0
+    ? items.map(improvementItem).join('')
+    : '<li class="empty-state">No improvements recorded.</li>';
+}
+
+function renderImprovements(data) {
   const repoEl = document.getElementById('repo-improvements-list');
   if (repoEl) {
-    const items = analysis.repoImprovements || [];
-    repoEl.innerHTML = items.length > 0
-      ? items.map(item => {
-          if (typeof item === 'string') return html`<li>${safe(renderMarkdown(item))}</li>`;
-          return html`<li><strong>${item.title || ''}</strong>${safe(item.detail ? `<br><span class="improvement-detail">${renderMarkdown(item.detail)}</span>` : '')}</li>`;
-        }).join('')
-      : '<li class="empty-state">No improvements recorded.</li>';
+    repoEl.innerHTML = improvementList(repoImprovementsFrom(data && data.lenses));
   }
-
   const userEl = document.getElementById('user-improvements-list');
   if (userEl) {
-    const items = analysis.userImprovements || [];
-    userEl.innerHTML = items.length > 0
-      ? items.map(item => {
-          if (typeof item === 'string') return html`<li>${safe(renderMarkdown(item))}</li>`;
-          return html`<li><strong>${item.title || ''}</strong>${safe(item.detail ? `<br><span class="improvement-detail">${renderMarkdown(item.detail)}</span>` : '')}</li>`;
-        }).join('')
-      : '<li class="empty-state">No improvements recorded.</li>';
+    const userLens = userImprovementsFrom(data && data.lenses);
+    userEl.innerHTML = improvementList((userLens && userLens.items) || []);
   }
 }
 
-function renderPromptPattern(analysis) {
-  const area = document.getElementById('prompt-pattern-area');
-  const pre = document.getElementById('prompt-pattern');
-  if (area && analysis.promptPattern) {
-    area.style.display = 'block';
-    if (pre) pre.textContent = analysis.promptPattern;
-  } else if (area) {
-    area.style.display = 'none';
+// Pure lookup: the lens record for a skill, scanning every pool a lens can land in
+// (contributors ∪ scorers ∪ failures), or null. Kept separate from the DOM renderer so it is
+// unit-testable without a document shim (Airplane Test: absent/empty lenses → null, never throws).
+function lensRecordFor(lenses, skill) {
+  const l = lenses || {};
+  for (const pool of [l.contributors, l.scorers, l.failures]) {
+    const found = (pool || []).find(r => r && r.skill === skill);
+    if (found) return found;
+  }
+  return null;
+}
+
+// The four dedicated contributors render into hardcoded panels via bespoke renderers, so they
+// never picked up the version marker the generic lens cards show via lensVersionSuffix. Prepend
+// a version line into each panel from the SAME data (data.lenses...version) the generic cards use.
+const DEDICATED_VERSION_PANELS = [
+  ['review', 'panel-review-findings'],
+  ['friction', 'panel-friction'],
+  ['repo-improvements', 'panel-repo-improvements'],
+  ['user-improvements', 'panel-user-improvements'],
+];
+
+function renderDedicatedVersions(data) {
+  const lenses = data && data.lenses;
+  for (const [skill, panelId] of DEDICATED_VERSION_PANELS) {
+    const rec = lensRecordFor(lenses, skill);
+    const version = rec && rec.version;
+    if (typeof version !== 'string' || !version) continue;   // no version → nothing to show
+    const panel = document.getElementById(panelId);
+    if (!panel) continue;                                     // no panel → nothing to touch
+    // Guard against double-injection on re-render.
+    if (panel.querySelector && panel.querySelector('.lens-version-line')) continue;
+    const line = document.createElement('div');
+    line.className = 'lens-version-line';
+    // Version is config/lockfile-sourced, but keep it text (no innerHTML) — a version line is
+    // never a place for markup.
+    line.textContent = 'v' + version;
+    panel.insertBefore(line, panel.firstChild);
   }
 }
 
@@ -939,10 +928,20 @@ function artifactLinkable(p) {
   return isSafePath(p) && (!p.endsWith('.jsonl') || p === 'transcript.jsonl');
 }
 
-function renderSessionArtifacts(analysis) {
+// Pure lookup: the Session Artifacts list mirrors data.artifactInventory — the deterministic
+// on-disk file enumeration built by render_html.py's build_artifact_inventory. Sourced here (not
+// from the evaluator's prose) so the list is a directory listing's job, not an LLM's (Sensor:
+// the evidence list must reflect what actually shipped in the pack, not what an LLM recalled).
+// Note: some of these artifacts (e.g. the transcript) are ALSO surfaced in the Proof sidebar.
+// That duplication is intentional — both are ground-truth views — not a double-render bug.
+function sessionArtifactsFrom(data) {
+  return (data && data.artifactInventory) || [];
+}
+
+function renderSessionArtifacts(data) {
   const list = document.getElementById('session-artifacts-list');
   if (!list) return;
-  const items = analysis.sessionArtifacts || [];
+  const items = sessionArtifactsFrom(data);
   if (items.length === 0) {
     list.innerHTML = '<li class="empty-state">No artifacts recorded.</li>';
     return;
@@ -967,11 +966,14 @@ function renderVerdictStatement(analysis) {
   }
 }
 
-function renderTranscript(transcript) {
+function renderTranscript(transcript, evalConfig) {
   const container = document.getElementById('transcript-container');
   if (!container) return;
+  const renderedIncluded = !evalConfig || evalConfig.includeRenderedTranscript !== false;
   if (!transcript || transcript.length === 0) {
-    container.innerHTML = '<p class="empty-state"><a href="transcript.html" target="_blank">Open transcript →</a></p>';
+    container.innerHTML = renderedIncluded
+      ? '<p class="empty-state"><a href="transcript.html" target="_blank">Open transcript →</a></p>'
+      : '<p class="empty-state">Transcript excluded from this pack.</p>';
     return;
   }
 
@@ -1075,34 +1077,427 @@ function renderDisabledBanner(analysis) {
 
 // ── main render ───────────────────────────────────────────────────────────────
 
+// Resolved eval-pack config (branding, subjectNoun, link templates). Set in renderSession.
+let EVAL_CONFIG = {};
+
+// Reject dangerous URL schemes from config-supplied link templates; allow http(s)/relative.
+function safeUrl(u) {
+  if (typeof u !== 'string' || !u) return '';
+  if (/^\s*(javascript|data|vbscript):/i.test(u)) return '';
+  return u;
+}
+
+// Linkify a repo-relative file path against repoBaseUrl, or render it as plain code.
+function pathLink(path) {
+  const base = EVAL_CONFIG.repoBaseUrl;
+  const url = base ? safeUrl(base.replace(/\/$/, '') + '/' + path) : '';
+  if (url) return html`<a href="${url}"><code>${path}</code></a>`;
+  return html`<code>${path}</code>`;
+}
+
+// Honor configured section toggle/order: hide unlisted tabs, reorder to match, activate first.
+function applySections(data) {
+  const order = (data.evalConfig || {}).sections || [];
+  if (!order.length) return;  // empty = default set/order
+  const nav = document.getElementById('tab-nav');
+  if (!nav) return;
+  const btns = Array.from(nav.querySelectorAll('.tab-btn'));
+  const actions = nav.querySelector('.tab-nav-actions');
+  // The legacy 'lenses' token now stands for the whole group of dynamically-injected
+  // per-lens tabs (data-panel="lens-*"); it's "known" iff any such button exists.
+  const lensBtns = btns.filter(b => (b.dataset.panel || '').startsWith('lens-'));
+  const isLensGroup = panel => panel === 'lenses';
+  const matchesOrder = b => order.includes(b.dataset.panel) ||
+    (order.includes('lenses') && lensBtns.includes(b));
+  const known = order.filter(panel =>
+    isLensGroup(panel) ? lensBtns.length : btns.some(b => b.dataset.panel === panel));
+  // All-unknown list: leave the default nav intact rather than hiding every tab.
+  if (!known.length) return;
+  btns.forEach(b => {
+    if (!matchesOrder(b)) b.style.display = 'none';
+  });
+  known.forEach(panel => {
+    if (isLensGroup(panel)) {
+      // Move the lens buttons as a contiguous group to the 'lenses' token's position.
+      lensBtns.forEach(btn => nav.insertBefore(btn, actions || null));
+      return;
+    }
+    const btn = btns.find(b => b.dataset.panel === panel);
+    if (btn) nav.insertBefore(btn, actions || null);
+  });
+  activatePanel(isLensGroup(known[0]) ? (lensBtns[0].dataset.panel) : known[0]);
+}
+
+function renderBranding(data) {
+  const cfg = data.evalConfig || {};
+  EVAL_CONFIG = cfg;
+
+  if (cfg.brandName) {
+    const logo = document.querySelector('.logo');
+    if (logo) logo.textContent = cfg.brandName;
+  }
+
+  const a = data.analysis || {};
+  document.title = cfg.reportTitle || a.title || cfg.brandName || 'Eval Pack';
+
+  const noun = cfg.subjectNoun;
+  if (noun && noun !== 'extension') {
+    document.querySelectorAll('.three-col-heading').forEach(h => {
+      h.textContent = h.textContent.replace(/\bextension\b/, noun);
+    });
+  }
+
+  // footerText overrides the brand span only — NOT the whole footer — so the version
+  // stamp and generated-at timestamp always survive.
+  if (cfg.footerText) {
+    const brand = document.getElementById('footer-brand');
+    if (brand) brand.textContent = cfg.footerText;
+  }
+
+  // Stamp the eval-pack version that produced this report.
+  const ver = document.getElementById('eval-pack-version');
+  if (ver && data.evalPackVersion) ver.textContent = `eval-pack v${data.evalPackVersion}`;
+}
+
+// messages: override any labeled UI string by element id, e.g. {"page-title":"…"} (i18n hook).
+// Applied LAST, after every renderer, so a specific string (e.g. page-title) isn't clobbered.
+function applyMessages(data) {
+  const messages = (data.evalConfig || {}).messages || {};
+  Object.keys(messages).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = messages[id];
+  });
+}
+
+// Display a lens score defensively: a finite number clamped to [0,100], else an em dash.
+function lensScore(x) {
+  const n = Number(x);
+  return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : '—';
+}
+
+// Verdict-facing confidence: when scorer lenses ran under a non-core rule, the aggregated
+// finalScore IS the confidence a user should lead with (finding: cosmetic finalScore).
+function effectiveConfidence(analysis, lenses) {
+  const core = ((analysis || {}).highlights || {}).confidencePercent;
+  const l = lenses || {};
+  const scorers = l.scorers || [];
+  if (l.rule && l.rule !== 'core' && scorers.length && l.finalScore != null) {
+    return { value: l.finalScore,
+             note: `${l.rule} of core ${l.coreScore} and ${scorers.length} scorer lens(es)` };
+  }
+  return { value: core != null ? core : null, note: null };
+}
+
+// A lens finding may be a plain string or a shaped object — render every known shape
+// readably, and degrade unknown objects to "key: value" lines, never raw JSON.
+function lensFindingText(f) {
+  if (typeof f === 'string') return f;
+  if (f && typeof f === 'object') {
+    // verification-rigor shape: {claim, backed, evidence}
+    if (f.claim != null) {
+      const mark = f.backed === true ? '✓' : f.backed === false ? '✗' : '•';
+      const ev = f.evidence && f.evidence !== 'none' ? ` — ${f.evidence}` : '';
+      return `${mark} ${f.claim}${ev}`;
+    }
+    // requirement-drift shape: {type, detail}
+    const detail = f.detail != null ? String(f.detail) : '';
+    if (f.type || detail) return f.type ? `${f.type}: ${detail}` : detail;
+    // unknown object: readable key-value join, not JSON
+    return Object.entries(f).map(([k, v]) => `${k}: ${String(v)}`).join(' · ');
+  }
+  return String(f);
+}
+
+// Resolve a dot-path into a lens record.
+function lensPath(obj, path) {
+  return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
+}
+
+function lensValueText(v) {
+  if (v == null) return '';
+  return typeof v === 'object' ? lensFindingText(v) : String(v);
+}
+
+// Render a repo-authored lens template (mustache-lite). The MARKUP is trusted — it came
+// from a repo file, resolve-time confined — but every interpolated VALUE is untrusted LLM
+// output and is ALWAYS escaped. Supported: {{field}} / {{dot.path}} (escaped value),
+// {{#arrayField}}...{{/arrayField}} (repeat per item, one level), {{.}} (the item, via
+// lensFindingText, escaped). Unknown fields render as empty strings.
+function renderLensTemplate(tpl, data) {
+  let out = tpl.replace(/\{\{#([\w.]+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (m, key, body) => {
+    const arr = lensPath(data, key);
+    if (!Array.isArray(arr)) return '';
+    return arr.map(item => body
+      .replace(/\{\{\.\}\}/g, escapeHtml(lensFindingText(item)))
+      .replace(/\{\{([\w.]+)\}\}/g, (mm, k) => escapeHtml(lensValueText(lensPath(item, k))))
+    ).join('');
+  });
+  return out.replace(/\{\{([\w.]+)\}\}/g, (m, k) => escapeHtml(lensValueText(lensPath(data, k))));
+}
+
+// Contributors that render in their own dedicated tab/table — excluded from the generic
+// Lenses list to avoid double-rendering. Grows as dimensions are extracted into lenses.
+const DEDICATED_CONTRIBUTORS = new Set(['review', 'friction', 'repo-improvements', 'user-improvements']);
+
+// Slugify a skill name into a stable, id-safe token (fallback 'lens' when empty).
+function lensSlug(skill) {
+  const s = String(skill == null ? '' : skill).toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return s || 'lens';
+}
+
+// Title-case a skill name for a tab label (fallback 'Lens' when empty).
+function lensTabLabel(skill) {
+  const words = String(skill == null ? '' : skill).split(/[-_\s]+/).filter(Boolean)
+    .map(w => w[0].toUpperCase() + w.slice(1));
+  return words.length ? words.join(' ') : 'Lens';
+}
+
+// PURE lookup (separate from the DOM renderer, matching this file's lens idiom): which
+// lenses should each get their own nav tab, and in what order. Scorers first, then
+// non-dedicated contributors (dedicated ones own their hardcoded tabs), then failures.
+// Airplane Test: absent/empty lenses → [], never throws on missing arrays.
+function lensTabsFrom(lenses) {
+  const l = lenses || {};
+  const records = [];
+  // A card-only lens is normally excluded here — EXCEPT one that carries detail, which still
+  // earns a tab so its findings/mitigation/main-risk are never silently dropped.
+  const earnsTab = r => r.display !== 'card' || lensHasDetail(r);
+  (l.scorers || []).forEach(r => { if (earnsTab(r)) records.push({ kind: 'scorer', record: r }); });
+  (l.contributors || []).forEach(r => {
+    if (DEDICATED_CONTRIBUTORS.has(r.skill)) return;
+    if (earnsTab(r)) records.push({ kind: 'contributor', record: r });
+  });
+  (l.failures || []).forEach(r => { if (earnsTab(r)) records.push({ kind: 'failure', record: r }); });
+
+  const seen = new Map();  // panelId → count, to de-dupe colliding slugs
+  return records.map(({ kind, record }) => {
+    const id = lensSlug(record.skill);
+    let panelId = 'lens-' + id;
+    const n = (seen.get(panelId) || 0) + 1;
+    seen.set(panelId, n);
+    if (n > 1) panelId = `${panelId}-${n}`;
+    const label = (typeof record.title === 'string' && record.title)
+      ? record.title : lensTabLabel(record.skill);
+    return { id, panelId, label, kind, record };
+  });
+}
+
+// PURE lookup (lens idiom): which lenses render as compact HEADER CARDS (display:'card')
+// rather than nav tabs — projected into descriptors the highlights-row renderer consumes.
+// Order mirrors lensTabsFrom: scorers → non-dedicated contributors → failures. This is the
+// generic mechanism business-risk migrated onto (it used to be three bespoke hardcoded cards).
+// Airplane Test: absent/empty lenses → [], never throws on a missing field.
+// Does this lens carry renderable detail beyond its level/note/score summary? Drives whether a
+// display:'card' lens still earns a tab — so card-only never SILENTLY drops findings/mitigation.
+function lensHasDetail(rec) {
+  const r = rec || {};
+  return ((r.findings || []).length > 0) || ((r.mitigation || []).length > 0) || !!r.mainRisk;
+}
+
+// Does this lens render a header card (and therefore already show its one-line note there)?
+function lensHasCard(rec) {
+  const d = (rec || {}).display;
+  return d === 'card' || d === 'both';
+}
+
+function lensCardsFrom(lenses) {
+  const l = lenses || {};
+  const records = [];
+  const carded = d => d === 'card' || d === 'both';
+  (l.scorers || []).forEach(r => { if (carded(r.display)) records.push({ kind: 'scorer', record: r }); });
+  (l.contributors || []).forEach(r => { if (carded(r.display)) records.push({ kind: 'contributor', record: r }); });
+  (l.failures || []).forEach(r => { if (carded(r.display)) records.push({ kind: 'failure', record: r }); });
+
+  const isLevel = v => typeof v === 'string' && /^(low|medium|high)$/i.test(v);
+  return records.map(({ kind, record }) => {
+    const level = isLevel(record.level) ? record.level.toLowerCase() : null;
+    const value = (typeof record.score === 'number') ? record.score
+      : (level ? level.charAt(0).toUpperCase() + level.slice(1) : null);
+    // AT-A-GLANCE only: value + one-line note. Findings/mitigation/mainRisk live in the tab.
+    return {
+      id: lensSlug(record.skill),
+      label: record.title || lensTabLabel(record.skill),
+      kind,
+      value,
+      level,
+      note: record.rationale || record.notes || '',
+      version: record.version,
+      record,
+    };
+  });
+}
+
+// A record with a repo-authored templateHtml renders via the mustache-lite interpolator
+// (markup trusted, values escaped); on interpolation failure fall back to a VISIBLE
+// failure card rather than a blank/broken one.
+function lensCustomCard(rec, headExtra) {
+  try {
+    return html`<div class="lens-card lens-custom"><div class="lens-head"><span class="lens-meta">${rec.role} · ${rec.skill}</span>${safe(headExtra || '')}</div>${safe(renderLensTemplate(rec.templateHtml, rec))}</div>`;
+  } catch (e) {
+    return html`<div class="lens-card lens-fail"><div class="lens-meta">template failed · ${rec.skill}</div><p>${String(e)}</p></div>`;
+  }
+}
+
+// Field-driven detail body for a contributor lens tab. Renders whatever the lens actually
+// produced — level, notes, findings, mitigation, main risk — WITHOUT keying on any skill
+// name (business-risk is just a contributor whose fields happen to be populated). All values
+// are untrusted LLM output → escaped via html``; `level` is drawn from a whitelist before it
+// reaches a class attribute.
+function lensContributorBody(rec) {
+  const level = (typeof rec.level === 'string' && /^(low|medium|high)$/i.test(rec.level))
+    ? rec.level.toLowerCase() : null;
+  // A lens that also renders a header card already shows this one-line note there — don't repeat it here.
+  const note = lensHasCard(rec) ? '' : (rec.rationale || rec.notes || '');
+  const findings = (rec.findings || []).map(f => html`<li>${lensFindingText(f)}</li>`).join('');
+  const mitigation = (rec.mitigation || []).map(m => html`<li>${m}</li>`).join('');
+  return '' +
+    (level ? html`<div class="lens-level biz-risk-${level}">${level}</div>` : '') +
+    (note ? html`<p class="lens-rationale">${note}</p>` : '') +
+    (findings ? html`<ul class="lens-findings">${safe(findings)}</ul>` : '') +
+    (mitigation ? html`<h5 class="lens-subhead">Mitigation</h5><ul class="mitigation-list">${safe(mitigation)}</ul>` : '') +
+    (rec.mainRisk ? html`<p class="lens-mainrisk"><strong>Main risk:</strong> ${rec.mainRisk}</p>` : '');
+}
+
+// The lens card markup for one tab's panel body — dispatched by kind. Uses the html`` tag
+// (not safe() in plain literals — that stringifies to "[object Object]"). html`` escapes
+// each interpolation, which is what we want for untrusted lens output (skill names,
+// rationales, findings, error text).
+// Trusted-but-escaped version marker for a lens meta line. Empty string when no version,
+// so the meta line reads "scorer · skill" unchanged (Airplane Test).
+function lensVersionSuffix(rec) {
+  const v = rec && rec.version;
+  return (typeof v === 'string' && v) ? html` · v${v}` : '';
+}
+
+function lensCardMarkup(tab) {
+  const rec = tab.record;
+  if (tab.kind === 'scorer') {
+    if (rec.templateHtml) return lensCustomCard(rec, html`<span class="lens-score">${lensScore(rec.score)}</span>`);
+    const findings = (rec.findings || []).map(f => html`<li>${lensFindingText(f)}</li>`).join('');
+    // A scorer that also renders a header card shows its rationale there — the tab carries only the findings detail.
+    const rationale = lensHasCard(rec) ? '' : html`<p class="lens-rationale">${rec.rationale}</p>`;
+    return html`<div class="lens-card"><div class="lens-head"><span class="lens-meta">scorer · ${rec.skill}${safe(lensVersionSuffix(rec))}</span><span class="lens-score">${lensScore(rec.score)}</span></div>${safe(rationale)}${safe(findings ? html`<ul class="lens-findings">${safe(findings)}</ul>` : '')}</div>`;
+  }
+  if (tab.kind === 'contributor') {
+    if (rec.templateHtml) return lensCustomCard(rec);
+    return html`<div class="lens-card"><div class="lens-head"><span class="lens-meta">contributor · ${rec.skill}${safe(lensVersionSuffix(rec))}</span></div><h4>${rec.title}</h4>${safe(lensContributorBody(rec))}</div>`;
+  }
+  // failure
+  return html`<div class="lens-card lens-fail"><div class="lens-meta">failed · ${rec.skill}${safe(lensVersionSuffix(rec))}</div><p>${rec.error}</p></div>`;
+}
+
+// Inject display:'card' lenses as compact cards into the highlights row, after the static
+// completion/confidence cards. business-risk arrives here via the generic mechanism (it used
+// to be three hardcoded cards + special-cased renderHighlights logic). All values are untrusted
+// LLM output → escaped via html`` / textContent; the only markup is our own card scaffold.
+function renderLensCards(lenses) {
+  const row = document.getElementById('highlights-row');
+  if (!row) return;
+  lensCardsFrom(lenses).forEach(c => {
+    const card = document.createElement('div');
+    card.className = 'highlight-card' + (c.level ? ' biz-risk-' + c.level : '');
+    // Card is an at-a-glance summary: label + value + one-line note only. A display:'both'
+    // lens carries its full detail (findings, mitigation, main risk) in its own tab — a
+    // header card that grows a list is a God-card.
+    card.innerHTML =
+      html`<div class="highlight-card-label">${c.label}</div>` +
+      html`<div class="highlight-card-value">${c.value == null ? '' : c.value}</div>` +
+      html`<div class="highlight-card-notes">${c.note}</div>` +
+      ((typeof c.version === 'string' && c.version) ? html`<div class="highlight-card-version">v${c.version}</div>` : '');
+    row.appendChild(card);
+  });
+}
+
+// The user-improvements lens judges developer ownership; surface its overall level as an
+// at-a-glance header card. It is a DEDICATED_CONTRIBUTOR (own tab), so it isn't scanned by
+// lensCardsFrom — render its card here. Colors INVERT vs risk cards: high ownership is GOOD.
+function renderOwnershipCard(data) {
+  const row = document.getElementById('highlights-row');
+  if (!row) return;
+  const ui = userImprovementsFrom(data && data.lenses);
+  const lvl = ui && typeof ui.level === 'string' && /^(low|medium|high)$/i.test(ui.level)
+    ? ui.level.toLowerCase() : null;
+  if (!lvl) return;
+  const card = document.createElement('div');
+  card.className = 'highlight-card ownership-' + lvl;
+  const value = lvl.charAt(0).toUpperCase() + lvl.slice(1);
+  card.innerHTML =
+    html`<div class="highlight-card-label">Developer Ownership</div>` +
+    html`<div class="highlight-card-value">${value}</div>` +
+    html`<div class="highlight-card-notes">${ui.levelNote || ''}</div>`;
+  row.appendChild(card);
+}
+
+function renderLenses(data) {
+  renderLensCards(data.lenses);  // card lenses land in the highlights row (before any tabs)
+  renderOwnershipCard(data);     // ownership card lands after the risk cards (inverted colors)
+  // Aggregation transparency — the core X → final Y math must stay auditable independent of
+  // whether any lens renders as a tab (all lenses could be display:'card', leaving zero tabs).
+  // Render it into the always-present #lens-agg-line so it never depends on tab existence.
+  const aggLine = document.getElementById('lens-agg-line');
+  if (aggLine && data.lenses && data.lenses.finalScore != null) {
+    aggLine.innerHTML = html`<p class="lens-agg">Verdict aggregation — core <strong>${lensScore(data.lenses.coreScore)}</strong> <code>${data.lenses.rule}</code> lenses → final <strong>${lensScore(data.lenses.finalScore)}</strong></p>`;
+  }
+  const tabs = lensTabsFrom(data.lenses);
+  const nav = document.getElementById('tab-nav');
+  const actions = nav.querySelector('.tab-nav-actions');
+  const sessionArtifacts = document.getElementById('session-artifacts');
+  const panelsParent = sessionArtifacts.parentNode;
+  // No surfaced lenses → no lens tabs at all (the old code hid an empty shared tab).
+  if (!tabs.length) return;
+
+  tabs.forEach((t) => {
+    const btn = document.createElement('button');
+    btn.className = 'tab-btn';
+    btn.dataset.panel = t.panelId;
+    btn.setAttribute('role', 'tab');
+    btn.setAttribute('aria-selected', 'false');
+    btn.textContent = t.label;
+    nav.insertBefore(btn, actions || null);
+
+    const section = document.createElement('section');
+    section.className = 'tab-panel card';
+    section.id = 'panel-' + t.panelId;
+    section.setAttribute('role', 'tabpanel');
+    section.style.display = 'none';
+    const inner = lensCardMarkup(t);
+    section.innerHTML = inner;
+    panelsParent.insertBefore(section, sessionArtifacts);
+  });
+  // Click handlers are NOT attached here: init() wires every .tab-btn after renderSession
+  // (which calls renderLenses) runs, so these injected buttons are present in time.
+}
+
 function renderSession(data) {
   const analysis = data.analysis || {};
   renderDisabledBanner(analysis);
 
+  renderBranding(data);
   renderPageHeader(data);
-  renderHighlights(analysis);
+  renderHighlights(analysis, data.lenses);
   renderVerdict(data);
   renderStats(data);
   renderFlags(data);
-  renderSummary(analysis);
-  renderProof(analysis);
-  renderTestsExisting(analysis);
-  renderTestsNew(analysis);
-  renderReviewFindings(analysis);
-  renderFriction(analysis);
-  renderDiff(analysis);
+  renderSummary(data);
+  renderProof(data);
+  renderTests(data);
+  renderReviewFindings(data);
+  renderFriction(data);
+  renderDiff(data);
   renderTools(data.tools);
-  renderImprovements(analysis);
-  renderPromptPattern(analysis);
-  renderSessionArtifacts(analysis);
+  renderImprovements(data);
+  renderDedicatedVersions(data);
+  renderSessionArtifacts(data);
   renderVerdictStatement(analysis);
   renderTimeline(analysis);
+  renderLenses(data);
 }
 
 function init(data) {
   renderSession(data);
   renderVisualEvidence(data);
-  renderTranscript(data.transcript);
+  renderTranscript(data.transcript, data.evalConfig);
 
   // Tab navigation
   document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -1118,7 +1513,15 @@ function init(data) {
   // Theme toggle — persist selection in localStorage
   const themeToggle = document.getElementById('theme-toggle');
   const savedTheme = localStorage.getItem('eval-pack-theme');
-  if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+  const cfgTheme = (data.evalConfig || {}).defaultTheme;
+  if (savedTheme) {
+    document.documentElement.dataset.theme = savedTheme;
+  } else if (cfgTheme === 'system') {
+    const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+    document.documentElement.dataset.theme = prefersLight ? 'light' : 'dark';
+  } else if (cfgTheme === 'light' || cfgTheme === 'dark') {
+    document.documentElement.dataset.theme = cfgTheme;
+  }
 
   if (themeToggle) {
     themeToggle.addEventListener('click', () => {
@@ -1131,6 +1534,12 @@ function init(data) {
 
   // Activate default panel
   activatePanel('summary');
+
+  // Apply configured section toggle/order (overrides the default activation above)
+  applySections(data);
+
+  // Apply message overrides LAST so they win over every renderer's default text.
+  applyMessages(data);
 }
 
 // ── bootstrap ─────────────────────────────────────────────────────────────────
@@ -1152,5 +1561,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, estimateCost, modelRates, estimateSubagentCost, sumReportedCost, artifactHref, artifactLinkable };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderDiff, lensTabsFrom, lensCardsFrom, lensContributorBody, lensCardMarkup, lensVersionSuffix, lensHasDetail, renderLenses, renderOwnershipCard, renderTranscript, improvementItem, lensRecordFor, renderDedicatedVersions };
 }

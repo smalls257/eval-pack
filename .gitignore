@@ -6,3 +6,6 @@ __pycache__/
 
 # Eval packs live on PR branches, not main
 .eval-packs/
+
+# Per-developer config override (never committed)
+.eval-pack.local.json
