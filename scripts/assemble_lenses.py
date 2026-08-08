@@ -36,6 +36,13 @@ def assemble(pack_dir):
     cfg = config.read_config(str(cfg_path)) if cfg_path.is_file() else config.read_config()
     rule = cfg.get("verdictAggregation", "core")
 
+    # Orphan guard: the pack dir persists across rounds (render no longer deletes it), so a
+    # lenses/<skill>.json from a lens since removed from config could linger. Assemble only what
+    # is CONFIGURED — a present-but-unconfigured file is ignored (the reverse of the vanishing-lens
+    # gate below, which flags configured-but-missing).
+    configured = {l.get("skill") for l in cfg.get("analysisLenses") or [] if l.get("skill")}
+    results = [r for r in results if r.get("skill") in configured]
+
     # Deterministic gate: a configured lens with no output file is a FAILURE, not an absence.
     # The orchestrator is an LLM; prose promises don't count. (finding: vanishing lens)
     produced = {r.get("skill") for r in results}

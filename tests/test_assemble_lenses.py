@@ -10,15 +10,23 @@ sys.path.insert(0, str(SCRIPTS))
 import assemble_lenses  # noqa: E402
 
 
-def _pack(d, core=None, rule="min", lenses=None):
+def _pack(d, core=None, rule="min", lenses=None, analysis_lenses=None):
     pack = Path(d)
     if core is not None:
         (pack / "analysis.json").write_text(
             json.dumps({"highlights": {"confidencePercent": core}}), encoding="utf-8")
-    (pack / "eval-config.json").write_text(json.dumps({"verdictAggregation": rule}), encoding="utf-8")
+    lenses = lenses or {}
+    # A resolved pack config always lists its lenses (the orphan guard assembles only
+    # configured skills), so register each written file unless the caller overrides.
+    if analysis_lenses is None:
+        analysis_lenses = [{"skill": name, "role": obj.get("role", "contributor")}
+                           for name, obj in lenses.items()]
+    (pack / "eval-config.json").write_text(
+        json.dumps({"verdictAggregation": rule, "analysisLenses": analysis_lenses}),
+        encoding="utf-8")
     ldir = pack / "lenses"
     ldir.mkdir(exist_ok=True)
-    for name, obj in (lenses or {}).items():
+    for name, obj in lenses.items():
         (ldir / (name + ".json")).write_text(json.dumps(obj), encoding="utf-8")
     return pack
 
@@ -54,7 +62,10 @@ class TestAssemble(unittest.TestCase):
 
     def test_malformed_lens_file_quarantined(self):
         with tempfile.TemporaryDirectory() as d:
-            pack = _pack(d, core=80, rule="min", lenses={})
+            # A CONFIGURED lens whose file is malformed is quarantined as a failure (not an
+            # orphan): broken is listed in analysisLenses, so the orphan guard keeps it.
+            pack = _pack(d, core=80, rule="min", lenses={},
+                         analysis_lenses=[{"skill": "broken", "role": "scorer"}])
             (pack / "lenses" / "broken.json").write_text("{not json", encoding="utf-8")
             out = assemble_lenses.assemble(d)
             self.assertTrue(any(f.get("skill") == "broken" for f in out["failures"]))
@@ -74,6 +85,22 @@ class TestLensGates(unittest.TestCase):
         base["analysisLenses"] = lenses
         base["verdictAggregation"] = rule
         (Path(d) / "eval-config.json").write_text(json.dumps(base), encoding="utf-8")
+
+    def test_orphan_lens_file_not_in_config_is_ignored(self):
+        with tempfile.TemporaryDirectory() as d:
+            pack = Path(d); (pack / "lenses").mkdir()
+            (pack / "lenses" / "verification-rigor.json").write_text(
+                json.dumps({"skill": "verification-rigor", "role": "scorer", "score": 90, "rationale": "ok"}),
+                encoding="utf-8")
+            (pack / "lenses" / "ghost.json").write_text(
+                json.dumps({"skill": "ghost", "role": "contributor", "title": "Ghost", "findings": ["boo"]}),
+                encoding="utf-8")
+            (pack / "analysis.json").write_text(json.dumps({"highlights": {"confidencePercent": 88}}), encoding="utf-8")
+            self._cfg(d, [{"skill": "verification-rigor", "role": "scorer"}])
+            out = assemble_lenses.assemble(d)
+            skills = {r["skill"] for r in out["contributors"] + out["scorers"] + out["failures"]}
+            self.assertNotIn("ghost", skills)
+            self.assertIn("verification-rigor", skills)
 
     def test_configured_but_missing_lens_is_failure(self):
         with tempfile.TemporaryDirectory() as d:

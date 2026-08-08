@@ -210,6 +210,21 @@ print(f"  Tools in data.json: {len(tools)} tool types")
 print("  PASS")
 PYEOF
 
+# Step 5a: pack dir PERSISTS after a successful render (gitignored working cache for `tune`).
+# The zip is the deliverable, but the on-disk pack dir must survive so a later single-lens
+# re-run can reuse the prior round's outputs instead of reconstructing them from the zip.
+echo ""
+echo "--- Step 5a: Pack dir persists after render ---"
+if [[ ! -d "$TEST_DIR/$SESSION_ID" ]]; then
+  echo "FAIL: pack dir $TEST_DIR/$SESSION_ID was removed after render (should persist)" >&2
+  exit 1
+fi
+if [[ ! -f "$TEST_DIR/$SESSION_ID/metrics.json" ]]; then
+  echo "FAIL: persisted pack dir missing metrics.json artifact" >&2
+  exit 1
+fi
+echo "  PASS"
+
 # Step 5b: openable copy exists outside repo, zip still present, jsonl excluded
 echo ""
 echo "--- Step 5b: Openable dashboard copy ---"
@@ -251,8 +266,9 @@ echo "  PASS"
 # Step 6: Test regeneration (round 2)
 echo ""
 echo "--- Step 6: Test regeneration (round 2) ---"
-# Regeneration re-runs the full pipeline — pack_dir was cleaned up after Step 5.
-# Recreate metrics (validation gate requires it) and analysis before rendering.
+# Regeneration re-runs the full pipeline. The pack dir now PERSISTS after Step 5, but a
+# real round-2 still re-derives metrics and restores analysis before rendering; do the same
+# so this step exercises the regeneration path rather than silently reusing round-1 artifacts.
 mkdir -p "$TEST_DIR/$SESSION_ID"
 python3 "$PLUGIN_ROOT/scripts/extract_metrics.py" "$TEST_DIR/transcript.jsonl" "$TEST_DIR/$SESSION_ID"
 cp "$TEST_DIR/analysis_backup.json" "$TEST_DIR/$SESSION_ID/analysis.json"

@@ -801,7 +801,10 @@ def main():
                     f"unzip it and open index.html.",
                 )
 
-    shutil.rmtree(pack_dir)
+    # The pack dir persists as a gitignored working cache (.eval-packs/<sid>/) — the zip and the
+    # openable copy are the deliverables, but keeping the dir lets `tune` re-run a single lens
+    # against the prior round's on-disk outputs without reconstructing them from the zip.
+    # (Error paths above still rmtree a partial pack.)
 
 
 if __name__ == "__main__":
