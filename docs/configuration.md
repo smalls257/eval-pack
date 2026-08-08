@@ -241,4 +241,5 @@ also the privacy-safe posture for attaching a pack to a public PR.)
 After editing `.eval-pack.json`, **`/eval-pack:tune`** re-evaluates an existing pack with your new
 config — it reuses the recorded facts (transcript, metrics, diffs) and re-runs only evaluation +
 rendering, appending a new round. That's the fast loop for tuning rubric / stance / lenses /
-detectors / branding.
+detectors / branding. To iterate on a single lens's rubric/prompt, target it directly (e.g. "tune
+only the sycophancy lens") — tune re-dispatches just that lens and reuses everything else on disk.
