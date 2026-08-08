@@ -66,6 +66,17 @@ Write one `promptPattern`: a concrete, better version of the opening ask that fr
 intent, constraints, and the decisions and due-diligence the developer should have owned — or an
 empty string if the opening ask already owned them.
 
+**Assign an overall `level` — how much the DEVELOPER owned the cognitive load and decision-making,
+versus offloaded it to the AI.** (Note: HIGH is GOOD here — the reverse of a risk score.)
+- **high** — the developer owned the intent, the key decisions, and the due diligence the risk
+  warranted; the AI executed. Strengths dominate; few or no offloaded-judgment moments.
+- **medium** — mixed: owned some, offloaded some judgment (a decision handed up, or a check left
+  to the AI to decide was needed).
+- **low** — pervasive offloading: intent left for the AI to invent, decisions handed up, blanket
+  approval of large plans/diffs. Vibecoding.
+Also write a one-sentence `levelNote` justifying the level. Base the level ONLY on the same cited
+evidence as your items — do not inflate it.
+
 Write your result to `PACK_DIR/lenses/user-improvements.json` EXACTLY matching this schema (valid
 JSON, no prose around it):
 
@@ -74,9 +85,11 @@ JSON, no prose around it):
   "skill": "user-improvements",
   "role": "contributor",
   "title": "User Improvements",
+  "level": "low|medium|high",
+  "levelNote": "One sentence justifying the ownership level (high = developer owned it).",
   "items": [
-    {"kind": "strength", "title": "Short title", "detail": "Cited paragraph: what the developer did well and why it is good ownership."},
-    {"kind": "improvement", "title": "Short title", "detail": "Cited paragraph: the decision, intent, or check that was offloaded or skipped, and what owning it looks like next time."}
+    {"kind": "strength", "title": "Short title", "detail": "Cited paragraph explaining the strength."},
+    {"kind": "improvement", "title": "Short title", "detail": "Cited paragraph explaining the improvement."}
   ],
   "promptPattern": "Example opening ask that owns intent + constraints + the key decisions and due-diligence, or empty string if nothing to improve."
 }
@@ -84,6 +97,7 @@ JSON, no prose around it):
 
 Rules:
 - `kind` is exactly `"strength"` or `"improvement"`. `title` is short; `detail` is a full paragraph.
+- `level` is exactly `low`, `medium`, or `high` (high = the developer owned the work well); `levelNote` is one sentence.
 - **Every item — strength or improvement — MUST cite a concrete transcript moment** (what was said,
   which turn) and, for a due-diligence item, the specific change that triggered it. No citation, no
   claim. Generic advice is banned: "be clearer" is too vague; "the diff added a `/charge` endpoint
