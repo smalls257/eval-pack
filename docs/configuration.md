@@ -115,7 +115,9 @@ a failing lens never crashes the eval. Default lenses:
 `review`, `business-risk`, `friction`, `repo-improvements`, `user-improvements`, `sycophancy` (contributors),
 `requirement-drift`, `verification-rigor` (scorers). See the README for the full lens authoring guide.
 `sycophancy` is business-risk-shaped: a contributor emitting a low/medium/high level plus cited
-findings (does not feed the verdict).
+findings (does not feed the verdict). `user-improvements` also emits an overall ownership `level`
+surfaced as a "Developer Ownership" header card (high = the developer owned the work — the reverse
+of the risk cards, so it renders green when high).
 
 ### Lens versioning
 
