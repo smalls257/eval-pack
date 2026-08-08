@@ -254,6 +254,9 @@ a nonzero exit — becomes that same red flag; it can't vanish silently.
 3. `/eval-pack:tune` — re-evaluates the latest pack with your new config in minutes: recorded
    facts (transcript, metrics, tests) are reused; only patterns, the evaluator, lenses, and the
    report re-run. Each tune appends a **round**, so the report shows your before/after.
+   **Iterating on one lens? Re-run just that lens** — e.g. "tune only the sycophancy lens" (or
+   `lens=sycophancy`). It re-dispatches that single lens against the prior round's on-disk outputs
+   and reuses everything else — no regenerating the whole pack. Fast loop for lens-prompt tweaks.
 4. Ship the config that produces the eval you trust; it's committed with the repo, so the whole
    team gets it.
 

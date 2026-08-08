@@ -1,5 +1,5 @@
 ---
-description: Re-evaluate an existing eval pack with your current .eval-pack.json — the fast tuning loop for rubric/stance/lens/detector changes. Reuses recorded facts; re-runs only evaluation and rendering, appending a new round.
+description: Re-evaluate an existing eval pack with your current .eval-pack.json — the fast tuning loop for rubric/stance/lens/detector changes. Reuses recorded facts; re-runs only evaluation and rendering, appending a new round. Can also re-run a SINGLE lens (e.g. "tune only the sycophancy lens") against the prior round's on-disk outputs without regenerating the whole pack.
 tags: ["eval", "tune", "config"]
 ---
 
