@@ -18,15 +18,17 @@ A Claude Code plugin that generates eval packs — polished HTML reports capturi
 - **Session metrics** — per-model token breakdown (controller + subagents), turns, files changed
 - **Session timeline** — human-readable narrative of what happened during the session
 - **Heuristic flags** — false completions, retries, scope drift, test failures
-- **Judgment lenses** — seven toggleable dimensions, each its own agent, each default-on:
+- **Judgment lenses** — eight toggleable dimensions, each its own agent, each default-on:
   requirement-drift (did delivery match the ask?), verification-rigor (were claims backed by
   evidence?), review (adversarial findings), business-risk (stakeholder risk + mitigation),
   friction (dev-experience friction, classified), repo-improvements (how the codebase could
-  improve), and user-improvements (how well the developer owned the
+  improve), user-improvements (how well the developer owned the
   work — intent, engineering decisions, and the review/due-diligence the risk warranted, incl.
   when the *whether-to-check* decision itself was offloaded to the AI — vs. vibecoding; calls out
   both good ownership and offloaded-judgment moments, proportional to risk, each cited to a
-  transcript moment, + an example better prompt).
+  transcript moment, + an example better prompt), and sycophancy (how much the assistant
+  flattered/validated the developer vs. stayed candid — evidence-decoupled agreement, cited;
+  grounded in the sycophancy literature).
   Every dimension is tunable per-repo via `analysisLenses` — see
   [Extension lenses](#extension-lenses--your-own-analyses-and-scores).
 - **Tests tab** — deterministic, generated straight from `test-results.json`/`testCommands` exit
@@ -269,7 +271,7 @@ a nonzero exit — becomes that same red flag; it can't vanish silently.
 
 ### Lenses are default-on, and default-on means mandatory
 
-All seven bundled lenses ship enabled in `analysisLenses` — that is the "preserve today's
+All eight bundled lenses ship enabled in `analysisLenses` — that is the "preserve today's
 behavior" baseline, not a suggestion. **Enabling a lens makes its execution mandatory**: once a
 skill is listed in `analysisLenses`, a run where that lens produces no output is not a silent
 gap — it surfaces as a non-suppressible red `lensFailed` flag. To turn a judgment dimension off,

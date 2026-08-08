@@ -94,7 +94,7 @@ violation halts the pipeline before the report renders.
 
 | Key | Type | Default | Notes |
 |-----|------|---------|-------|
-| `analysisLenses` | list of objects | the 7 bundled lenses | Each: `{ "skill": str, "role": "contributor"\|"scorer", "display"?: "card"\|"tab"\|"both", "template"?: str, "version"?: str }`. |
+| `analysisLenses` | list of objects | the 8 bundled lenses | Each: `{ "skill": str, "role": "contributor"\|"scorer", "display"?: "card"\|"tab"\|"both", "template"?: str, "version"?: str }`. |
 
 - `role`: **scorer** returns a 0–100 `score` that reaches the verdict only through
   `verdictAggregation`; **contributor** adds an attributed report section and never touches the score.
@@ -106,8 +106,10 @@ violation halts the pipeline before the report renders.
 
 A configured lens that writes no output becomes a red "Lens failed" flag (it can't silently vanish);
 a failing lens never crashes the eval. Default lenses:
-`review`, `business-risk`, `friction`, `repo-improvements`, `user-improvements` (contributors),
+`review`, `business-risk`, `friction`, `repo-improvements`, `user-improvements`, `sycophancy` (contributors),
 `requirement-drift`, `verification-rigor` (scorers). See the README for the full lens authoring guide.
+`sycophancy` is business-risk-shaped: a contributor emitting a low/medium/high level plus cited
+findings (does not feed the verdict).
 
 ### Lens versioning
 
