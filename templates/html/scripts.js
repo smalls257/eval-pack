@@ -872,6 +872,47 @@ function renderImprovements(data) {
   }
 }
 
+// Pure lookup: the lens record for a skill, scanning every pool a lens can land in
+// (contributors ∪ scorers ∪ failures), or null. Kept separate from the DOM renderer so it is
+// unit-testable without a document shim (Airplane Test: absent/empty lenses → null, never throws).
+function lensRecordFor(lenses, skill) {
+  const l = lenses || {};
+  for (const pool of [l.contributors, l.scorers, l.failures]) {
+    const found = (pool || []).find(r => r && r.skill === skill);
+    if (found) return found;
+  }
+  return null;
+}
+
+// The four dedicated contributors render into hardcoded panels via bespoke renderers, so they
+// never picked up the version marker the generic lens cards show via lensVersionSuffix. Prepend
+// a version line into each panel from the SAME data (data.lenses...version) the generic cards use.
+const DEDICATED_VERSION_PANELS = [
+  ['review', 'panel-review-findings'],
+  ['friction', 'panel-friction'],
+  ['repo-improvements', 'panel-repo-improvements'],
+  ['user-improvements', 'panel-user-improvements'],
+];
+
+function renderDedicatedVersions(data) {
+  const lenses = data && data.lenses;
+  for (const [skill, panelId] of DEDICATED_VERSION_PANELS) {
+    const rec = lensRecordFor(lenses, skill);
+    const version = rec && rec.version;
+    if (typeof version !== 'string' || !version) continue;   // no version → nothing to show
+    const panel = document.getElementById(panelId);
+    if (!panel) continue;                                     // no panel → nothing to touch
+    // Guard against double-injection on re-render.
+    if (panel.querySelector && panel.querySelector('.lens-version-line')) continue;
+    const line = document.createElement('div');
+    line.className = 'lens-version-line';
+    // Version is config/lockfile-sourced, but keep it text (no innerHTML) — a version line is
+    // never a place for markup.
+    line.textContent = 'v' + version;
+    panel.insertBefore(line, panel.firstChild);
+  }
+}
+
 function isSafePath(path) {
   if (/^\/\//.test(path)) return false;
   return /^https?:\/\//i.test(path) || /^\.{0,2}\//.test(path) || /^[^:]+$/.test(path);
@@ -1446,6 +1487,7 @@ function renderSession(data) {
   renderDiff(data);
   renderTools(data.tools);
   renderImprovements(data);
+  renderDedicatedVersions(data);
   renderSessionArtifacts(data);
   renderVerdictStatement(analysis);
   renderTimeline(analysis);
@@ -1519,5 +1561,5 @@ if (typeof window !== 'undefined' && !window.__EVAL_PACK_TEST__) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderDiff, lensTabsFrom, lensCardsFrom, lensContributorBody, lensCardMarkup, lensVersionSuffix, lensHasDetail, renderLenses, renderOwnershipCard, renderTranscript, improvementItem };
+  module.exports = { screenshotBadge, wrapIndex, zoomAt, computeBaseFit, artifactHref, artifactLinkable, effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lensValueText, reviewFindingsFrom, frictionEntriesFrom, diffReposFrom, repoImprovementsFrom, userImprovementsFrom, sessionArtifactsFrom, deliveredFrom, unmetFrom, provenFrom, unprovenFrom, testResultsSummary, renderImprovements, renderDiff, lensTabsFrom, lensCardsFrom, lensContributorBody, lensCardMarkup, lensVersionSuffix, lensHasDetail, renderLenses, renderOwnershipCard, renderTranscript, improvementItem, lensRecordFor, renderDedicatedVersions };
 }

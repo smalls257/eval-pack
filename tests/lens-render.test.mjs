@@ -23,7 +23,7 @@ const { effectiveConfidence, lensFindingText, renderLensTemplate, lensPath, lens
   deliveredFrom, unmetFrom, provenFrom, unprovenFrom,
   testResultsSummary, renderImprovements, renderDiff, lensTabsFrom,
   lensCardsFrom, lensContributorBody, lensCardMarkup, lensVersionSuffix, lensHasDetail, renderTranscript,
-  improvementItem, renderOwnershipCard } = require('../templates/html/scripts.js');
+  improvementItem, renderOwnershipCard, lensRecordFor, renderDedicatedVersions } = require('../templates/html/scripts.js');
 
 test('effectiveConfidence uses finalScore when a non-core rule ran scorers', () => {
   const analysis = { highlights: { confidencePercent: 90 } };
@@ -772,4 +772,125 @@ test('improvementItem escapes untrusted title/detail', () => {
   const out = improvementItem({ kind: 'improvement', title: '<script>x</script>', detail: '<img src=x>' });
   assert.ok(!out.includes('<script>x</script>'));
   assert.ok(out.includes('&lt;script&gt;'));
+});
+
+// ── Dedicated-tab lens versions ─────────────────────────────────────────────
+// The four dedicated contributors render into hardcoded panels via bespoke renderers, so they
+// never picked up the lensVersionSuffix the generic lens cards show. lensRecordFor is the pure
+// lookup (contributors ∪ scorers ∪ failures → record|null); renderDedicatedVersions injects the
+// version line into each panel. Both are separated (lookup vs DOM) matching this file's lens idiom.
+
+test('lensRecordFor finds a contributor by skill', () => {
+  const lenses = { contributors: [
+    { skill: 'other', role: 'contributor' },
+    { skill: 'user-improvements', role: 'contributor', version: '2.3.0' },
+  ] };
+  assert.strictEqual(lensRecordFor(lenses, 'user-improvements').version, '2.3.0');
+});
+
+test('lensRecordFor finds a scorer by skill (contributors ∪ scorers ∪ failures)', () => {
+  const lenses = { scorers: [{ skill: 'verification-rigor', role: 'scorer', version: '1.1.0' }] };
+  assert.strictEqual(lensRecordFor(lenses, 'verification-rigor').version, '1.1.0');
+});
+
+test('lensRecordFor returns null for an absent skill / absent lenses (Airplane Test)', () => {
+  assert.strictEqual(lensRecordFor(null, 'review'), null);
+  assert.strictEqual(lensRecordFor({}, 'review'), null);
+  assert.strictEqual(lensRecordFor({ contributors: [{ skill: 'x' }] }, 'review'), null);
+});
+
+// A fake panel that records insertBefore/firstChild/querySelector — enough for
+// renderDedicatedVersions to prepend a version line and to detect a prior injection.
+function makeFakePanel() {
+  return {
+    firstChild: null,
+    children: [],
+    insertBefore(node) { this.children.unshift(node); this.firstChild = node; },
+    querySelector(sel) {
+      return sel === '.lens-version-line'
+        ? (this.children.find(c => c.className === 'lens-version-line') || null)
+        : null;
+    },
+  };
+}
+
+function dedicatedFakeDoc(panels) {
+  return {
+    getElementById(id) { return panels[id] || null; },
+    createElement() { return { className: '', textContent: '' }; },
+  };
+}
+
+test('renderDedicatedVersions injects v2.3.0 into #panel-user-improvements', () => {
+  const panel = makeFakePanel();
+  const restore = global.document;
+  global.document = dedicatedFakeDoc({ 'panel-user-improvements': panel });
+  try {
+    renderDedicatedVersions({ lenses: { contributors: [
+      { skill: 'user-improvements', role: 'contributor', version: '2.3.0' },
+    ] } });
+    assert.strictEqual(panel.children.length, 1);
+    assert.strictEqual(panel.firstChild.className, 'lens-version-line');
+    assert.strictEqual(panel.firstChild.textContent, 'v2.3.0');
+  } finally {
+    global.document = restore;
+  }
+});
+
+test('renderDedicatedVersions injects the version into #panel-repo-improvements', () => {
+  const panel = makeFakePanel();
+  const restore = global.document;
+  global.document = dedicatedFakeDoc({ 'panel-repo-improvements': panel });
+  try {
+    renderDedicatedVersions({ lenses: { contributors: [
+      { skill: 'repo-improvements', role: 'contributor', version: '0.9.1' },
+    ] } });
+    assert.strictEqual(panel.children.length, 1);
+    assert.strictEqual(panel.firstChild.textContent, 'v0.9.1');
+  } finally {
+    global.document = restore;
+  }
+});
+
+test('renderDedicatedVersions injects nothing when the lens has no version', () => {
+  const panel = makeFakePanel();
+  const restore = global.document;
+  global.document = dedicatedFakeDoc({ 'panel-user-improvements': panel });
+  try {
+    renderDedicatedVersions({ lenses: { contributors: [
+      { skill: 'user-improvements', role: 'contributor' },
+    ] } });
+    assert.strictEqual(panel.children.length, 0);
+  } finally {
+    global.document = restore;
+  }
+});
+
+test('renderDedicatedVersions does not double-inject when called twice', () => {
+  const panel = makeFakePanel();
+  const restore = global.document;
+  global.document = dedicatedFakeDoc({ 'panel-friction': panel });
+  try {
+    const data = { lenses: { contributors: [
+      { skill: 'friction', role: 'contributor', version: '1.0.0' },
+    ] } };
+    renderDedicatedVersions(data);
+    renderDedicatedVersions(data);
+    assert.strictEqual(panel.children.length, 1);
+    assert.strictEqual(panel.querySelector('.lens-version-line').textContent, 'v1.0.0');
+  } finally {
+    global.document = restore;
+  }
+});
+
+test('renderDedicatedVersions never throws on absent lenses / missing panels (Airplane Test)', () => {
+  const restore = global.document;
+  global.document = dedicatedFakeDoc({});   // no panels registered
+  try {
+    assert.doesNotThrow(() => renderDedicatedVersions({}));
+    assert.doesNotThrow(() => renderDedicatedVersions({ lenses: { contributors: [
+      { skill: 'review', role: 'contributor', version: '1.0.0' } ] } }));
+  } finally {
+    global.document = restore;
+  }
 });
