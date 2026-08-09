@@ -47,5 +47,19 @@ class TestEvalLenses(unittest.TestCase):
         r = eval_lenses.evaluate_bundle(bundle, base / "tr", C)
         self.assertTrue(r["passed"], r)
 
+    def test_items_adapter_catches_hallucinated_quote(self):
+        import tempfile, shutil
+        base = Path(tempfile.mkdtemp()); self.addCleanup(lambda: shutil.rmtree(base, ignore_errors=True))
+        bundle = base / "own"; (bundle / "fixtures" / "c1").mkdir(parents=True)
+        (bundle / "basis.md").write_text('```json\n{"sources": [], "claims": [{"id":"c","covers":["c1"]}], "rules": []}\n```')
+        (bundle / "provenance.json").write_text("{}")
+        (bundle / "gold.json").write_text('{"c1": {"level": {"min": "medium"}}}')
+        (bundle / "fixtures" / "c1" / "transcript.jsonl").write_text('{"type":"user","message":{"role":"user","content":"the real transcript text"}}\n')
+        trials = base / "tr" / "c1"; trials.mkdir(parents=True)
+        (trials / "trial-0.json").write_text('{"level":"high","items":[{"kind":"strength","quote":"THIS QUOTE IS NOT IN THE TRANSCRIPT","evidential":true}]}')
+        C = {"gradedField":"level","levelOrdinal":["low","medium","high"],"findingsKey":"items","typeField":"kind","findingTypes":["strength","improvement"]}
+        r = eval_lenses.evaluate_bundle(bundle, base / "tr", C)
+        self.assertFalse(r["passed"], "hallucinated items quote must fail evidence-resolution via findingsKey routing")
+
 if __name__ == "__main__":
     unittest.main()
