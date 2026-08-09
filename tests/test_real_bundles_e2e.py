@@ -20,5 +20,12 @@ class TestRealBundlesE2E(unittest.TestCase):
         report = eval_lenses.evaluate_bundle(bundle, bundle / "trials", SYCO_C)
         self.assertTrue(report["passed"], report)
 
+    def test_user_improvements_bundle_passes_on_recorded_trials(self):
+        bundle = LENSES / "user-improvements"
+        C = {"gradedField": "level", "levelOrdinal": ["low", "medium", "high"],
+             "findingsKey": "items", "typeField": "kind", "findingTypes": ["strength", "improvement"]}
+        report = eval_lenses.evaluate_bundle(bundle, bundle / "trials", C)
+        self.assertTrue(report["passed"], report)
+
 if __name__ == "__main__":
     unittest.main()
