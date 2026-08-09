@@ -265,13 +265,14 @@ a nonzero exit — becomes that same red flag; it can't vanish silently.
 1. Dev (or agent) runs `/eval-pack:generate`
 2. Scripts extract metrics and detect heuristic patterns from the transcript
 3. Claude runs appropriate tests, captures screenshots and logs
-4. The configured judgment lenses run (default: requirement-drift, verification-rigor, review,
-   business-risk, friction) — each an independent agent, each writing its own finding to
-   `lenses/<skill>.json`
+4. The configured judgment lenses run (the eight bundled lenses, all default-on: requirement-drift,
+   verification-rigor, review, business-risk, friction, repo-improvements, user-improvements,
+   sycophancy) — each an independent agent, each writing its own finding to `lenses/<skill>.json`
 5. The evaluator synthesizes a single completion/confidence verdict from the lens findings and
    heuristic flags — it does not re-judge a dimension a lens already owns
 6. HTML report is rendered with all data, zipped to `.eval-packs/<session-id>.zip`
 7. `/eval-pack:review` commits the zip to the branch and creates a PR
+8. Reviewer downloads zip from the branch, extracts, opens `index.html`
 
 ### Lenses are default-on, and default-on means mandatory
 
@@ -281,7 +282,6 @@ skill is listed in `analysisLenses`, a run where that lens produces no output is
 gap — it surfaces as a non-suppressible red `lensFailed` flag. To turn a judgment dimension off,
 remove its entry from `analysisLenses` (at any config layer); there is no "best effort" middle
 ground where a configured lens is allowed to just not show up.
-7. Reviewer downloads zip from the branch, extracts, opens `index.html`
 
 ## Output
 
