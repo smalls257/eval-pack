@@ -76,6 +76,46 @@ source-refresh → provenance ledger ──commit──▶ trials/ + committed b
 Everything at gate-time left of `eval_lenses.py` except the lens dispatch is deterministic. The lens
 dispatch is the one non-deterministic step; its output (`trials/`) is then checked deterministically.
 
+## Lens contract
+
+The checks require lenses to present a uniform interface — a **Filter** the generic harness reads
+identically. Kept minimal to avoid a **Leaky Narrative** (authors filling fields they don't
+understand). Two levels: the **output contract is universal** (all lenses conform now); the **basis
+bundle is per-lens** (a lens is *evaluated* iff it ships one).
+
+### Output contract — universal (all lenses)
+
+Declared in each lens `.md` frontmatter (alongside `name`/`description`/`tools`):
+
+```yaml
+output:
+  gradedField: score            # "score" (0-100 scorer) | "level" (contributor)
+  levelOrdinal: [low, medium, high]   # contributors only
+  findingTypes: [capitulation, false-belief, compound, drift, praise, one-sided-flag]
+```
+
+Every result must then present:
+- the declared `gradedField` (`score` or `level` from `levelOrdinal`);
+- `findings[]`, each with a `type` from `findingTypes` and a **structured `quote`** holding the
+  verbatim evidence span.
+- **Evidential vs proposing findings.** A finding that *asserts something about the session* MUST
+  carry a resolvable `quote`. A finding that *proposes* something and references no session span
+  (improvement/suggestion lenses) sets `quote: null, evidential: false`; evidence-resolution skips
+  it, but a non-evidential finding **cannot move a verdict** (only evidential findings can set the
+  score/level). This keeps atomic provenance honest without forcing suggestions to fabricate a quote.
+
+Retrofit cost: all 8 lens `.md` files gain the `output` block + the `quote`/`evidential` finding
+fields, each bumping its `lens-versions.json` sha. A lens whose output violates its own declared
+contract **fails loud** — a non-suppressible contract-violation flag, reusing eval-pack's existing
+`lensFailed` gate — never a silent skip.
+
+### Basis bundle — per-lens (evaluated lenses)
+
+`basis.md` + `provenance.json` + `gold.json` + `fixtures/` (next section). v1 ships bundles for
+`requirement-drift` and `sycophancy`; the other 6 lenses carry the universal output contract but are
+not yet evaluated. `basis.md` `rules` operate over the vocabulary the lens declared in its `output`
+frontmatter.
+
 ## The per-lens basis bundle
 
 Self-contained directory discovered by lens name:
@@ -132,9 +172,10 @@ Every finding a trial emits must quote its evidence. The check anchors on the **
 index is only a hint — lens schemas cite "~turn N" approximately) and asserts the quote appears
 **verbatim** (whitespace-normalized) somewhere in the fixture's **evidence corpus**: `transcript.jsonl`
 for all lenses, plus the reconstructed **diff** for diff-needing lenses (drift findings quote the ask
-or the delivered hunk, not turns). A finding whose quote resolves nowhere is **stripped and the trial
-fails the check** — fake evidence must not survive. Pure string search. Catches the lens hallucinating
-its own evidence.
+or the delivered hunk, not turns). A finding marked `evidential: false` (a proposing/suggestion
+finding, per the output contract) is skipped. Any *evidential* finding whose `quote` resolves nowhere
+is **stripped and the trial fails the check** — fake evidence must not survive. Pure string search.
+Catches the lens hallucinating its own evidence.
 
 ### 2. Rule-consistency (respects-the-rules) — deterministic
 
@@ -241,6 +282,8 @@ the vetted allowlist — and resolved into `provenance.json`. v1 fixtures: `Mele
 
 ## Error handling (fail-loud, no silent swallow)
 
+- Lens output missing its declared `gradedField`, using an undeclared finding `type`, or (for an
+  evidential finding) missing `quote` → contract violation → non-suppressible `lensFailed` flag.
 - Finding with unresolvable evidence → strip + fail the trial's evidence-resolution (logged).
 - Trial violating a declared rule → fail rule-consistency (report the violated rule).
 - `basis.md` source missing from / mismatched in `provenance.json` → fail reference-resolution.
@@ -260,8 +303,11 @@ the vetted allowlist — and resolved into `provenance.json`. v1 fixtures: `Mele
 
 ## v1 scope
 
-Full verification substrate, both lenses:
+Full verification substrate, both lenses, universal output contract:
 
+- **Universal output contract retrofit:** all 8 lens `.md` files gain the `output` frontmatter block
+  (`gradedField` / `levelOrdinal` / `findingTypes`) and the `quote`/`evidential` finding fields;
+  each bumps its `lens-versions.json` sha. Contract-violation → `lensFailed` flag.
 - Generic harness: bundle convention, `basis.md` parse, `provenance.json` ledger, fixture-loader,
   dispatch runbook, and `eval_lenses.py` with **all five checks**.
 - Authoring tools: harvester adapters (drift, syco) + `refresh_sources.py`.
