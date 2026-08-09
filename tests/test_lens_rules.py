@@ -36,5 +36,10 @@ class TestLensRules(unittest.TestCase):
         with self.assertRaises(ValueError):
             lens_rules.check_rules(bad, {"level": "low", "findings": []}, ORD)
 
+    def test_malformed_require_shape_raises(self):
+        bad = [{"when": {"level": "low"}, "require": {"findings.types": ["praise"]}}]
+        with self.assertRaises(ValueError):
+            lens_rules.check_rules(bad, {"level": "low", "findings": [{"type": "capitulation"}]}, ORD)
+
 if __name__ == "__main__":
     unittest.main()

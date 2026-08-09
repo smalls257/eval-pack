@@ -56,6 +56,8 @@ def _require_ok(require, output, ordinal):
         if field not in _FIELDS:
             raise ValueError("unknown rule field: {!r}".format(field))
         value = _field_value(field, output)
+        if not isinstance(spec, dict):
+            raise ValueError("require-clause for {!r} must be an operator dict, got {!r}".format(field, spec))
         for op, target in spec.items():
             if op not in _REQUIRE_OPS:
                 raise ValueError("unknown require-operator: {!r}".format(op))
