@@ -1225,6 +1225,28 @@ function lensFindingText(f) {
   return String(f);
 }
 
+// A finding that carries teaching fields (consequence / guidance) renders as a rich block —
+// the quote, a "Why it matters" banner (the implication a reader might miss), and a "Do next"
+// banner (a concrete developer action). Findings without those fields fall back to one line.
+function lensFindingMarkup(f) {
+  if (!f || typeof f !== 'object' ||
+      (f.consequence == null && f.guidance == null && f.quote == null)) {
+    return html`<li>${lensFindingText(f)}</li>`;
+  }
+  const type = f.type || f.kind || '';
+  const detail = f.detail != null ? String(f.detail) : '';
+  const quote = f.quote || '';
+  const cons = f.consequence || '';
+  const guid = f.guidance || '';
+  return html`<li class="lens-finding-rich">` +
+    (type ? html`<span class="finding-type">${type}</span>` : '') +
+    (detail ? html`<div class="finding-detail">${detail}</div>` : '') +
+    (quote ? html`<blockquote class="finding-quote">${quote}</blockquote>` : '') +
+    (cons ? html`<div class="banner banner-why"><span class="banner-lbl">Why it matters</span> ${cons}</div>` : '') +
+    (guid ? html`<div class="banner banner-do"><span class="banner-lbl">Do next</span> ${guid}</div>` : '') +
+    '</li>';
+}
+
 // Resolve a dot-path into a lens record.
 function lensPath(obj, path) {
   return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
@@ -1365,13 +1387,20 @@ function lensCustomCard(rec, headExtra) {
 function lensContributorBody(rec) {
   const level = (typeof rec.level === 'string' && /^(low|medium|high)$/i.test(rec.level))
     ? rec.level.toLowerCase() : null;
-  // A lens that also renders a header card already shows this one-line note there — don't repeat it here.
-  const note = lensHasCard(rec) ? '' : (rec.rationale || rec.notes || '');
-  const findings = (rec.findings || []).map(f => html`<li>${lensFindingText(f)}</li>`).join('');
+  // A guidance-lens (declares requiresGuidance → carries a top-level `guidance`) shows the summary
+  // as a Why-it-matters / Do-next pair; other lenses keep the plain one-line note.
+  const hasGuidance = rec.guidance != null;
+  // A lens that also renders a header card already shows its one-line note there — don't repeat it.
+  const note = (lensHasCard(rec) || hasGuidance) ? '' : (rec.rationale || rec.notes || '');
+  const whyMatters = hasGuidance ? (rec.notes || '') : '';
+  const doNext = hasGuidance ? (rec.guidance || '') : '';
+  const findings = (rec.findings || []).map(f => lensFindingMarkup(f)).join('');
   const mitigation = (rec.mitigation || []).map(m => html`<li>${m}</li>`).join('');
   return '' +
     (level ? html`<div class="lens-level biz-risk-${level}">${level}</div>` : '') +
     (note ? html`<p class="lens-rationale">${note}</p>` : '') +
+    (whyMatters ? html`<div class="banner banner-why banner-summary"><span class="banner-lbl">Why it matters</span> ${whyMatters}</div>` : '') +
+    (doNext ? html`<div class="banner banner-do banner-summary"><span class="banner-lbl">Do next</span> ${doNext}</div>` : '') +
     (findings ? html`<ul class="lens-findings">${safe(findings)}</ul>` : '') +
     (mitigation ? html`<h5 class="lens-subhead">Mitigation</h5><ul class="mitigation-list">${safe(mitigation)}</ul>` : '') +
     (rec.mainRisk ? html`<p class="lens-mainrisk"><strong>Main risk:</strong> ${rec.mainRisk}</p>` : '');
@@ -1415,6 +1444,8 @@ function lensCardMarkup(tab) {
 // Layout matches info density: rich rationale gets a hero card, an at-a-glance level gets a row.
 function renderHeaderItem(o) {
   const version = (typeof o.version === 'string' && o.version) ? o.version : '';
+  // The header card is at-a-glance: level + the one-line summary note only. The full Why-it-matters
+  // / Do-next teaching lives in the lens tab below (see lensContributorBody / lensFindingMarkup).
   if (o.cardStyle === 'hero') {
     const wrap = document.getElementById('verdict-hero');
     if (!wrap) return;

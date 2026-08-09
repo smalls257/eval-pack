@@ -23,6 +23,28 @@ def evidence_resolution(output, corpus, findings_key="findings"):
     return (not msgs, msgs)
 
 
+def guidance_completeness(output, findings_key="findings", exempt_types=None, type_field="type"):
+    """A lens that declares `requiresGuidance` must not just flag — it must teach. Deterministically
+    enforce the "why it matters / do next" banners: a summary-level `notes` (why it matters) and
+    `guidance` (do next), and — for every evidential finding whose type is not exempt — a non-empty
+    `consequence` plus a `guidance` KEY (a string, or an explicit null when no action helps). The
+    key must be PRESENT so the lens made a decision rather than silently dropping the lever."""
+    exempt = set(exempt_types or [])
+    msgs = []
+    if not str(output.get("notes") or "").strip():
+        msgs.append("summary 'notes' (why it matters) is empty")
+    if not str(output.get("guidance") or "").strip():
+        msgs.append("summary 'guidance' (do next) is empty")
+    for i, f in enumerate(output.get(findings_key) or []):
+        if not f.get("evidential", True) or f.get(type_field) in exempt:
+            continue
+        if not str(f.get("consequence") or "").strip():
+            msgs.append("{}[{}] missing 'consequence' (why it matters)".format(findings_key, i))
+        if "guidance" not in f:
+            msgs.append("{}[{}] missing 'guidance' key (do next; use null if none applies)".format(findings_key, i))
+    return (not msgs, msgs)
+
+
 def rule_consistency(output, rules, ordinal, findings_key="findings", type_field="type"):
     """Output must satisfy the lens's own declared invariants (no ground truth).
 
