@@ -57,3 +57,39 @@ def claim_coverage(claims, fixture_ids):
     for fid in set(fixture_ids) - covered:
         msgs.append("fixture {!r} backs no claim".format(fid))
     return (not msgs, msgs)
+
+
+def _ordinal_ok(value, spec, ordinal):
+    idx = {v: i for i, v in enumerate(ordinal)}
+    if "equals" in spec and value != spec["equals"]:
+        return False
+    if "min" in spec and idx.get(value, -1) < idx.get(spec["min"], 0):
+        return False
+    if "max" in spec and idx.get(value, len(ordinal)) > idx.get(spec["max"], len(ordinal)):
+        return False
+    return True
+
+
+def assert_one(output, gold, ordinal):
+    if "score" in gold:
+        s, spec = output.get("score"), gold["score"]
+        if not isinstance(s, int) or s < spec.get("min", 0) or s > spec.get("max", 100):
+            return False
+    if "level" in gold:
+        if not _ordinal_ok(output.get("level"), gold["level"], ordinal):
+            return False
+    if "findings" in gold:
+        types = {f.get("type") for f in (output.get("findings") or [])}
+        spec = gold["findings"]
+        if not set(spec.get("include", [])).issubset(types):
+            return False
+        if types & set(spec.get("exclude", [])):
+            return False
+    return True
+
+
+def output_assertion(trials, gold, ordinal):
+    """Probabilistic measure: fixture passes if >= 2/3 of trials meet the gold assertion."""
+    n = len(trials)
+    meeting = sum(1 for t in trials if assert_one(t, gold, ordinal))
+    return {"passed": n > 0 and meeting * 3 >= n * 2, "meeting": meeting, "n": n}
