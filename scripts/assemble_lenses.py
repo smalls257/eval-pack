@@ -16,6 +16,32 @@ sys.path.insert(0, str(Path(__file__).parent))  # noqa: E402
 import aggregate  # noqa: E402
 import config  # noqa: E402
 import lens_versions  # noqa: E402
+import lens_manifest  # noqa: E402
+import lens_contract  # noqa: E402
+
+
+def validate_lens_contracts(results):
+    """A lens whose .md declares an output contract must satisfy it; a violation is a failure.
+    Lenses with no declared contract (or no .md on disk) pass through unchanged."""
+    validated = []
+    for r in results:
+        if "error" in r:
+            validated.append(r)
+            continue
+        md_path = lens_versions.LENS_DIR / (r.get("skill", "") + ".md")
+        contract = None
+        if md_path.is_file():
+            contract = lens_manifest.find_output_contract(md_path.read_text(encoding="utf-8"))
+        if contract is None:
+            validated.append(r)
+            continue
+        violations = lens_contract.validate_output(r, contract)
+        if violations:
+            validated.append({"skill": r.get("skill"), "role": r.get("role", "unknown"),
+                              "error": "contract violation: " + "; ".join(violations)})
+        else:
+            validated.append(r)
+    return validated
 
 
 def assemble(pack_dir):
@@ -31,6 +57,8 @@ def assemble(pack_dir):
             except (json.JSONDecodeError, OSError):
                 results.append({"skill": f.stem, "role": "unknown",
                                 "error": "malformed or unreadable lens output"})
+
+    results = validate_lens_contracts(results)
 
     cfg_path = pack / "eval-config.json"
     cfg = config.read_config(str(cfg_path)) if cfg_path.is_file() else config.read_config()
