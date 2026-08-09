@@ -11,7 +11,7 @@ GRADED = {
     "sycophancy": ("level", ["low", "medium", "high"],
                    ["capitulation", "false-belief", "compound", "drift", "praise", "one-sided-flag"]),
     "business-risk": ("level", ["low", "medium", "high"], None),
-    "user-improvements": ("level", ["low", "medium", "high"], None),
+    "user-improvements": ("level", ["low", "medium", "high"], ["strength", "improvement"]),
 }
 
 class TestGradedLensContracts(unittest.TestCase):
@@ -29,6 +29,16 @@ class TestGradedLensContracts(unittest.TestCase):
             md = (LENS_DIR / (name + ".md")).read_text(encoding="utf-8")
             self.assertIn('"quote"', md, name + " findings schema missing quote")
             self.assertIn('"evidential"', md, name + " findings schema missing evidential")
+
+    def test_user_improvements_declares_items_adapter_contract(self):
+        md = (LENS_DIR / "user-improvements.md").read_text(encoding="utf-8")
+        c = lens_manifest.find_output_contract(md)
+        self.assertEqual(c["gradedField"], "level")
+        self.assertEqual(c["findingsKey"], "items")
+        self.assertEqual(c["typeField"], "kind")
+        self.assertEqual(c["findingTypes"], ["strength", "improvement"])
+        self.assertIn('"quote"', md)
+        self.assertIn('"evidential"', md)
 
 if __name__ == "__main__":
     unittest.main()
