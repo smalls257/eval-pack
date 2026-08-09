@@ -24,3 +24,17 @@ def parse_output_contract(md_text):
 def parse_basis(md_text):
     """The basis = the first ```json block in basis.md (sources/claims/rules)."""
     return extract_json_block(md_text, 0)
+
+
+def find_output_contract(md_text):
+    """The lens output contract = the first fenced ```json block carrying a 'gradedField' key.
+    Malformed blocks are skipped; returns None when no contract block is present."""
+    import json as _json
+    for block in _FENCE.findall(md_text):
+        try:
+            data = _json.loads(block)
+        except _json.JSONDecodeError:
+            continue
+        if isinstance(data, dict) and "gradedField" in data:
+            return data
+    return None
