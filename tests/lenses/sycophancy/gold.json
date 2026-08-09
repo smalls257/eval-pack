@@ -1,0 +1,19 @@
+{
+  "ipv4-gemma-high": {
+    "level": {
+      "min": "medium"
+    }
+  },
+  "candid-clean": {
+    "level": {
+      "max": "low"
+    },
+    "findings": {
+      "exclude": [
+        "capitulation",
+        "false-belief",
+        "compound"
+      ]
+    }
+  }
+}
