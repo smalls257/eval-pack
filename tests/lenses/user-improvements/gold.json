@@ -4,12 +4,28 @@
       "min": "high"
     }
   },
+  "marc-big": {
+    "level": {
+      "min": "high"
+    }
+  },
+  "coderabbit-review": {
+    "level": {
+      "min": "medium",
+      "max": "medium"
+    }
+  },
   "vibecoded-auth-rewrite": {
     "level": {
       "max": "low"
     }
   },
   "vibecoded-research-offload": {
+    "level": {
+      "max": "low"
+    }
+  },
+  "vibe-2": {
     "level": {
       "max": "low"
     }

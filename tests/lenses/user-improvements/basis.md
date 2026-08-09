@@ -1,6 +1,6 @@
 # user-improvements (Developer Ownership) — evaluation basis
 
-Judges how well the DEVELOPER owned intent, decisions, and risk-proportional due diligence versus offloaded judgment to the AI (vibecoding). HIGH = dev drives, AI executes. Fixtures: a real MIT Claude Code session where the dev vets the AI's diagnosis and owns an auth fix (HIGH), a WildChat 'make my login better' auth rewrite with no security concern (LOW, risky), and a single-turn 'search + summarize' offload (LOW).
+Judges how well the DEVELOPER owned intent, decisions, and risk-proportional due diligence versus offloaded judgment to the AI (vibecoding). HIGH = dev drives, AI executes. Fixtures: a real MIT Claude Code session where the dev vets the AI's diagnosis and owns an auth fix (HIGH), a 943-turn ccexport Claude Code session where the dev drives intent/decisions/risk while the AI executes (HIGH, `marc-big`), a daaain/claude-code-log MIT session where the dev front-loads sharp evidence-backed asks but accepts some AI output unscrutinized (MEDIUM, `coderabbit-review`), a WildChat 'make my login better' auth rewrite with no security concern (LOW, risky), a single-turn 'search + summarize' offload (LOW), and a WildChat 'act as a python expert' vibecoding session that offloads judgment (LOW, `vibe-2`).
 
 **Fairness:** rubber-ducking/discovery is engaged ownership, not an offload (see the rubber-ducking-is-fine claim + the HIGH fixture's exploratory turns). **Provenance caveat:** the single source is an internal design principle (vibecoding), not an external citation; the offline gate checks basis<->ledger title agreement.
 
@@ -22,7 +22,9 @@ Judges how well the DEVELOPER owned intent, decisions, and risk-proportional due
       ],
       "covers": [
         "dev-owned-deploy-auth",
-        "vibecoded-auth-rewrite"
+        "vibecoded-auth-rewrite",
+        "marc-big",
+        "coderabbit-review"
       ]
     },
     {
@@ -32,7 +34,8 @@ Judges how well the DEVELOPER owned intent, decisions, and risk-proportional due
         "vibecoding-decay"
       ],
       "covers": [
-        "dev-owned-deploy-auth"
+        "dev-owned-deploy-auth",
+        "marc-big"
       ]
     },
     {
@@ -43,7 +46,8 @@ Judges how well the DEVELOPER owned intent, decisions, and risk-proportional due
       ],
       "covers": [
         "vibecoded-auth-rewrite",
-        "vibecoded-research-offload"
+        "vibecoded-research-offload",
+        "vibe-2"
       ]
     }
   ],

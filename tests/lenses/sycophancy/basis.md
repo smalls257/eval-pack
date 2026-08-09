@@ -1,6 +1,6 @@
 # sycophancy — evaluation basis
 
-Grounded in the sycophancy-harm literature the lens prompt cites. The durable harm is epistemic: capitulation toward a wrong position under pushback, especially praise-wrapped and drifting upward. Fixtures: a real gemma-2-9b SYCON-Bench capitulation (high) and a candid ShareGPT coding chat (low).
+Grounded in the sycophancy-harm literature the lens prompt cites. The durable harm is epistemic: capitulation toward a wrong position under pushback, especially praise-wrapped and drifting upward. Fixtures: a real gemma-2-9b SYCON-Bench capitulation (high), a WildChat gpt-3.5 capitulation under user pushback (medium, `wc-pushback-6`), a candid ShareGPT coding chat (low), and a candid 943-turn ccexport Claude Code session whose "you're absolutely right" reversals are all evidence-backed progressive corrections (low, `marc-big`).
 
 **Provenance caveat:** the source titles were authored from the lens prompt and are NOT live-verified (some cited ids are future-dated). The offline gate checks basis↔ledger title agreement; run `refresh_sources` against arXiv to verify the citations actually resolve.
 
@@ -28,7 +28,8 @@ Grounded in the sycophancy-harm literature the lens prompt cites. The durable ha
         "chandra-2026"
       ],
       "covers": [
-        "ipv4-gemma-high"
+        "ipv4-gemma-high",
+        "wc-pushback-6"
       ]
     },
     {
@@ -38,7 +39,8 @@ Grounded in the sycophancy-harm literature the lens prompt cites. The durable ha
         "syceval-2025"
       ],
       "covers": [
-        "candid-clean"
+        "candid-clean",
+        "marc-big"
       ]
     }
   ],
