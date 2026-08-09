@@ -361,7 +361,7 @@ test('lensCardsFrom degrades to [] for absent/empty lenses (Airplane Test)', () 
   assert.deepStrictEqual(lensCardsFrom({}), []);
 });
 
-// Render-level: a display:'card' business-risk lens is injected into #highlights-row with its
+// Render-level: a display:'card' business-risk lens is injected into #lens-list with its
 // level class, and its untrusted values are ESCAPED (no raw <script> reaches innerHTML).
 test('renderLenses injects card lenses into the highlights row and escapes their values', () => {
   const require2 = createRequire(import.meta.url);
@@ -369,7 +369,7 @@ test('renderLenses injects card lenses into the highlights row and escapes their
   const row = { children: [], appendChild(el) { this.children.push(el); } };
   const nav = { querySelector() { return null; }, insertBefore() {} };
   const elements = {
-    'highlights-row': row,
+    'lens-list': row,
     'tab-nav': nav,
     'session-artifacts': { parentNode: { insertBefore() {} } },
   };
@@ -408,7 +408,7 @@ test('renderLenses injects card lenses into the highlights row and escapes their
 // so it is rendered by renderOwnershipCard, not the generic lensCardsFrom scan.
 function ownershipFakeDoc(row) {
   return {
-    getElementById(id) { return id === 'highlights-row' ? row : null; },
+    getElementById(id) { return id === 'lens-list' ? row : null; },
     createElement() { return { className: '', innerHTML: '', appendChild() {} }; },
   };
 }
@@ -533,7 +533,7 @@ test('renderLenses puts contributor detail (mitigation + main risk) in its lens 
   const nav = { querySelector() { return null; }, insertBefore() {} };
   const created = [];
   const elements = {
-    'highlights-row': row,
+    'lens-list': row,
     'tab-nav': nav,
     'session-artifacts': { parentNode: { insertBefore() {} } },
   };
@@ -579,7 +579,7 @@ test('renderLenses renders the aggregation line even when there are no lens tabs
   const nav = { querySelector() { return null; }, insertBefore() {} };
   const aggLine = { innerHTML: '' };
   const elements = {
-    'highlights-row': row,
+    'lens-list': row,
     'lens-agg-line': aggLine,
     'tab-nav': nav,
     'session-artifacts': { parentNode: { insertBefore() {} } },

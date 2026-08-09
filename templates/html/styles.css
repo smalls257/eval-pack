@@ -146,7 +146,8 @@ main.container {
 /* ===== Highlights Row ===== */
 .highlights-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  align-items: stretch;
   gap: 12px;
   margin-bottom: 12px;
 }
@@ -179,7 +180,7 @@ main.container {
   font-size: 12px;
   color: var(--text-secondary);
   margin-top: 6px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .highlight-card-version { font-size: 0.7rem; color: var(--text-secondary); margin-top: 2px; }
@@ -227,6 +228,82 @@ main.container {
 .ownership-high   .highlight-card-value { color: var(--green, #17b169); }
 .ownership-medium .highlight-card-value { color: var(--amber, #f5a623); }
 .ownership-low    .highlight-card-value { color: var(--red, #e5484d); }
+
+/* ===== Configurable header layout: hero cards + lens scorecard list =====
+   The two rich verdicts (completion + confidence) and any lens with cardStyle:'hero' render as
+   wide hero cards with room for a full rationale (long ones clamp + Show more). Lenses with
+   cardStyle:'list' (the default) render as compact scorecard rows. Layout matches info density. */
+.verdict-hero {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  align-items: start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.vcard .highlight-card-value { font-size: 22px; margin-bottom: 10px; line-height: 1.2; }
+.vcard .highlight-card-notes {
+  display: block;
+  font-size: 13px;
+  line-height: 1.55;
+  max-height: 12.5em;      /* ~8 lines before clamping */
+  overflow: hidden;
+  position: relative;
+}
+.vcard.hero-expanded .highlight-card-notes { max-height: none; }
+.vcard.hero-clamped .highlight-card-notes::after {
+  content: "";
+  position: absolute; left: 0; right: 0; bottom: 0; height: 2.4em;
+  background: linear-gradient(transparent, var(--bg-card));
+  pointer-events: none;
+}
+.vcard-more {
+  margin-top: 8px; padding: 0;
+  font-size: 11px; font-weight: 600;
+  color: var(--accent, #4a9eff);
+  background: none; border: none; cursor: pointer;
+  display: none;
+}
+.vcard.hero-clamped .vcard-more, .vcard.hero-expanded .vcard-more { display: inline-block; }
+
+.lens-list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.lens-list:empty { display: none; }
+.lrow {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 16px;
+  padding: 14px 20px;
+  align-items: baseline;
+  border-top: 1px solid var(--border);
+}
+.lrow:first-child { border-top: none; }
+.lchip { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; }
+.lchip .cdot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.lname { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-secondary); font-weight: 600; margin-top: 4px; }
+.lrow-version { font-size: 0.7rem; color: var(--text-secondary); margin-top: 2px; }
+.lnote { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+
+/* Chip colors reuse the same level classes the header cards use (single source of truth). */
+.biz-risk-low .lchip, .ownership-high .lchip    { color: var(--green, #17b169); }
+.biz-risk-medium .lchip, .ownership-medium .lchip { color: var(--amber, #f5a623); }
+.biz-risk-high .lchip, .ownership-low .lchip    { color: var(--red, #e5484d); }
+
+@media (max-width: 640px) { .lrow { grid-template-columns: 1fr; gap: 6px; } }
+
+/* Honest-scope caption for Session Metrics: the snapshot excludes the eval run itself. */
+.stats-note {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  margin: 16px 0 0;
+  max-width: 90ch;
+}
+.stats-note code { font-family: var(--font-mono); font-size: 0.9em; }
 
 /* Card-lens item list (e.g. business-risk mitigation steps + main risk). */
 .mitigation-list {
@@ -276,8 +353,8 @@ main.container {
 }
 
 .verdict-icon { font-size: 28px; flex-shrink: 0; }
-.verdict-text { font-size: 18px; font-weight: 600; }
-.verdict-detail { font-size: 13px; color: var(--text-secondary); margin-left: auto; }
+.verdict-text { font-size: 18px; font-weight: 600; flex: 0 0 auto; }
+.verdict-detail { font-size: 13px; color: var(--text-secondary); flex: 1 1 auto; margin-left: 20px; max-width: 70ch; line-height: 1.5; }
 
 /* ===== Cards ===== */
 .card {

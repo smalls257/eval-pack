@@ -55,20 +55,24 @@
       </div>
     </section>
 
-    <!-- Highlights: completion status + confidence. display:'card' lenses (e.g. business-risk)
-         are injected here at render time by renderLensCards. -->
-    <div class="highlights-row" id="highlights-row">
-      <div class="highlight-card completion-card" id="completion-card">
+    <!-- Highlights: the two rich verdicts (completion + confidence) render as wide hero cards;
+         the simpler display:'card' lenses (business-risk, sycophancy) and the ownership card
+         render as compact scorecard rows in #lens-list (injected at render time by
+         renderLensCards / renderOwnershipCard). Layout matches info density: rich text gets room,
+         at-a-glance levels stay compact. Long hero rationales clamp with a Show more expand. -->
+    <div class="verdict-hero" id="verdict-hero">
+      <div class="highlight-card vcard completion-card" id="completion-card">
         <div class="highlight-card-label">Completion</div>
         <div class="highlight-card-value" id="completion-value"></div>
         <div class="highlight-card-notes" id="completion-notes"></div>
       </div>
-      <div class="highlight-card confidence-card" id="confidence-card" style="display:none">
+      <div class="highlight-card vcard confidence-card" id="confidence-card" style="display:none">
         <div class="highlight-card-label">Confidence</div>
         <div class="highlight-card-value" id="confidence-value"></div>
         <div class="highlight-card-notes" id="confidence-notes"></div>
       </div>
     </div>
+    <div class="lens-list" id="lens-list"></div>
 
     <!-- Verdict-aggregation transparency line (core → final). Rendered here — after the
          always-present highlights row — so the aggregation math is auditable even when every
@@ -86,6 +90,7 @@
     <section class="card" id="stats-card">
       <h2 class="card-title">Session Metrics</h2>
       <div class="stats-row" id="stats-row"></div>
+      <p class="stats-note">Point-in-time snapshot of the coding session, captured <em>before</em> this eval pack was generated — it does <strong>not</strong> include the eval run itself (the lens and evaluator subagents) and may therefore read lower than Claude Code's live <code>/usage</code>. Per-model rows cover the main loop; subagent work is the combined <em>Subagent tokens</em> total.</p>
     </section>
 
     <!-- Session Timeline (always visible) -->

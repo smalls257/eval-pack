@@ -152,6 +152,9 @@ AGGREGATION_RULES = ("core", "min", "mean")
 # Allowed report themes.
 THEMES = ("dark", "light", "system")
 DISPLAY_MODES = ("card", "tab", "both")
+# A card-region lens renders either as a wide 'hero' card (room for a full rationale) or a compact
+# 'list' scorecard row. Default 'list'; a lens opts into 'hero' for a rich at-a-glance rationale.
+CARD_STYLES = ("hero", "list")
 
 # Model tiers a lens's subagent may be pinned to (cost/quality tuning). Mirrors the Agent
 # tool's model aliases; a lens with no model inherits the session model.
@@ -387,6 +390,9 @@ def validate(cfg):
             if isinstance(lens, dict) and "model" in lens and lens.get("model") not in LENS_MODELS:
                 errors.append("analysisLenses[{}]: model must be one of: {}".format(
                     i, ", ".join(repr(m) for m in LENS_MODELS)))
+            if isinstance(lens, dict) and "cardStyle" in lens and lens.get("cardStyle") not in CARD_STYLES:
+                errors.append("analysisLenses[{}]: cardStyle must be one of: {}".format(
+                    i, ", ".join(repr(m) for m in CARD_STYLES)))
     theme = cfg.get("defaultTheme")
     if theme is not None and theme not in THEMES:
         errors.append("defaultTheme: {!r} is not one of {}".format(theme, list(THEMES)))
