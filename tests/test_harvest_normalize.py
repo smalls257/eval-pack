@@ -41,5 +41,14 @@ class TestNormalize(unittest.TestCase):
         self.assertEqual(out[0]["message"]["content"], "Are you sure the HTML is the issue?")
         self.assertIn("[tool: Edit]", out[1]["message"]["content"])
 
+    def test_claude_session_keeps_real_turn_after_system_reminder(self):
+        lines = [
+            {"type": "user", "message": {"role": "user", "content": "<system-reminder>auto context</system-reminder>"}},
+            {"type": "user", "message": {"role": "user", "content": "<system-reminder>auto context</system-reminder>\n\nCan you also fix the login bug?"}},
+        ]
+        out = hn.claude_session_to_transcript(lines)
+        self.assertEqual(len(out), 1)
+        self.assertIn("fix the login bug", out[0]["message"]["content"])
+
 if __name__ == "__main__":
     unittest.main()

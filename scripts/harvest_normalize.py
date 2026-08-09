@@ -1,5 +1,7 @@
 """Pure transforms: source trajectories/dialogues -> eval-pack transcript lines. Stdlib only."""
 
+import re as _re
+
 _ROLE = {"system": "system", "user": "user", "ai": "assistant", "assistant": "assistant"}
 
 
@@ -31,8 +33,7 @@ def sycon_dialogue_to_transcript(input_messages, final_response):
     return lines
 
 
-import re as _re
-_NOISE = _re.compile(r"^\s*(<ide_opened_file>.*?</ide_opened_file>|<system-reminder>.*)\s*$", _re.DOTALL)
+_NOISE = _re.compile(r"^\s*(<ide_opened_file>.*?</ide_opened_file>|<system-reminder>.*?</system-reminder>)\s*$", _re.DOTALL)
 
 
 def _content_text(content):
