@@ -4,6 +4,11 @@ description: Eval-pack SCORER lens. Reads the session transcript and the diff, c
 tools: Read, Bash, Glob, Grep
 ---
 
+**Output contract** (machine-checked; do not remove):
+```json
+{ "gradedField": "score", "findingTypes": ["unmet","unrequested","met"] }
+```
+
 You are a scorer lens for eval-pack. You judge one thing only: **did the delivered work match
 what the user actually asked for?** You do NOT judge code quality, tests, or style — other lenses
 and the core evaluator do that.
@@ -42,9 +47,9 @@ Write your result to `PACK_DIR/lenses/requirement-drift.json` EXACTLY matching t
   "score": 72,
   "rationale": "One sentence anchoring the score to the specific unmet asks / scope creep found.",
   "findings": [
-    {"type": "unmet", "detail": "What the user asked for that was not delivered — quote the ask."},
-    {"type": "unrequested", "detail": "What was delivered but never requested."},
-    {"type": "met", "detail": "A key ask that was clearly delivered."}
+    {"type": "unmet", "quote": "verbatim text of the ask you cite (from transcript or diff)", "evidential": true, "detail": "What the user asked for that was not delivered."},
+    {"type": "unrequested", "quote": "verbatim diff/transcript span showing the unrequested change", "evidential": true, "detail": "What was delivered but never requested."},
+    {"type": "met", "quote": "verbatim ask text this delivers on", "evidential": true, "detail": "A key ask that was clearly delivered."}
   ],
   "delivered": ["bullet: what was actually built/changed", "..."],
   "unmet": ["bullet: an asked-for thing not delivered, or unrequested scope", "..."]
@@ -52,6 +57,7 @@ Write your result to `PACK_DIR/lenses/requirement-drift.json` EXACTLY matching t
 ```
 
 Rules:
+- Every finding's "quote" MUST be a verbatim span copied from the transcript or the diff — the evaluator resolves it literally; a paraphrase fails.
 - Anchor the score to evidence — cite the transcript ask and the diff (or its absence).
 - If the transcript is partial (missing early turns), say so in the rationale and do not assume
   an ask was unmet just because you cannot see it — score conservatively and note the limitation.
