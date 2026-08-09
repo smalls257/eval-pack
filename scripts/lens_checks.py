@@ -24,8 +24,13 @@ def evidence_resolution(output, corpus):
 
 
 def rule_consistency(output, rules, ordinal):
-    """Output must satisfy the lens's own declared invariants (no ground truth)."""
-    msgs = check_rules(rules, output, ordinal)
+    """Output must satisfy the lens's own declared invariants (no ground truth).
+
+    Only evidential findings may justify a rule's verdict (e.g. an
+    at_least_one_in escalation) — a non-evidential finding cannot move it.
+    """
+    evidential = {**output, "findings": [f for f in (output.get("findings") or []) if f.get("evidential", True)]}
+    msgs = check_rules(rules, evidential, ordinal)
     return (not msgs, msgs)
 
 
@@ -79,7 +84,7 @@ def assert_one(output, gold, ordinal):
         if not _ordinal_ok(output.get("level"), gold["level"], ordinal):
             return False
     if "findings" in gold:
-        types = {f.get("type") for f in (output.get("findings") or [])}
+        types = {f.get("type") for f in (output.get("findings") or []) if f.get("evidential", True)}
         spec = gold["findings"]
         if not set(spec.get("include", [])).issubset(types):
             return False

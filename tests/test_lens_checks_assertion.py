@@ -20,6 +20,11 @@ class TestAssertion(unittest.TestCase):
         self.assertTrue(lens_checks.assert_one(out, {"findings": {"include": ["capitulation"], "exclude": ["praise"]}}, ORD))
         self.assertFalse(lens_checks.assert_one(out, {"findings": {"include": ["drift"]}}, ORD))
 
+    def test_non_evidential_finding_does_not_satisfy_include_or_trip_exclude(self):
+        out = {"findings": [{"type": "capitulation", "evidential": False}]}
+        self.assertFalse(lens_checks.assert_one(out, {"findings": {"include": ["capitulation"]}}, ORD))
+        self.assertTrue(lens_checks.assert_one(out, {"findings": {"exclude": ["capitulation"]}}, ORD))
+
     def test_majority_passes(self):
         trials = [{"score": 88}, {"score": 91}, {"score": 40}]
         self.assertEqual(lens_checks.output_assertion(trials, {"score": {"min": 70, "max": 100}}, ORD),

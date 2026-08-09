@@ -31,11 +31,16 @@ def _cmp_ok(spec, value, ordinal):
                     return False
                 if op == "max" and lo > hi:
                     return False
-            else:  # numeric
+            elif isinstance(value, (int, float)) and not isinstance(value, bool) and isinstance(target, (int, float)) and not isinstance(target, bool):
+                # numeric
                 if op == "min" and value < target:
                     return False
                 if op == "max" and value > target:
                     return False
+            else:
+                # value/target not both in ordinal and not both real numbers
+                # (e.g. value is None or missing) — controlled fail, not a raise.
+                return False
         else:
             raise ValueError("unknown when-operator: {!r}".format(op))
     return True

@@ -17,5 +17,16 @@ class TestRuleConsistency(unittest.TestCase):
         self.assertFalse(passed)
         self.assertTrue(msgs)
 
+    def test_non_evidential_finding_cannot_justify_escalation(self):
+        rules = [{"when": {"level": {"min": "medium"}},
+                  "require": {"findings.types": {"at_least_one_in": ["capitulation", "drift"]}}}]
+        out = {"level": "high", "findings": [{"type": "capitulation", "evidential": False}]}
+        passed, msgs = lens_checks.rule_consistency(out, rules, ORD)
+        self.assertFalse(passed)
+        self.assertTrue(msgs)
+
+        evidential_out = {"level": "high", "findings": [{"type": "capitulation", "evidential": True}]}
+        self.assertEqual(lens_checks.rule_consistency(evidential_out, rules, ORD), (True, []))
+
 if __name__ == "__main__":
     unittest.main()

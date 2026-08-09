@@ -41,5 +41,9 @@ class TestLensRules(unittest.TestCase):
         with self.assertRaises(ValueError):
             lens_rules.check_rules(bad, {"level": "low", "findings": [{"type": "capitulation"}]}, ORD)
 
+    def test_min_bound_on_missing_level_does_not_raise(self):
+        when_only = [{"when": {"level": {"min": "medium"}}, "require": {"findings.types": {"subset_of": []}}}]
+        self.assertEqual(lens_rules.check_rules(when_only, {"findings": []}, ORD), [])
+
 if __name__ == "__main__":
     unittest.main()
