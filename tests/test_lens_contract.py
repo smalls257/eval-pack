@@ -34,5 +34,19 @@ class TestLensContract(unittest.TestCase):
     def test_level_not_in_ordinal(self):
         self.assertTrue(lens_contract.validate_output({"level": "extreme", "findings": []}, LEVEL_C))
 
+    def test_score_rejects_bool(self):
+        self.assertTrue(lens_contract.validate_output({"score": True, "findings": []}, SCORE_C))
+
+    def test_findings_unchecked_when_no_findingTypes(self):
+        # a contract without findingTypes must not flag findings that lack a 'type'
+        c = {"gradedField": "score"}
+        out = {"score": 80, "findings": [{"claim": "x", "backed": True, "evidence": "cmd"}]}
+        self.assertEqual(lens_contract.validate_output(out, c), [])
+
+    def test_findings_checked_when_findingTypes_present(self):
+        c = {"gradedField": "score", "findingTypes": ["met"]}
+        out = {"score": 80, "findings": [{"claim": "x"}]}  # no 'type' -> violation
+        self.assertTrue(lens_contract.validate_output(out, c))
+
 if __name__ == "__main__":
     unittest.main()
