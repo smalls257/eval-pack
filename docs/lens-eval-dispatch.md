@@ -2,10 +2,18 @@
 
 The lens evaluator has two modes. **The CI gate is deterministic and offline**: it replays the
 committed `trials/` through the pure engine (`tests/test_real_bundles_e2e.py` →
-`eval_lenses.evaluate_bundle`). **This runbook is the other mode** — the *live measurement loop* that
-dispatches the real lens to produce fresh trials. It needs a live LLM, so it is a documented
-procedure, not a unit test. Run it when a lens prompt changes, to see whether the current lens still
-scores its gold fixtures correctly.
+`eval_lenses.evaluate_bundle`) as a regression check — it does not measure a fresh distribution.
+**This runbook is the other mode** — the *live measurement loop* that dispatches the real lens to
+produce fresh trials. It needs a live LLM, so it is a documented procedure, not a unit test. Run it
+when a lens prompt changes, to see whether the current lens still scores its gold fixtures correctly.
+
+**Committed trials are N=1, not N=3.** The bundles that ship today commit one representative trial
+per fixture. The N=3 "run several, look at the distribution" behavior below — and the `(flaky)`
+non-unanimous signal it produces — are properties of the *live* dispatch loop: you cannot get a
+fresh distribution by replaying fixed, already-recorded trials. Committing all N trials is optional;
+the offline gate simply replays however many trials are present in `trials/<case>/`. With a single
+committed trial, the `≥2/3` rule in step 4 degenerates to "the representative trial passed" — that's
+the intended regression semantics of the offline gate, not a statistical claim about flakiness.
 
 ## What a bundle is
 
@@ -24,7 +32,8 @@ tests/lenses/<lens>/
 ## Live dispatch — regenerate `trials/`
 
 For each fixture, dispatch the lens **N=3 times** (Schmid's "run several, look at the distribution")
-and collect each output as a trial.
+and collect each output as a trial. N=3 is the live-loop recommendation for measuring a distribution;
+committing all three to `trials/` is optional — the offline gate replays whatever subset you commit.
 
 1. **Load the fixture.** For a diff-needing lens (e.g. `requirement-drift`):
 
@@ -59,9 +68,11 @@ and collect each output as a trial.
    print(report["passed"], report["checks"], report["fixtures"])
    ```
 
-   A fixture passes when ≥2/3 trials meet its gold assertion, every evidential finding's quote
-   resolves, and the output obeys the lens's declared `rules`. The bundle passes when all fixtures
-   pass and the per-bundle checks (reference-resolution, claim-coverage) pass.
+   A fixture passes when ≥2/3 of its trials meet its gold assertion, every evidential finding's
+   quote resolves, and the output obeys the lens's declared `rules`. This ratio applies to however
+   many trials are present — with the single trial the shipped bundles commit, it degenerates to
+   "the representative trial passed." The bundle passes when all fixtures pass and the per-bundle
+   checks (reference-resolution, claim-coverage) pass.
 
 5. **Commit** the refreshed `trials/` once the bundle passes. The offline gate now replays them.
 
