@@ -16,7 +16,21 @@ def _read_json(p):
 
 
 def _corpus(fixture_dir):
-    text = (fixture_dir / "transcript.jsonl").read_text(encoding="utf-8")
+    parts = []
+    for line in (fixture_dir / "transcript.jsonl").read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            d = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        content = (d.get("message") or {}).get("content")
+        if isinstance(content, str):
+            parts.append(content)
+        elif isinstance(content, list):
+            parts.append(" ".join(b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text"))
+    text = "\n".join(parts)
     patch = fixture_dir / "delivered.patch"
     if patch.is_file():
         text += "\n" + patch.read_text(encoding="utf-8")
@@ -30,6 +44,7 @@ def evaluate_bundle(bundle_dir, trials_dir, contract):
     gold = _read_json(bundle_dir / "gold.json")
     ordinal = contract.get("levelOrdinal") or []
     fkey = contract.get("findingsKey", "findings")
+    tfield = contract.get("typeField", "type")
     fixture_ids = set(gold.keys())
 
     checks = {
@@ -43,7 +58,7 @@ def evaluate_bundle(bundle_dir, trials_dir, contract):
         corpus = _corpus(fixdir)
         trials = [_read_json(p) for p in sorted((trials_dir / fid).glob("trial-*.json"))]
         ev = [evidence_resolution(t, corpus, findings_key=fkey) for t in trials]
-        rc = [rule_consistency(t, basis.get("rules", []), ordinal, findings_key=fkey) for t in trials]
+        rc = [rule_consistency(t, basis.get("rules", []), ordinal, findings_key=fkey, type_field=tfield) for t in trials]
         oa = output_assertion(trials, gold[fid], ordinal, findings_key=fkey)
         fixtures[fid] = {
             "evidence_ok": all(p for p, _ in ev),
