@@ -32,5 +32,20 @@ class TestEvalLenses(unittest.TestCase):
         self._write_trials("clean-case", [clean, clean, clean])
         self.assertFalse(eval_lenses.evaluate_bundle(BUNDLE, self.tmp, CONTRACT)["passed"])
 
+    def test_bundle_with_items_adapter(self):
+        # a fabricated items/kind lens bundle passes when evidence + level line up
+        import tempfile, shutil
+        base = Path(tempfile.mkdtemp()); self.addCleanup(lambda: shutil.rmtree(base, ignore_errors=True))
+        bundle = base / "own"; (bundle / "fixtures" / "c1").mkdir(parents=True); (bundle / "lenses").mkdir(exist_ok=True)
+        (bundle / "basis.md").write_text('```json\n{"sources": [], "claims": [{"id":"c","covers":["c1"]}], "rules": []}\n```')
+        (bundle / "provenance.json").write_text("{}")
+        (bundle / "gold.json").write_text('{"c1": {"level": {"min": "medium"}}}')
+        (bundle / "fixtures" / "c1" / "transcript.jsonl").write_text('{"type":"user","message":{"role":"user","content":"Are you sure?"}}\n')
+        trials = base / "tr" / "c1"; trials.mkdir(parents=True)
+        (trials / "trial-0.json").write_text('{"level":"high","items":[{"kind":"strength","quote":"Are you sure?","evidential":true}]}')
+        C = {"gradedField":"level","levelOrdinal":["low","medium","high"],"findingsKey":"items","typeField":"kind","findingTypes":["strength","improvement"]}
+        r = eval_lenses.evaluate_bundle(bundle, base / "tr", C)
+        self.assertTrue(r["passed"], r)
+
 if __name__ == "__main__":
     unittest.main()

@@ -29,6 +29,7 @@ def evaluate_bundle(bundle_dir, trials_dir, contract):
     ledger = _read_json(bundle_dir / "provenance.json")
     gold = _read_json(bundle_dir / "gold.json")
     ordinal = contract.get("levelOrdinal") or []
+    fkey = contract.get("findingsKey", "findings")
     fixture_ids = set(gold.keys())
 
     checks = {
@@ -41,9 +42,9 @@ def evaluate_bundle(bundle_dir, trials_dir, contract):
         fixdir = bundle_dir / "fixtures" / fid
         corpus = _corpus(fixdir)
         trials = [_read_json(p) for p in sorted((trials_dir / fid).glob("trial-*.json"))]
-        ev = [evidence_resolution(t, corpus) for t in trials]
-        rc = [rule_consistency(t, basis.get("rules", []), ordinal) for t in trials]
-        oa = output_assertion(trials, gold[fid], ordinal)
+        ev = [evidence_resolution(t, corpus, findings_key=fkey) for t in trials]
+        rc = [rule_consistency(t, basis.get("rules", []), ordinal, findings_key=fkey) for t in trials]
+        oa = output_assertion(trials, gold[fid], ordinal, findings_key=fkey)
         fixtures[fid] = {
             "evidence_ok": all(p for p, _ in ev),
             "rules_ok": all(p for p, _ in rc),
