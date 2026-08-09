@@ -40,3 +40,20 @@ def reference_resolution(sources, ledger):
         elif _norm(entry.get("title")).lower() != _norm(s.get("title")).lower():
             msgs.append("source {!r} title mismatch vs ledger".format(sid))
     return (not msgs, msgs)
+
+
+def claim_coverage(claims, fixture_ids):
+    """No-op test: every claim exercised by a real fixture; every fixture backs a claim."""
+    msgs = []
+    covered = set()
+    for c in claims:
+        covers = c.get("covers") or []
+        if not covers:
+            msgs.append("claim {!r} covers no fixture (no-op — delete or add a fixture)".format(c.get("id")))
+        for fid in covers:
+            if fid not in fixture_ids:
+                msgs.append("claim {!r} covers unknown fixture {!r}".format(c.get("id"), fid))
+            covered.add(fid)
+    for fid in set(fixture_ids) - covered:
+        msgs.append("fixture {!r} backs no claim".format(fid))
+    return (not msgs, msgs)
