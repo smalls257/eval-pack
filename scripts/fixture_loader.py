@@ -7,12 +7,18 @@ from pathlib import Path
 
 
 def _git(repo, *args):
-    subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, check=True)
+    cmd = ["git", "-C", str(repo), *args]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"command failed ({result.returncode}): {' '.join(cmd)}\n{result.stderr}"
+        )
+    return result
 
 
 @contextlib.contextmanager
 def load_fixture(fixture_dir):
-    fixture_dir = Path(fixture_dir)
+    fixture_dir = Path(fixture_dir).resolve()
     base = fixture_dir / "base"
     patch = fixture_dir / "delivered.patch"
     if not (base.is_dir() and patch.is_file()):
