@@ -19,9 +19,11 @@ def validate_output(output, contract):
 
     if "findingTypes" in contract:
         allowed = set(contract.get("findingTypes") or [])
-        for i, f in enumerate(output.get("findings") or []):
-            if f.get("type") not in allowed:
-                v.append("finding[{}] type {!r} not in {}".format(i, f.get("type"), sorted(allowed)))
+        fkey = contract.get("findingsKey", "findings")
+        tfield = contract.get("typeField", "type")
+        for i, f in enumerate(output.get(fkey) or []):
+            if f.get(tfield) not in allowed:
+                v.append("{}[{}] {} {!r} not in {}".format(fkey, i, tfield, f.get(tfield), sorted(allowed)))
             if f.get("evidential", True) and not (f.get("quote") or "").strip():
-                v.append("finding[{}] is evidential but has no quote".format(i))
+                v.append("{}[{}] is evidential but has no quote".format(fkey, i))
     return v
