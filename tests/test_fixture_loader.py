@@ -37,7 +37,13 @@ class TestFixtureLoader(unittest.TestCase):
         (self.tmp / "delivered.patch").write_text(patch)
         (self.tmp / "transcript.jsonl").write_text('{"type":"user"}\n')
 
-        relative_fixture_dir = Path(os.path.relpath(self.tmp))
+        # A relative path only exists when tmp and cwd share a drive. On Windows CI the system
+        # temp dir (C:) and the checkout (D:) are on different mounts, so os.path.relpath raises —
+        # there is nothing to test there, so skip rather than fail.
+        try:
+            relative_fixture_dir = Path(os.path.relpath(self.tmp))
+        except ValueError:
+            self.skipTest("temp dir and cwd are on different drives; no relative path to exercise")
         with fixture_loader.load_fixture(relative_fixture_dir) as (pack, repo, diff_base):
             self.assertIsNotNone(repo)
             self.assertTrue(diff_base)
