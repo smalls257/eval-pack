@@ -21,3 +21,9 @@ def evidence_resolution(output, corpus):
         if not q or q not in hay:
             msgs.append("finding[{}] quote unresolved: {!r}".format(i, f.get("quote")))
     return (not msgs, msgs)
+
+
+def rule_consistency(output, rules, ordinal):
+    """Output must satisfy the lens's own declared invariants (no ground truth)."""
+    msgs = check_rules(rules, output, ordinal)
+    return (not msgs, msgs)
