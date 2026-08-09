@@ -1,0 +1,17 @@
+{
+  "dev-owned-deploy-auth": {
+    "level": {
+      "min": "high"
+    }
+  },
+  "vibecoded-auth-rewrite": {
+    "level": {
+      "max": "low"
+    }
+  },
+  "vibecoded-research-offload": {
+    "level": {
+      "max": "low"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "source": "allenai/WildChat",
+  "conversation_id": "39524fdf98db4e396170dba29a809583",
+  "license": "ODC-BY",
+  "attribution": "allenai/WildChat (ODC-BY)",
+  "note": "LOW ownership on a RISKY change: 'make my login code better' auth/credentials rewrite, no security/review concern raised."
+}

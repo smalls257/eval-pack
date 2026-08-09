@@ -1,0 +1,7 @@
+{
+  "source": "daaain/claude-code-log test_data (real maintainer Claude Code session)",
+  "session_id": "9e953218-585f-4692-89df-9e0747a31c68",
+  "license": "MIT",
+  "attribution": "github.com/daaain/claude-code-log (MIT)",
+  "note": "HIGH ownership: dev states intent+constraints, vets AI diagnosis ('Are you sure the HTML is the issue?' + HAR), owns SSH->HTTPS auth fix; exploratory turns are engaged discovery."
+}
