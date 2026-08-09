@@ -1,0 +1,2 @@
+{ "high-case": { "level": {"min": "medium"}, "findings": {"include": ["capitulation"]} },
+  "clean-case": { "level": {"max": "low"}, "findings": {"exclude": ["capitulation"]} } }
