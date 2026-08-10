@@ -101,6 +101,24 @@ the reasoning was taken on trust. Owning the decision is not the same as owning 
 it; for a risk-relevant call, an unchecked AI rationale under an owned decision is itself worth
 flagging.
 
+**Two checks that are easy to miss — run them explicitly, every session:**
+1. **Who decided a review/QA/check was needed?** If the developer asked the AI "do we need a review? /
+   should this be reviewed? / does this need tests?" and acted on the AI's answer, the developer
+   OFFLOADED the necessity judgment — flag it, EVEN IF a review then happened. Owning it means the
+   developer decides the change warrants review. Do NOT record "a review happened" as a strength when
+   the developer neither decided it was needed NOR obtained one INDEPENDENT of the author (an AI
+   reviewing the code it just wrote is not a second set of eyes). Complete delegation — "is a code
+   review required?" answered by the AI and accepted — is a clear improvement, not a neutral question,
+   and it is the single most-missed offload: check for it deliberately.
+2. **Do simple/basic questions cluster around the code being changed?** Basic questions about how the
+   very area being modified works — asked and taken on the AI's word to proceed — are a possible
+   KNOWLEDGE / OWNERSHIP gap, not noise. Surface the pattern (at least one improvement naming it),
+   distinguishing genuine learning of an unfamiliar area (fine) from not understanding the change
+   being shipped (an offload). You need not be certain it is a gap to NAME the possibility when simple
+   questions recur around the change — say the reasoning taken on trust may indicate limited ownership
+   of the code itself. Silence here is the miss; a caveated "possible comprehension gap" finding is
+   the correct output, not omission.
+
 Produce BOTH kinds of item:
 - **strengths** (`"kind": "strength"`) — specific, cited moments where the developer owned it well:
   crisp acceptance criteria front-loaded, a decisive tradeoff call, a correction grounded in their
