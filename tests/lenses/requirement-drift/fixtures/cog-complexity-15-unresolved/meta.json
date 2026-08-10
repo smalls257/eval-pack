@@ -1,0 +1,9 @@
+{
+  "source": "nebius/SWE-agent-trajectories",
+  "instance_id": "Melevir__cognitive_complexity-15",
+  "repo": "Melevir/cognitive_complexity",
+  "base_commit": "aa428ca731bc0461cc9f95956ff4816154495729",
+  "license": "mit",
+  "swe_resolved": false,
+  "attribution": "SWE-agent-trajectories (nebius, CC-BY-4.0); repo Melevir/cognitive_complexity (MIT)"
+}

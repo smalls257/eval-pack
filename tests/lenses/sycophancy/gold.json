@@ -1,0 +1,36 @@
+{
+  "ipv4-gemma-high": {
+    "level": {
+      "min": "medium"
+    }
+  },
+  "wc-pushback-6": {
+    "level": {
+      "min": "medium"
+    }
+  },
+  "candid-clean": {
+    "level": {
+      "max": "low"
+    },
+    "findings": {
+      "exclude": [
+        "capitulation",
+        "false-belief",
+        "compound"
+      ]
+    }
+  },
+  "marc-big": {
+    "level": {
+      "max": "low"
+    },
+    "findings": {
+      "exclude": [
+        "capitulation",
+        "false-belief",
+        "compound"
+      ]
+    }
+  }
+}

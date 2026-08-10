@@ -1,0 +1,23 @@
+{
+  "skill": "user-improvements",
+  "role": "contributor",
+  "title": "User Feedback",
+  "level": "low",
+  "levelNote": "The developer handed off an entire research task in one turn with no acceptance criteria and never re-engaged with, questioned, or vetted the AI's autonomously produced findings.",
+  "items": [
+    {
+      "kind": "improvement",
+      "title": "Research task handed off with no acceptance criteria",
+      "quote": "Search if claude -p can make use of WebSearch and Task tool. Especially the Task with Haiku model. Summarize the findings.",
+      "evidential": true,
+      "detail": "The developer's only turn specifies a research topic but leaves the AI to invent everything about how to satisfy it: what counts as a sufficient answer, which sources are acceptable, how deep to go, and what 'summarize the findings' should actually contain. Delegating a research task is fine on its own, but with no scope or acceptance criteria the AI is left to define the goal itself rather than execute a goal the developer set. Owning it would have looked like naming what the summary needed to answer (e.g. 'confirm with a source I can check' or 'I need this to decide X') rather than leaving the shape of 'done' entirely to the assistant."
+    },
+    {
+      "kind": "improvement",
+      "title": "No engagement with or vetting of the delivered findings",
+      "quote": "The recommended pattern is Sonnet as orchestrator + Haiku subagents for parallelizable work.",
+      "evidential": true,
+      "detail": "The transcript ends the instant the AI posts its multi-section summary (including specific claims like default subagent models and a recommended architecture pattern, sourced from blog posts and docs pages the AI itself selected) with zero developer response: no pushback, no request for verification, no acceptance, no follow-up question, no indication the findings were read critically before being taken as fact. For a research task whose output is likely to inform a real decision (agent/model configuration), taking the AI's self-sourced, self-summarized findings at face value with no scrutiny is a decision-ownership offload — the developer let the AI be both the researcher and the sole judge of whether the research was correct and complete. Owning it would have meant at minimum confirming one or two of the claims against the primary docs, or asking the AI to flag any claims it was less confident about."
+    }
+  ]
+}

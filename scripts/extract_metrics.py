@@ -85,6 +85,31 @@ def extract_subagent_tokens(entries, token_field_re=DEFAULT_TOKEN_FIELD_RE):
     return total, by_model
 
 
+def _usage_dedupe_key(entry):
+    """Identity of the API request an assistant entry belongs to. Claude Code writes several
+    streamed JSONL lines per request that share this key; we keep only the last. Prefer requestId,
+    fall back to the message id, and last-resort a unique object id (so an entry with neither key is
+    never merged into another)."""
+    rid = entry.get("requestId") or entry.get("request_id")
+    if rid:
+        return ("req", rid)
+    mid = (entry.get("message") or {}).get("id")
+    if mid:
+        return ("msg", mid)
+    return ("obj", id(entry))
+
+
+def dedupe_usage_entries(entries):
+    """Keep the LAST usage-bearing entry per request (ccusage 'last-entry-wins by requestId'), so
+    the intermediate streaming snapshots — same cache/input, growing output — are not summed. Order
+    is preserved (dict keeps first-seen position, value updated to the last entry)."""
+    last = {}
+    for e in entries:
+        if get_usage(e):
+            last[_usage_dedupe_key(e)] = e
+    return list(last.values())
+
+
 def main():
     parser = argparse.ArgumentParser(description="Extract session metrics from transcript")
     parser.add_argument("transcript_file", type=Path)
@@ -133,10 +158,17 @@ def main():
             model = m
             break
 
-    input_tokens = sum((get_usage(e).get("input_tokens") or 0) for e in assistant_entries)
-    output_tokens = sum((get_usage(e).get("output_tokens") or 0) for e in assistant_entries)
-    cache_read_tokens = sum((get_usage(e).get("cache_read_input_tokens") or 0) for e in assistant_entries)
-    cache_write_tokens = sum((get_usage(e).get("cache_creation_input_tokens") or 0) for e in assistant_entries)
+    # Claude Code streams one API request across several JSONL lines that SHARE a requestId: each
+    # carries the same cache/input counts and a GROWING output_tokens, and only the LAST line holds
+    # the final totals. Summing every line double-counts (~2x, cache/output-heavy). Keep the last
+    # entry per requestId (fallback message.id) before summing — the ccusage 'last-entry-wins by
+    # requestId' approach — so the numbers match Claude Code's own /cost accounting.
+    billable_entries = dedupe_usage_entries(assistant_entries)
+
+    input_tokens = sum((get_usage(e).get("input_tokens") or 0) for e in billable_entries)
+    output_tokens = sum((get_usage(e).get("output_tokens") or 0) for e in billable_entries)
+    cache_read_tokens = sum((get_usage(e).get("cache_read_input_tokens") or 0) for e in billable_entries)
+    cache_write_tokens = sum((get_usage(e).get("cache_creation_input_tokens") or 0) for e in billable_entries)
     total_tokens = input_tokens + output_tokens + cache_read_tokens + cache_write_tokens
 
     timestamps = [e.get("timestamp") for e in entries if e.get("timestamp")]
@@ -147,7 +179,7 @@ def main():
         "inputTokens": 0, "outputTokens": 0,
         "cacheReadTokens": 0, "cacheWriteTokens": 0,
     })
-    for e in assistant_entries:
+    for e in billable_entries:
         m = get_model(e) or "unknown"
         if m == "<synthetic>":
             continue

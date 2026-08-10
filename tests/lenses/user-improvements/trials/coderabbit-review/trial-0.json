@@ -1,0 +1,58 @@
+{
+  "skill": "user-improvements",
+  "role": "contributor",
+  "title": "User Feedback",
+  "level": "medium",
+  "levelNote": "The developer front-loaded sharp, evidence-backed bug reports and caught a real mistake (test.md) on their own, but twice accepted AI output at face value without follow-up scrutiny: a silently-collapsed commit plan and an unverified PR checklist.",
+  "items": [
+    {
+      "kind": "strength",
+      "title": "Precise initial ask with evidence",
+      "quote": "can you please update @extract-coderabbit-feedback.py so that the contents of <details> get filtered out? See @test.md for current output",
+      "evidential": true,
+      "detail": "The opening request names the exact file to change, the exact behavior to remove (<details> content), and points to a concrete output artifact (test.md) as evidence of the current bad state. This is intent ownership done well: a scoped goal grounded in observed output, not a vague 'clean this up'."
+    },
+    {
+      "kind": "strength",
+      "title": "Root-caused the 'Lines 0' bug and specified the fix behavior",
+      "quote": "I s'pose we should be grouping feedback by file and correctly printing line numbers, and the omitting the Lines: n bit if we can't find line numbers in the feedback",
+      "evidential": true,
+      "detail": "Rather than just reporting the symptom ('Lines 0' looks wrong, file count is wrong), the developer specified the desired behavior for the edge case (omit the 'Lines: n' prefix when no line number can be found) before the AI touched any code. This is acceptance-criteria ownership, not just bug spotting."
+    },
+    {
+      "kind": "strength",
+      "title": "Independently caught test.md before it was committed",
+      "quote": "I removed test.md as it shouldn't be committed, please go ahead with creating the branch and commits (but don't push)",
+      "evidential": true,
+      "detail": "The AI's atomic-commit plan never flagged that test.md (a local output artifact opened in the IDE throughout the session) risked being swept into a commit. The developer caught and fixed this themselves, on their own judgment, before authorizing the commit step -- a concrete example of scrutinizing the situation rather than trusting the AI's plan to have covered it."
+    },
+    {
+      "kind": "strength",
+      "title": "Pushed back on the AI's incorrect explanation with API-level evidence",
+      "quote": "So it should be possible to attribute even if the comment body doesn't have it. Can you please investigate and propose a solution?",
+      "evidential": true,
+      "detail": "After the AI claimed a specific comment was correctly filtered as expected behavior, the developer supplied the exact file path and line range from the GitHub UI to demonstrate that attribution should have been possible from API data alone, and demanded the AI re-investigate rather than accepting the prior explanation. This is real vetting -- challenging a claim with independent evidence instead of taking it at face value. The follow-up investigation (message 46) confirmed the AI's earlier explanation had in fact been wrong."
+    },
+    {
+      "kind": "strength",
+      "title": "Contributed a debugging hypothesis instead of just handing off the bug",
+      "quote": "Weird that it's in a quote block, maybe that's what's breaking it?",
+      "evidential": true,
+      "detail": "While reporting the missing 'Outside diff range comments' issue, the developer offered their own technical hypothesis (blockquote markup breaking the parser) grounded in the raw GitHub markdown they pasted. This is healthy rubber-ducking/collaboration: engaging with the problem's mechanics rather than only describing symptoms and waiting for the AI to diagnose everything unaided. The eventual root cause (HTML-escaped '>' blockquote markers) confirmed the instinct was on the right track."
+    },
+    {
+      "kind": "improvement",
+      "title": "Approved a 6-commit atomic plan, then rubber-stamped a 3-commit result without checking the deviation",
+      "quote": "Amazing!",
+      "evidential": true,
+      "detail": "The developer approved a detailed 6-commit atomic breakdown ('please go ahead with creating the branch and commits (but don't push)'). During execution the AI unilaterally decided to collapse this into a single combined commit plus two extras ('Since the changes to extract-coderabbit-feedback.py include auto-formatting along with functional changes, I'll commit the main script changes together with a comprehensive commit message'), producing 3 commits instead of the agreed 6. The developer's next message was an unqualified 'Amazing!' with no indication they reviewed `git log` or the diff to confirm the actual commit structure matched what was approved. Owning this would have meant glancing at `git log --stat` (which the AI itself offered as a command) before treating the deviation as settled, especially since the developer explicitly cared about commit granularity ('divide the changes to atomic commits')."
+    },
+    {
+      "kind": "improvement",
+      "title": "Accepted a self-certified PR checklist without verification",
+      "quote": "I have added appropriate error handling",
+      "evidential": true,
+      "detail": "When asked to fill in the PR template, the AI checked boxes asserting 'My code follows the repository's style guidelines', 'I have added appropriate error handling', and 'I have added or updated documentation as needed' -- none of which were substantiated by anything shown earlier in the session (no lint run, no error-handling review, no documentation changes). The developer never questioned these claims in the following turns before presumably using the template as-is for the PR. Owning this would have meant either asking the AI to justify each checked box against the actual diff, or unchecking claims that weren't actually verified during the session, rather than letting the AI self-certify a document meant to represent due diligence to reviewers."
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "skill": "user-improvements",
+  "role": "contributor",
+  "title": "User Feedback",
+  "level": "high",
+  "levelNote": "The developer front-loaded intent and constraints, vetted the AI's diagnosis with concrete evidence, and personally diagnosed and owned the SSH-to-HTTPS auth fix rather than accepting the AI's account at face value.",
+  "items": [
+    {
+      "kind": "strength",
+      "title": "Stated goal, constraint, and acceptance criteria up front",
+      "quote": "Would I be able to redirect so the old URL doesn't break?",
+      "evidential": true,
+      "detail": "Before any restructuring work began, the developer named the acceptance criterion that mattered to them (no broken old URL) alongside their deployment constraint (Vercel), rather than leaving the AI to infer what 'done' meant. This let the AI plan the redirect work against a concrete requirement instead of guessing."
+    },
+    {
+      "kind": "strength",
+      "title": "Vetted the AI's diagnosis instead of accepting it at face value",
+      "quote": "Are you sure the HTML is the issue? That's the only thing that actually loaded, I could see the page, but without styling and JS.",
+      "evidential": true,
+      "detail": "When the AI claimed 'The issue is in the HTML' (after the first path-fix attempt still failed), the developer pushed back with their own observation of what actually rendered and attached the full HAR file as supporting evidence, rather than trusting the assistant's assertion. This is exactly the vetting behaviour the fairness rule calls out as a core strength: challenging the AI's claim and demanding evidence forced a correct diagnosis (the CSS/JS 404s, not the HTML) instead of chasing the AI's first, wrong theory."
+    },
+    {
+      "kind": "strength",
+      "title": "Diagnosed and owned the SSH-to-HTTPS submodule auth fix",
+      "quote": "This is annoying, maybe we should use the https repo address?",
+      "evidential": true,
+      "detail": "After the Vercel build log showed 'Host key verification failed' / 'fatal: Could not read from remote repository' when cloning the SSH submodule URL, the developer read the raw log themselves, correctly identified that Vercel's build environment lacked SSH credentials, and proposed the concrete fix (switch the submodule remote to HTTPS) rather than just pasting the error and asking the AI to figure it out. The developer owned the root-cause call on a deployment-auth failure, with the AI executing the git commands to apply it."
+    },
+    {
+      "kind": "strength",
+      "title": "Identified a performance regression the AI's own fix introduced and drove the follow-up",
+      "quote": "Do you think we could set up rewrites for the JS and CSS? This basePath method does the job, but we end up with two failed requests for so it impacts page load times",
+      "evidential": true,
+      "detail": "After the dynamic <base> tag workaround was working functionally, the developer noticed on their own that it caused wasted failed requests and impacted page load, and proposed a specific, better-engineered alternative (explicit rewrites) rather than accepting 'it works' as good enough. This is engaged discovery and a real engineering judgment call the developer made themselves, not an offload."
+    }
+  ]
+}

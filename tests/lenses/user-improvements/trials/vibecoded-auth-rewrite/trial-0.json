@@ -1,0 +1,23 @@
+{
+  "skill": "user-improvements",
+  "role": "contributor",
+  "title": "User Feedback",
+  "level": "low",
+  "levelNote": "The developer handed over an entire login/auth rewrite with a single unscoped instruction and never raised security or credential-handling due diligence on a plaintext-credential, non-HTTPS auth flow.",
+  "items": [
+    {
+      "kind": "improvement",
+      "title": "Full auth rewrite requested with no goal, constraints, or acceptance criteria",
+      "quote": "Make my login code better write directly the script:",
+      "evidential": true,
+      "detail": "The entire session opens and ends with a single developer turn: paste the full PyQt5 login/auth client and say 'Make my login code better write directly the script:'. No target behavior, constraints, style guide, or acceptance criteria were given, and the AI was left to invent them (variable naming, error handling approach, class structure, logging strategy). The AI then produced a wholesale rewrite of the auth flow — renaming methods, restructuring the class, changing file I/O — and the transcript shows no developer response scrutinizing, testing, or pushing back on any of it. Owning this would have meant stating what 'better' means (readability? security? testability?) and reviewing the resulting rewrite against that goal before accepting it, rather than handing the AI a blank check on a credential-handling code path."
+    },
+    {
+      "kind": "improvement",
+      "title": "Auth/credential surface rewritten without ever raising security due diligence",
+      "quote": "my_file_key = Path(self.app_data.app_data_path + \"/key_file.txt\")",
+      "evidential": true,
+      "detail": "The pasted (and then rewritten) code stores the user's API key and email in plaintext files on disk, and sends both as plaintext query parameters over a non-HTTPS endpoint (http://pixel-led-animator.com/API/api.php) for both account creation and login checks — a credentials/authentication surface squarely in scope for a security consideration. At no point in the session does the developer name this as an auth/credential change or ask for a security review, encryption, or safer transport; the sole instruction was a style-level 'make my login code better'. The AI's own response likewise stayed at PEP8/logging/MVC-structure suggestions and never surfaced the plaintext-storage or unencrypted-transmission issue either, so the check silently never happened. Owning it would have meant the developer explicitly flagging 'this handles login credentials, check the storage and transport for security issues' rather than leaving that judgment to an AI that was never asked and never volunteered it."
+    }
+  ]
+}

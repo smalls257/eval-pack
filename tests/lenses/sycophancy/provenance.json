@@ -1,0 +1,14 @@
+{
+  "chandra-2026": {
+    "title": "Sycophantic Chatbots Cause Delusional Spiraling",
+    "authors": "Chandra et al.",
+    "date": "2026",
+    "resolved_at": "authored from the lens prompt's citation; NOT live-verified \u2014 run refresh_sources against arXiv to verify"
+  },
+  "syceval-2025": {
+    "title": "SycEval: Evaluating LLM Sycophancy",
+    "authors": "Fanous et al.",
+    "date": "2025",
+    "resolved_at": "authored from the lens prompt's citation; NOT live-verified"
+  }
+}

@@ -105,7 +105,15 @@ function renderPageHeader(data) {
   setText('header-stat-workspace-value', m.lastModel || '—');
   setText('header-stat-messages-value', m.turnCount != null ? m.turnCount : '—');
   setText('header-stat-files-value', m.filesChanged != null ? m.filesChanged : '—');
-  setText('header-stat-tokens-value', formatNumber((m.inputTokens || 0) + (m.outputTokens || 0) + (m.subagentTotalTokens || 0)));
+  // True total tokens = full main-loop accounting (input + output + cache) + subagent tokens.
+  // metrics.totalTokens already sums the main loop incl cache; add subagent on top. Fall back to
+  // input+output+cache if an older pack lacks totalTokens.
+  const grandTotalTokens =
+    (m.totalTokens != null
+      ? m.totalTokens
+      : (m.inputTokens || 0) + (m.outputTokens || 0) + (m.cacheReadTokens || 0) + (m.cacheWriteTokens || 0))
+    + (m.subagentTotalTokens || 0);
+  setText('header-stat-tokens-value', formatNumber(grandTotalTokens));
   setText('header-stat-branch-value', latestRound.gitBranch || '—');
 
   const genAt = document.getElementById('generated-at');
@@ -124,7 +132,7 @@ function renderHighlights(analysis, lenses) {
   const notes = document.getElementById('completion-notes');
   if (card && cs.label) {
     const color = /^(green|amber|red)$/.test(cs.color || '') ? cs.color : 'green';
-    card.className = `highlight-card completion-card completion-${color}`;
+    card.className = `highlight-card vcard completion-card completion-${color}`;
     if (val) val.innerHTML = html`<span class="completion-dot"></span>${cs.label}`;
     if (notes) notes.textContent = cs.notes || '';
   }
@@ -138,7 +146,7 @@ function renderHighlights(analysis, lenses) {
   if (confCard && pct != null) {
     const n = Math.max(0, Math.min(100, Number(pct) || 0));
     const tier = n >= 75 ? 'high' : n >= 40 ? 'mid' : 'low';
-    confCard.className = `highlight-card confidence-card confidence-${tier}`;
+    confCard.className = `highlight-card vcard confidence-card confidence-${tier}`;
     confCard.style.display = '';
     if (confVal) confVal.innerHTML =
       html`${n}%<div class="confidence-bar"><div class="confidence-bar-fill" style="width:${n}%"></div></div>`;
@@ -149,7 +157,10 @@ function renderHighlights(analysis, lenses) {
     confCard.style.display = 'none';
   }
   // business-risk no longer special-cased here: it renders via the generic display:'card'
-  // mechanism (config analysisLenses → lensCardsFrom → renderLensCards into #highlights-row).
+  // mechanism (config analysisLenses → lensCardsFrom → renderLensCards). Completion + Confidence
+  // are the always-hero verdicts; clamp long rationales with a Show more expand.
+  clampHero(card);
+  if (confCard && confCard.style.display !== 'none') clampHero(confCard);
 }
 
 function renderVerdict(data) {
@@ -218,6 +229,12 @@ function renderStats(data) {
         { label: 'Controller input',  value: formatNumber(m.inputTokens) },
         { label: 'Controller output', value: formatNumber(m.outputTokens) },
       ];
+  // Cache is real usage (prompt context re-read every turn) and usually the dominant share —
+  // it comes straight from each message's usage accounting. Surface it plus a true total so the
+  // headline numbers aren't silently input+output only.
+  if (m.cacheReadTokens)  tokenItems.push({ label: 'Cache read',  value: formatNumber(m.cacheReadTokens) });
+  if (m.cacheWriteTokens) tokenItems.push({ label: 'Cache write', value: formatNumber(m.cacheWriteTokens) });
+  if (m.totalTokens != null) tokenItems.push({ label: 'Total (incl cache)', value: formatNumber(m.totalTokens) });
   const subagentTokensByModel = Array.isArray(m.subagentTokensByModel) ? m.subagentTokensByModel : [];
   const subagentItems = subagentTokensByModel.length > 0
     ? subagentTokensByModel.map(r => ({ label: shortModelName(r.model), value: formatNumber(r.totalTokens) }))
@@ -831,7 +848,7 @@ function repoImprovementsFrom(lenses) {
 
 // Pure lookup: the user-improvements lens is a contributor named "user-improvements" in
 // data.lenses.contributors. Returns the whole contributor record (or null) rather than
-// just `.items`, so the User Feedback list reads from this one lookup (Airplane Test:
+// just `.items`, so the Developer Ownership list reads from this one lookup (Airplane Test:
 // an absent lens must yield null, not throw).
 function userImprovementsFrom(lenses) {
   const contributors = (lenses && lenses.contributors) || [];
@@ -1208,6 +1225,28 @@ function lensFindingText(f) {
   return String(f);
 }
 
+// A finding that carries teaching fields (consequence / guidance) renders as a rich block —
+// the quote, a "Why it matters" banner (the implication a reader might miss), and a "Do next"
+// banner (a concrete developer action). Findings without those fields fall back to one line.
+function lensFindingMarkup(f) {
+  if (!f || typeof f !== 'object' ||
+      (f.consequence == null && f.guidance == null && f.quote == null)) {
+    return html`<li>${lensFindingText(f)}</li>`;
+  }
+  const type = f.type || f.kind || '';
+  const detail = f.detail != null ? String(f.detail) : '';
+  const quote = f.quote || '';
+  const cons = f.consequence || '';
+  const guid = f.guidance || '';
+  return html`<li class="lens-finding-rich">` +
+    (type ? html`<span class="finding-type">${type}</span>` : '') +
+    (detail ? html`<div class="finding-detail">${detail}</div>` : '') +
+    (quote ? html`<blockquote class="finding-quote">${quote}</blockquote>` : '') +
+    (cons ? html`<div class="banner banner-why"><span class="banner-lbl">Why it matters</span> ${cons}</div>` : '') +
+    (guid ? html`<div class="banner banner-do"><span class="banner-lbl">Do next</span> ${guid}</div>` : '') +
+    '</li>';
+}
+
 // Resolve a dot-path into a lens record.
 function lensPath(obj, path) {
   return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
@@ -1323,6 +1362,7 @@ function lensCardsFrom(lenses) {
       level,
       note: record.rationale || record.notes || '',
       version: record.version,
+      cardStyle: record.cardStyle,
       record,
     };
   });
@@ -1347,13 +1387,20 @@ function lensCustomCard(rec, headExtra) {
 function lensContributorBody(rec) {
   const level = (typeof rec.level === 'string' && /^(low|medium|high)$/i.test(rec.level))
     ? rec.level.toLowerCase() : null;
-  // A lens that also renders a header card already shows this one-line note there — don't repeat it here.
-  const note = lensHasCard(rec) ? '' : (rec.rationale || rec.notes || '');
-  const findings = (rec.findings || []).map(f => html`<li>${lensFindingText(f)}</li>`).join('');
+  // A guidance-lens (declares requiresGuidance → carries a top-level `guidance`) shows the summary
+  // as a Why-it-matters / Do-next pair; other lenses keep the plain one-line note.
+  const hasGuidance = rec.guidance != null;
+  // A lens that also renders a header card already shows its one-line note there — don't repeat it.
+  const note = (lensHasCard(rec) || hasGuidance) ? '' : (rec.rationale || rec.notes || '');
+  const whyMatters = hasGuidance ? (rec.notes || '') : '';
+  const doNext = hasGuidance ? (rec.guidance || '') : '';
+  const findings = (rec.findings || []).map(f => lensFindingMarkup(f)).join('');
   const mitigation = (rec.mitigation || []).map(m => html`<li>${m}</li>`).join('');
   return '' +
     (level ? html`<div class="lens-level biz-risk-${level}">${level}</div>` : '') +
     (note ? html`<p class="lens-rationale">${note}</p>` : '') +
+    (whyMatters ? html`<div class="banner banner-why banner-summary"><span class="banner-lbl">Why it matters</span> ${whyMatters}</div>` : '') +
+    (doNext ? html`<div class="banner banner-do banner-summary"><span class="banner-lbl">Do next</span> ${doNext}</div>` : '') +
     (findings ? html`<ul class="lens-findings">${safe(findings)}</ul>` : '') +
     (mitigation ? html`<h5 class="lens-subhead">Mitigation</h5><ul class="mitigation-list">${safe(mitigation)}</ul>` : '') +
     (rec.mainRisk ? html`<p class="lens-mainrisk"><strong>Main risk:</strong> ${rec.mainRisk}</p>` : '');
@@ -1391,21 +1438,77 @@ function lensCardMarkup(tab) {
 // completion/confidence cards. business-risk arrives here via the generic mechanism (it used
 // to be three hardcoded cards + special-cased renderHighlights logic). All values are untrusted
 // LLM output → escaped via html`` / textContent; the only markup is our own card scaffold.
-function renderLensCards(lenses) {
-  const row = document.getElementById('highlights-row');
-  if (!row) return;
-  lensCardsFrom(lenses).forEach(c => {
+// A header item renders in one of two configurable styles (per-lens cardStyle):
+//   'hero' → a wide card in #verdict-hero (room for a full rationale; long ones clamp + Show more)
+//   'list' (default) → a compact scorecard row in #lens-list
+// Layout matches info density: rich rationale gets a hero card, an at-a-glance level gets a row.
+function renderHeaderItem(o) {
+  const version = (typeof o.version === 'string' && o.version) ? o.version : '';
+  // The header card is at-a-glance: level + the one-line summary note only. The full Why-it-matters
+  // / Do-next teaching lives in the lens tab below (see lensContributorBody / lensFindingMarkup).
+  if (o.cardStyle === 'hero') {
+    const wrap = document.getElementById('verdict-hero');
+    if (!wrap) return;
     const card = document.createElement('div');
-    card.className = 'highlight-card' + (c.level ? ' biz-risk-' + c.level : '');
-    // Card is an at-a-glance summary: label + value + one-line note only. A display:'both'
-    // lens carries its full detail (findings, mitigation, main risk) in its own tab — a
-    // header card that grows a list is a God-card.
+    card.className = 'highlight-card vcard' + (o.levelClass ? ' ' + o.levelClass : '');
     card.innerHTML =
-      html`<div class="highlight-card-label">${c.label}</div>` +
-      html`<div class="highlight-card-value">${c.value == null ? '' : c.value}</div>` +
-      html`<div class="highlight-card-notes">${c.note}</div>` +
-      ((typeof c.version === 'string' && c.version) ? html`<div class="highlight-card-version">v${c.version}</div>` : '');
-    row.appendChild(card);
+      html`<div class="highlight-card-label">${o.label}</div>` +
+      html`<div class="highlight-card-value">${o.value == null ? '' : o.value}</div>` +
+      html`<div class="highlight-card-notes">${o.note}</div>` +
+      (version ? html`<div class="highlight-card-version">v${version}</div>` : '');
+    wrap.appendChild(card);
+    clampHero(card);
+    return;
+  }
+  const list = document.getElementById('lens-list');
+  if (!list) return;
+  const row = document.createElement('div');
+  row.className = 'lrow' + (o.levelClass ? ' ' + o.levelClass : '');
+  row.innerHTML =
+    '<div>' +
+      html`<div class="lchip"><span class="cdot"></span>${o.value == null ? '' : o.value}</div>` +
+      html`<div class="lname">${o.label}</div>` +
+      (version ? html`<div class="lrow-version">v${version}</div>` : '') +
+    '</div>' +
+    html`<div class="lnote">${o.note}</div>`;
+  list.appendChild(row);
+}
+
+// Long hero rationales clamp to a comfortable height with a soft fade + a Show more expand,
+// instead of running the card away or hard-truncating with an ellipsis. Measure after layout.
+function clampHero(card) {
+  if (!card) return;
+  const notes = card.querySelector('.highlight-card-notes');
+  if (!notes) return;
+  const measure = () => {
+    if (notes.scrollHeight > notes.clientHeight + 2) {
+      card.classList.add('hero-clamped');
+      const btn = document.createElement('button');
+      btn.className = 'vcard-more';
+      btn.type = 'button';
+      btn.textContent = 'Show more';
+      btn.addEventListener('click', () => {
+        const expanded = card.classList.toggle('hero-expanded');
+        card.classList.toggle('hero-clamped', !expanded);
+        btn.textContent = expanded ? 'Show less' : 'Show more';
+      });
+      card.appendChild(btn);
+    }
+  };
+  (typeof requestAnimationFrame === 'function') ? requestAnimationFrame(measure) : measure();
+}
+
+function renderLensCards(lenses) {
+  if (!document.getElementById('verdict-hero') && !document.getElementById('lens-list')) return;
+  lensCardsFrom(lenses).forEach(c => {
+    renderHeaderItem({
+      label: c.label,
+      value: c.value,
+      note: c.note,
+      levelClass: c.level ? 'biz-risk-' + c.level : '',
+      version: c.version,
+      cardStyle: c.cardStyle,
+    });
   });
 }
 
@@ -1413,20 +1516,18 @@ function renderLensCards(lenses) {
 // at-a-glance header card. It is a DEDICATED_CONTRIBUTOR (own tab), so it isn't scanned by
 // lensCardsFrom — render its card here. Colors INVERT vs risk cards: high ownership is GOOD.
 function renderOwnershipCard(data) {
-  const row = document.getElementById('highlights-row');
-  if (!row) return;
   const ui = userImprovementsFrom(data && data.lenses);
   const lvl = ui && typeof ui.level === 'string' && /^(low|medium|high)$/i.test(ui.level)
     ? ui.level.toLowerCase() : null;
   if (!lvl) return;
-  const card = document.createElement('div');
-  card.className = 'highlight-card ownership-' + lvl;
-  const value = lvl.charAt(0).toUpperCase() + lvl.slice(1);
-  card.innerHTML =
-    html`<div class="highlight-card-label">Developer Ownership</div>` +
-    html`<div class="highlight-card-value">${value}</div>` +
-    html`<div class="highlight-card-notes">${ui.levelNote || ''}</div>`;
-  row.appendChild(card);
+  renderHeaderItem({
+    label: 'Developer Ownership',
+    value: lvl.charAt(0).toUpperCase() + lvl.slice(1),
+    note: ui.levelNote || '',
+    levelClass: 'ownership-' + lvl,   // inverted colors: high ownership is GOOD (green)
+    version: ui.version,
+    cardStyle: ui.cardStyle,
+  });
 }
 
 function renderLenses(data) {

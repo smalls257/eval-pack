@@ -16,6 +16,32 @@ sys.path.insert(0, str(Path(__file__).parent))  # noqa: E402
 import aggregate  # noqa: E402
 import config  # noqa: E402
 import lens_versions  # noqa: E402
+import lens_manifest  # noqa: E402
+import lens_contract  # noqa: E402
+
+
+def validate_lens_contracts(results):
+    """A lens whose .md declares an output contract must satisfy it; a violation is a failure.
+    Lenses with no declared contract (or no .md on disk) pass through unchanged."""
+    validated = []
+    for r in results:
+        if "error" in r:
+            validated.append(r)
+            continue
+        md_path = lens_versions.LENS_DIR / (r.get("skill", "") + ".md")
+        contract = None
+        if md_path.is_file():
+            contract = lens_manifest.find_output_contract(md_path.read_text(encoding="utf-8"))
+        if contract is None:
+            validated.append(r)
+            continue
+        violations = lens_contract.validate_output(r, contract)
+        if violations:
+            validated.append({"skill": r.get("skill"), "role": r.get("role", "unknown"),
+                              "error": "contract violation: " + "; ".join(violations)})
+        else:
+            validated.append(r)
+    return validated
 
 
 def assemble(pack_dir):
@@ -31,6 +57,8 @@ def assemble(pack_dir):
             except (json.JSONDecodeError, OSError):
                 results.append({"skill": f.stem, "role": "unknown",
                                 "error": "malformed or unreadable lens output"})
+
+    results = validate_lens_contracts(results)
 
     cfg_path = pack / "eval-config.json"
     cfg = config.read_config(str(cfg_path)) if cfg_path.is_file() else config.read_config()
@@ -75,6 +103,10 @@ def assemble(pack_dir):
     # a lens's self-declared display is untrusted and stripped; the configured value wins.
     disp_by_skill = {l.get("skill"): l.get("display")
                      for l in cfg.get("analysisLenses") or [] if l.get("display")}
+    # cardStyle ('hero'|'list') is presentation config — same trust rule as display: a lens's
+    # self-declared cardStyle is untrusted and stripped; the config value wins.
+    cardstyle_by_skill = {l.get("skill"): l.get("cardStyle")
+                          for l in cfg.get("analysisLenses") or [] if l.get("cardStyle")}
     # version is lens metadata — config/lockfile-sourced, same trust rule as display/templateHtml:
     # a lens's self-declared version is untrusted and stripped; the configured/locked value wins.
     _lock = lens_versions.load_lock()
@@ -83,6 +115,7 @@ def assemble(pack_dir):
     for r in results:
         r.pop("templateHtml", None)  # never trust lens-supplied markup — resolve-embedded only
         r.pop("display", None)       # never trust lens-supplied presentation — config only
+        r.pop("cardStyle", None)     # never trust lens-supplied presentation — config only
         r.pop("version", None)       # never trust lens-supplied version — config/lockfile only
         t = tpl_by_skill.get(r.get("skill"))
         if t and "error" not in r:
@@ -90,6 +123,9 @@ def assemble(pack_dir):
         d = disp_by_skill.get(r.get("skill"))
         if d and "error" not in r:
             r["display"] = d
+        cs = cardstyle_by_skill.get(r.get("skill"))
+        if cs and "error" not in r:
+            r["cardStyle"] = cs
         # version attaches to failures too — it's metadata, not trusted markup; a failure card
         # should show which lens version failed. So no "error not in r" guard here.
         v = ver_by_skill.get(r.get("skill")) or (_lock.get(r.get("skill")) or {}).get("version")

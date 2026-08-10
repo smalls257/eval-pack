@@ -1,0 +1,72 @@
+{
+  "skill": "user-improvements",
+  "role": "contributor",
+  "title": "User Feedback",
+  "level": "high",
+  "levelNote": "Across ~900 turns building a Claude-session export CLI, the developer consistently supplied precise acceptance criteria, caught the AI fabricating documentation and a second-opinion parser's bugs through their own testing and reasoning, and insisted on tests for nearly every feature; the one notable gap was an early vague research prompt that let the AI invent content, which the developer caught and corrected immediately.",
+  "items": [
+    {
+      "kind": "improvement",
+      "title": "Vague research prompt let the AI fabricate documentation",
+      "quote": "have a look at docs/JSONL_STRUCTURE_AND_FORMATTING.md and ultrathink about the contents. make updates to improve your understanding of the jsonl structure",
+      "evidential": true,
+      "detail": "This opening instruction gave no acceptance criteria for what 'improve your understanding' should produce, and the transcript shows the AI responded by writing detailed algorithmic descriptions of the JSONL format without ever reading an actual JSONL file (assistant turn ~50: \"I made a major mistake by fabricating content without actually examining the JSONL files first\"). Owning the intent here would have meant pairing the request with a concrete constraint up front, e.g. 'base every claim on files you actually opened, cite line numbers' — instead the developer had to discover the fabrication after the fact and spend a follow-up turn correcting it."
+    },
+    {
+      "kind": "strength",
+      "title": "Caught and named the fabrication directly",
+      "quote": "ok, that was hot garbage. at no point did you actually look at the jsonl files in question so you just made stuff up",
+      "evidential": true,
+      "detail": "Rather than accepting the AI's confident-sounding documentation update at face value, the developer verified it against reality, identified that no files had actually been inspected, and called it out in blunt, specific terms. This is exactly the vetting this lens rewards: challenging the AI's output instead of rubber-stamping a plausible-looking deliverable."
+    },
+    {
+      "kind": "strength",
+      "title": "Grounded the redesign in the developer's own analysis artifact",
+      "quote": "to help with understanding the structure of the jsonl files, i wrote @discover_structure.rb and wrote the output of that script to @discover_structure.out. it doesn't seem too complicated and we should just be able to process the entries liniarly. have a look and rethink how to implement the export",
+      "evidential": true,
+      "detail": "Instead of asking the AI to re-guess the JSONL structure (the thing that had just gone wrong), the developer did their own investigation, produced concrete evidence, and directed the redesign from that evidence — a clear architecture/tradeoff call made by the developer, with the AI executing the implementation against a spec the developer had personally verified."
+    },
+    {
+      "kind": "strength",
+      "title": "Standing insistence on test coverage",
+      "quote": "always update the tests",
+      "evidential": true,
+      "detail": "The developer repeatedly made test coverage a non-negotiable acceptance criterion throughout the session (also see \"i didn't see you add or update tests for this\" later), rather than accepting 'it works' as sufficient. This is due-diligence ownership proportional to a codebase that was growing a real CLI tool with many interacting flags."
+    },
+    {
+      "kind": "strength",
+      "title": "Caught a missing test after a feature was claimed done",
+      "quote": "i didn't see you add or update tests for this",
+      "evidential": true,
+      "detail": "After the AI presented a feature as complete, the developer checked for accompanying tests rather than trusting the completion claim, and called out their absence. This is the review-before-merge behavior the lens is looking for: verifying due diligence was actually done rather than accepting 'done' at face value."
+    },
+    {
+      "kind": "strength",
+      "title": "Verified a shipped feature's claimed behavior rather than trusting it",
+      "quote": "are these dates parsing? if i copy \"August 09, 2025 at 06:03:43 PM\" from the preview, and give it to the --from paramter, does it work?",
+      "evidential": true,
+      "detail": "Instead of assuming the newly added --from date parsing worked because the AI said it did, the developer posed a concrete, testable scenario (a copy-pasted timestamp from the tool's own preview output) to check the claim before relying on it — direct vetting of an AI assertion."
+    },
+    {
+      "kind": "strength",
+      "title": "Caught a duplicate-output bug via direct testing",
+      "quote": "ok, when i use just --no-open the file name is not included. however when i use --preview --no-open the filename is output twice. have a look",
+      "evidential": true,
+      "detail": "The developer ran the tool themselves with the new flag combination, observed and reported the exact malformed output, and pointed the AI at the specific defect rather than filing a vague 'it's broken' report — evidence-based bug ownership on a feature the AI had just implemented."
+    },
+    {
+      "kind": "strength",
+      "title": "Owned the debugging with original technical reasoning, not just re-prompting",
+      "quote": "yeah, that didn't work either. the thing is i don't know a solution. i know intuitively that for this example, the first and the last set of backticks belong to each other, but that's because i know the outcome i expect.",
+      "evidential": true,
+      "detail": "When the AI's fixes for the nested-backticks parsing bug kept failing, the developer didn't just say 'try again' — they worked through the code-block pairing logic themselves, articulated which pairings they were and weren't confident about, and handed the AI a precise problem statement (continued in the next turn: \"in this specific case, the first and last backticks should be part of a pair: sets 1 and 6...\"). This is decision/cognitive ownership of a hard problem, using the AI as a tool for execution once the developer had reasoned out the constraints."
+    },
+    {
+      "kind": "strength",
+      "title": "Sought a second opinion and had it independently vetted rather than trusted",
+      "quote": "i went and had a chat to your bigger sibling, Opus. it suggested the parser in @lib/markdown_code_block_parser.rb which tries to use some heuristics to disambiguate code block matches. have a look at that and see if it's usable.",
+      "evidential": true,
+      "detail": "Rather than pasting in Opus's suggested parser and accepting it as a fix, the developer explicitly asked for it to be evaluated for usability. The subsequent transcript shows the AI actually testing the parser against the real failing case and finding it still had pairing bugs before a corrected version passed the test suite — the developer's framing ('see if it's usable') is what triggered that scrutiny instead of a blind merge of a third party's code."
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+{"type":"user","message":{"role":"user","content":"How do I sort a list?"}}
+{"type":"assistant","message":{"role":"assistant","content":"Use sorted(). here is why that is correct."}}

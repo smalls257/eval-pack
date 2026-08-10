@@ -1,0 +1,14 @@
+{
+  "cog-complexity-15-resolved": {
+    "score": {
+      "min": 70,
+      "max": 100
+    }
+  },
+  "cog-complexity-15-unresolved": {
+    "score": {
+      "min": 0,
+      "max": 30
+    }
+  }
+}

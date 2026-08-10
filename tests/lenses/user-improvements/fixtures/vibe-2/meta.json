@@ -1,0 +1,6 @@
+{
+  "source": "allenai/WildChat-1M (real user ↔ gpt-3.5-turbo chat)",
+  "question": "'act as a python expert'; iterative script requests",
+  "license": "ODC-BY 1.0 (WildChat) — attribution required; verify at use",
+  "note": "vibecoding — dev offloads judgment, accepts output at face value → low ownership"
+}
