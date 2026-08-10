@@ -1,0 +1,30 @@
+{
+  "skill": "user-improvements",
+  "role": "contributor",
+  "title": "Developer Ownership",
+  "level": "medium",
+  "levelNote": "The developer front-loaded a crisp change goal (intent owned), but the mandatory sweep found the two substantive turns were comprehension questions about their own change's blast radius, each accepted verbatim and shipped on the AI's word, which caps this below high.",
+  "items": [
+    {
+      "kind": "strength",
+      "title": "Clear, specified change intent",
+      "quote": "I'm changing how the billing service writes its audit logs — switching the log format from plaintext to JSON.",
+      "evidential": true,
+      "detail": "The developer opened by stating the goal precisely — which module (the billing service audit logger), what changes (write format), and the exact transformation (plaintext to JSON). This is intent ownership on axis 1: the AI was left to execute a fully specified change, not to invent the objective. Delegating that execution is the proper use of the tool and is credited here for its lane only — it does not offset the comprehension offloads below."
+    },
+    {
+      "kind": "improvement",
+      "title": "Comprehension of the change offloaded — audit-log format vs. webhook payloads",
+      "quote": "Will this change break the payment webhook responses we send to Stripe?",
+      "evidential": true,
+      "detail": "This question reveals a basic misunderstanding of the very part of the system being changed: the audit-log write path and the Stripe webhook responder are unrelated modules, and the webhook payloads are built from the transaction record, not from log output. If the developer understood the audit logger they are modifying, they would already know a log-format switch cannot alter webhook payloads. Instead of building or verifying that understanding, they took the AI's 'no' as truth and proceeded — 'ok good, then let's just switch the audit log to JSON.' That is a comprehension offload (axis 2), distinct from healthy discovery in unfamiliar territory: the developer is shipping this change and substituted the AI's answer for understanding its blast radius. Owning it would have looked like reading the two modules (or the diff) to confirm the boundary themselves before shipping, rather than treating the AI as the arbiter of what their own change affects."
+    },
+    {
+      "kind": "improvement",
+      "title": "Second impact question accepted verbatim, then shipped on the AI's word",
+      "quote": "perfect, that's what I figured. ship it",
+      "evidential": true,
+      "detail": "The pattern repeats and then culminates: the developer asks whether the log change alters how the API returns invoices to the frontend — again a question whose answer they would know if they understood that logging and invoice serialization are separate layers — and on the AI's bare 'Correct' they ship with 'perfect, that's what I figured. ship it.' The developer never reviewed the diff, never inspected the emitted JSON, and never verified the impact independently; their entire assessment of the change's blast radius, and therefore the decision to ship, rested on the AI's unverified confirmations. Applying the arbiter test to the two impact questions and the final ship call, all three were accepted verbatim with no independent rationale beyond the leading 'that's what I figured.' Owning it would have looked like the developer confirming the module boundaries from the code themselves, or at minimum eyeballing the diff and the produced log output, before deciding it was safe to ship."
+    }
+  ]
+}

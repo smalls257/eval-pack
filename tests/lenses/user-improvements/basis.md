@@ -1,6 +1,6 @@
 # user-improvements (Developer Ownership) — evaluation basis
 
-Judges how well the DEVELOPER owned intent, decisions, and risk-proportional due diligence versus offloaded judgment to the AI (vibecoding). HIGH = dev drives, AI executes. Fixtures: a real MIT Claude Code session where the dev vets the AI's diagnosis and owns an auth fix (HIGH), a 943-turn ccexport Claude Code session where the dev drives intent/decisions/risk while the AI executes (HIGH, `marc-big`), a daaain/claude-code-log MIT session where the dev front-loads sharp evidence-backed asks but accepts some AI output unscrutinized (MEDIUM, `coderabbit-review`), a WildChat 'make my login better' auth rewrite with no security concern (LOW, risky), a single-turn 'search + summarize' offload (LOW), and a WildChat 'act as a python expert' vibecoding session that offloads judgment (LOW, `vibe-2`).
+Judges how well the DEVELOPER owned intent, decisions, and risk-proportional due diligence versus offloaded judgment to the AI (vibecoding). HIGH = dev drives, AI executes. Fixtures: a real MIT Claude Code session where the dev vets the AI's diagnosis and owns an auth fix (HIGH), a 943-turn ccexport Claude Code session where the dev drives intent/decisions/risk while the AI executes (HIGH, `marc-big`), a daaain/claude-code-log MIT session where the dev front-loads sharp evidence-backed asks but accepts some AI output unscrutinized (MEDIUM, `coderabbit-review`), a WildChat 'make my login better' auth rewrite with no security concern (LOW, risky), a single-turn 'search + summarize' offload (LOW), and a WildChat 'act as a python expert' vibecoding session that offloads judgment (LOW, `vibe-2`). Plus two SYNTHETIC marker fixtures (purpose-built, not real sessions; see each `meta.json`): `arbiter-offload-verbatim` (LOW — every decision, incl. an auth/ownership boundary, accepted verbatim: "ok, do it", "sure, go ahead", "whatever you think", "ship it") and `comprehension-gap` (MEDIUM — the dev owns intent but ships a log-format change while asking whether it affects unrelated webhook/invoice subsystems, taking the AI's answer on trust). These pin the arbiter-test and comprehension signals so the gate regression-locks them.
 
 **Fairness:** rubber-ducking/discovery is engaged ownership, not an offload (see the rubber-ducking-is-fine claim + the HIGH fixture's exploratory turns). **Provenance caveat:** the single source is an internal design principle (vibecoding), not an external citation; the offline gate checks basis<->ledger title agreement.
 
@@ -48,6 +48,26 @@ Judges how well the DEVELOPER owned intent, decisions, and risk-proportional due
         "vibecoded-auth-rewrite",
         "vibecoded-research-offload",
         "vibe-2"
+      ]
+    },
+    {
+      "id": "arbiter-offload-is-offload",
+      "statement": "Asking the AI to make or recommend a decision (whether a check is needed, which option, is it done, is it safe) and accepting its answer verbatim with no independent rationale — 'ok', 'sure', 'go ahead', 'whatever you think' — is an arbiter offload; ownership means engaging the answer: own reasoning, modifying it, choosing against it, or justifying the pick.",
+      "sources": [
+        "vibecoding-decay"
+      ],
+      "covers": [
+        "arbiter-offload-verbatim"
+      ]
+    },
+    {
+      "id": "comprehension-is-ownership",
+      "statement": "The developer must understand the change they ship; a question that reveals a basic misunderstanding of the part of the system being changed, taken on the AI's word and shipped, is an offload of comprehension — distinct from learning an unfamiliar area in order to own the change.",
+      "sources": [
+        "vibecoding-decay"
+      ],
+      "covers": [
+        "comprehension-gap"
       ]
     }
   ],

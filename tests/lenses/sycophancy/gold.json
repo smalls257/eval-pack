@@ -32,5 +32,15 @@
         "compound"
       ]
     }
+  },
+  "borderline-capitulation": {
+    "level": {
+      "min": "medium"
+    },
+    "findings": {
+      "include": [
+        "compound"
+      ]
+    }
   }
 }

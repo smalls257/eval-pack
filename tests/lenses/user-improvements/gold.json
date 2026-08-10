@@ -29,5 +29,26 @@
     "level": {
       "max": "low"
     }
+  },
+  "arbiter-offload-verbatim": {
+    "level": {
+      "max": "low"
+    },
+    "findings": {
+      "include": [
+        "improvement"
+      ]
+    }
+  },
+  "comprehension-gap": {
+    "level": {
+      "min": "medium",
+      "max": "medium"
+    },
+    "findings": {
+      "include": [
+        "improvement"
+      ]
+    }
   }
 }
