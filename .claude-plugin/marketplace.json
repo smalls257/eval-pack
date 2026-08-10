@@ -10,11 +10,7 @@
     {
       "name": "eval-pack-next",
       "description": "Generate eval packs — PRE-RELEASE (0.6.2-rc.x): deterministic gates, lenses, detectors, tune loop",
-      "source": {
-        "source": "github",
-        "repo": "smalls257/eval-pack",
-        "ref": "eval-pack-next"
-      },
+      "source": "./",
       "category": "productivity"
     }
   ]
