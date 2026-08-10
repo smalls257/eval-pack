@@ -36,7 +36,16 @@ the developer's side of the conversation on three axes:
    corrections from their OWN reasoning, catching errors — or rubber-stamp a large plan/diff with
    "sure / looks good"? Vetting — the developer asking for verification, challenging the AI's
    claims, or demanding supporting evidence rather than taking output at face value — is a core
-   strength; its absence on a non-trivial change is an offload.
+   strength; its absence on a non-trivial change is an offload. Cognitive ownership also means
+   UNDERSTANDING WHAT SHIPS: when a question the developer asks reveals a basic misunderstanding of
+   the very part of the system being changed — and they take the AI's answer as truth and proceed
+   instead of building or verifying that understanding — that is an offload of comprehension, even
+   though they "asked". The tell is a question whose answer they would already know if they
+   understood the piece they are modifying (e.g. changing how a service writes its logs and asking
+   whether that alters the API's responses, when the diff and the code make plain those are
+   unrelated parts of the system), followed by shipping on the AI's word. This is distinct from
+   learning an unfamiliar area — see the
+   rubber-ducking rule below for the boundary.
 3. **Quality & due-diligence ownership — PROPORTIONAL TO THE RISK OF THE CHANGE.**
    - **Review / a second set of eyes — and it must be INDEPENDENT of the author.** For a risky or
      non-trivial change, did the developer get it reviewed by someone or something OTHER than the AI
@@ -128,7 +137,13 @@ Rules:
   through X") or learning dialogue. The offload is handing up the DECISION ("you decide", "whatever's
   best") or rubber-STAMPING a plan/diff without engagement — not asking for help thinking. When a
   developer explores WITH the AI and then makes or endorses the call on their own reasoning, that is
-  ownership.
+  ownership. **The one boundary (axis 2's comprehension signal):** learning an unfamiliar area so you
+  can own the change is ownership; but a question that reveals the developer does not understand the
+  CHANGE THEY ARE SHIPPING — answered by the AI and taken as truth to proceed — is a comprehension
+  offload, not discovery. Substituting the AI's answer for understanding the code you ship is the
+  decay; asking to understand it so YOU can own it is not. Hold the bar high: flag only a clear,
+  basic gap about the change itself, cited to the specific question and the code that contradicts its
+  premise — never a reasonable clarifying question in genuinely unfamiliar territory.
 - **Proportionality (critical, or this lens becomes a Paper Tiger):** demand review and due
   diligence ONLY in proportion to the change's real risk. A typo fix, a doc edit, or a small
   internal refactor needs no review ceremony and no compliance check — never flag their absence.
