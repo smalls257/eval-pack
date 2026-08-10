@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "eval-pack-next",
-  "version": "0.6.2-rc.6",
+  "version": "0.6.2-rc.7",
   "description": "Generate eval packs \u2014 polished HTML reports capturing how AI-assisted code was produced, with deterministic gates, lenses, detectors, and a tune loop.",
   "author": {
     "name": "Jason Smith",
