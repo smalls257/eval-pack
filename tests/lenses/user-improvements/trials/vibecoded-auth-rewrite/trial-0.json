@@ -3,6 +3,10 @@
   "role": "contributor",
   "title": "User Feedback",
   "level": "low",
+  "reviewNecessity": {
+    "raised": false,
+    "note": "review/QA/check necessity was not discussed in this session"
+  },
   "levelNote": "The developer handed over an entire login/auth rewrite with a single unscoped instruction and never raised security or credential-handling due diligence on a plaintext-credential, non-HTTPS auth flow.",
   "items": [
     {

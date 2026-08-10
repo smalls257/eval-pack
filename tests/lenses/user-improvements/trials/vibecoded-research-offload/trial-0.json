@@ -1,23 +1,20 @@
 {
   "skill": "user-improvements",
   "role": "contributor",
-  "title": "User Feedback",
-  "level": "low",
-  "levelNote": "The developer handed off an entire research task in one turn with no acceptance criteria and never re-engaged with, questioned, or vetted the AI's autonomously produced findings.",
+  "title": "Developer Ownership",
+  "level": "high",
+  "levelNote": "The mandatory arbiter sweep was run and came up thin: the developer front-loaded a crisp, specific, well-scoped research request, handed the AI no judgment or decision, and the single low-risk fact-finding task shipped no code and warranted no review or domain due diligence.",
+  "reviewNecessity": {
+    "raised": false,
+    "note": "Review/QA/test necessity was never discussed in this session — no code change was made, so no review consideration arose. This is a single-turn research-and-summarize task with no diff to review."
+  },
   "items": [
     {
-      "kind": "improvement",
-      "title": "Research task handed off with no acceptance criteria",
-      "quote": "Search if claude -p can make use of WebSearch and Task tool. Especially the Task with Haiku model. Summarize the findings.",
+      "kind": "strength",
+      "title": "Crisp, scoped intent front-loaded with explicit acceptance",
+      "quote": "Especially the Task with Haiku model. Summarize the findings.",
       "evidential": true,
-      "detail": "The developer's only turn specifies a research topic but leaves the AI to invent everything about how to satisfy it: what counts as a sufficient answer, which sources are acceptable, how deep to go, and what 'summarize the findings' should actually contain. Delegating a research task is fine on its own, but with no scope or acceptance criteria the AI is left to define the goal itself rather than execute a goal the developer set. Owning it would have looked like naming what the summary needed to answer (e.g. 'confirm with a source I can check' or 'I need this to decide X') rather than leaving the shape of 'done' entirely to the assistant."
-    },
-    {
-      "kind": "improvement",
-      "title": "No engagement with or vetting of the delivered findings",
-      "quote": "The recommended pattern is Sonnet as orchestrator + Haiku subagents for parallelizable work.",
-      "evidential": true,
-      "detail": "The transcript ends the instant the AI posts its multi-section summary (including specific claims like default subagent models and a recommended architecture pattern, sourced from blog posts and docs pages the AI itself selected) with zero developer response: no pushback, no request for verification, no acceptance, no follow-up question, no indication the findings were read critically before being taken as fact. For a research task whose output is likely to inform a real decision (agent/model configuration), taking the AI's self-sourced, self-summarized findings at face value with no scrutiny is a decision-ownership offload — the developer let the AI be both the researcher and the sole judge of whether the research was correct and complete. Owning it would have meant at minimum confirming one or two of the claims against the primary docs, or asking the AI to flag any claims it was less confident about."
+      "detail": "In the sole user turn the developer fully owned the intent: they named the exact capabilities to investigate (whether `claude -p` can use WebSearch and the Task tool), singled out the specific case that mattered to them (\"Especially the Task with Haiku model\"), and stated the acceptance criterion (\"Summarize the findings\"). Nothing about the goal, scope, or deliverable was left for the AI to infer or invent — the AI was handed a specified execution task (research these facts and summarize them), which is exactly the delegation the tool is for. This is intent ownership done well, and the emphasis clause shows the developer directing the research rather than outsourcing what to care about."
     }
   ]
 }

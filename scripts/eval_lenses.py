@@ -7,7 +7,7 @@ from pathlib import Path
 from lens_manifest import parse_basis
 from lens_checks import (
     evidence_resolution, rule_consistency, reference_resolution,
-    claim_coverage, output_assertion, guidance_completeness,
+    claim_coverage, output_assertion, guidance_completeness, review_necessity_complete,
 )
 
 
@@ -82,17 +82,25 @@ def evaluate_bundle(bundle_dir, trials_dir, contract):
                                                     type_field=tfield)[0] for t in trials)
         else:
             guidance_ok = True
+        # A lens that declares requiresReviewNecessity must adjudicate who decided a review was
+        # needed BEFORE scoring; an AI-decided necessity with no improvement fails deterministically.
+        if contract.get("requiresReviewNecessity"):
+            review_ok = all(review_necessity_complete(t, findings_key=fkey, type_field=tfield)[0]
+                            for t in trials)
+        else:
+            review_ok = True
         fixtures[fid] = {
             "evidence_ok": all(p for p, _ in ev),
             "rules_ok": all(p for p, _ in rc),
             "guidance_ok": guidance_ok,
+            "review_ok": review_ok,
             "assertion": oa,
         }
 
     passed = (
         checks["reference_resolution"][0] and checks["claim_coverage"][0]
-        and all(f["evidence_ok"] and f["rules_ok"] and f["guidance_ok"] and f["assertion"]["passed"]
-                for f in fixtures.values())
+        and all(f["evidence_ok"] and f["rules_ok"] and f["guidance_ok"] and f["review_ok"]
+                and f["assertion"]["passed"] for f in fixtures.values())
     )
     return {"lens": bundle_dir.name, "passed": passed, "checks": checks, "fixtures": fixtures}
 

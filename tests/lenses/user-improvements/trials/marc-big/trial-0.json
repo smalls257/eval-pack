@@ -3,6 +3,10 @@
   "role": "contributor",
   "title": "User Feedback",
   "level": "high",
+  "reviewNecessity": {
+    "raised": false,
+    "note": "review/QA/check necessity was not discussed in this session"
+  },
   "levelNote": "Across ~900 turns building a Claude-session export CLI, the developer consistently supplied precise acceptance criteria, caught the AI fabricating documentation and a second-opinion parser's bugs through their own testing and reasoning, and insisted on tests for nearly every feature; the one notable gap was an early vague research prompt that let the AI invent content, which the developer caught and corrected immediately.",
   "items": [
     {

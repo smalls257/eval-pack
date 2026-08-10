@@ -1,0 +1,34 @@
+{
+  "skill": "user-improvements",
+  "role": "contributor",
+  "title": "Developer Ownership",
+  "level": "low",
+  "levelNote": "Mandatory arbiter sweep run: the developer specified the change precisely (intent owned) but offloaded every judgment call — twice asking whether the log-format change touches unrelated payment/API paths and shipping the billing/payments-adjacent change on the AI's verbatim 'No'/'Correct' with no verification or review, plus a clear comprehension gap about the code being modified.",
+  "reviewNecessity": {
+    "raised": false,
+    "note": "Review/QA necessity was never discussed. The developer never asked whether a review or check was needed and never asserted one was; no independent review or verification of the billing/payments-service change occurred before 'ship it'. Because necessity was not raised as a question, decidedBy/independentReview are omitted, but the absence of any review on a payments-adjacent change is captured as an improvement below."
+  },
+  "items": [
+    {
+      "kind": "strength",
+      "title": "Change specified precisely, not left to the AI to invent",
+      "quote": "switching the log format from plaintext to JSON",
+      "evidential": true,
+      "detail": "In the opening turn the developer named the exact change — switch the billing audit log from plaintext to JSON — rather than handing the AI a vague goal to interpret ('make the logs better'). This is genuine intent ownership: the AI executed a fully specified task and did not have to invent the objective, scope, or acceptance. Credit is scoped narrowly to the WHAT of the change; it does not extend to the safety/impact judgment or the decision to ship, both of which were offloaded (see below)."
+    },
+    {
+      "kind": "improvement",
+      "title": "Comprehension gap: repeatedly asked whether the log change touches unrelated modules",
+      "quote": "Will this change break the payment webhook responses we send to Stripe?",
+      "evidential": true,
+      "detail": "This question — and its twin later, 'and this won't change how the API returns invoices to the frontend either, right?' — asks whether changing the audit-log WRITE path affects the webhook responder and the invoice API. The AI's own answers ('separate modules', 'a different layer entirely') confirm these are unrelated parts of the system: the answers are things the developer would already know if they understood the module they are modifying. This is the axis-2/Check-2 tell — basic questions clustering around the very code being changed, answered by the AI and taken as truth to proceed — a possible comprehension/ownership offload rather than learning a genuinely unfamiliar area. Owning it would have looked like reading the audit-logger and webhook/invoice modules (or their call graph) to confirm the boundary from the code themselves, instead of substituting the AI's assurance for that understanding before shipping."
+    },
+    {
+      "kind": "improvement",
+      "title": "Shipped a payments-adjacent change on the AI's word, with no verification or review",
+      "quote": "perfect, that's what I figured. ship it",
+      "evidential": true,
+      "detail": "Both safety/impact questions were accepted verbatim — 'ok good, then let's just switch' after the first, and 'ship it' after the second — with no independent rationale, no test, no run, no code inspection, and no review by anyone or anything other than the AI that made the change. The gesture 'that's what I figured' is not verification: the developer still sought the AI's confirmation and acted on it as settled rather than checking the module boundary themselves. This is an arbiter offload on a consequential decision (whether a change to the billing/payments audit path is safe to ship), and it compounds with the absence of any review on a payments-adjacent change. Owning it would have looked like verifying the claim directly (grep/read the webhook and invoice serializers, or run the relevant tests) and, given the billing/payments surface, getting an independent set of eyes before shipping rather than treating the AI's 'No'/'Correct' as the arbiter."
+    }
+  ]
+}

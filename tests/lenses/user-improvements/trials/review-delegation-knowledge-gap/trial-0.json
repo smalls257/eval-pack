@@ -1,0 +1,43 @@
+{
+  "skill": "user-improvements",
+  "role": "contributor",
+  "title": "Developer Ownership",
+  "level": "low",
+  "levelNote": "Mandatory sweep run: the developer owned only the initial intent (24h to 1h in the auth service) and then offloaded every judgment the security-sensitive change warranted — comprehension of how the change behaves, whether a review was needed, the review itself (to the authoring AI), and the ship decision — so ownership of the risky part was pervasively handed up.",
+  "reviewNecessity": {
+    "raised": true,
+    "decidedBy": "ai",
+    "independentReview": false,
+    "note": "The developer asked the AI whether a review was needed ('do we need a code review for this?') rather than deciding it themselves (decidedBy: ai), then had the same AI that authored the change review its own work ('ok can you review it then?') and shipped on its verdict (independentReview: false). No reviewer independent of the author ever looked at the change."
+  },
+  "items": [
+    {
+      "kind": "strength",
+      "title": "Crisp, specific intent stated up front",
+      "quote": "I need to change the session token expiry from 24h to 1h in our auth service",
+      "evidential": true,
+      "detail": "The developer opened with an unambiguous goal — the exact system (the auth service), the exact knob (session token expiry), and the exact values (24h to 1h). There was nothing for the AI to invent about the objective or the acceptance target; execution was delegated against a fully specified intent, which is the correct use of the tool. This is genuine intent ownership and worth reinforcing. Scope it narrowly, though: it covers the goal statement only and does not extend to the decision-making or due-diligence that followed."
+    },
+    {
+      "kind": "improvement",
+      "title": "Whether a review was needed was decided by the AI",
+      "quote": "do we need a code review for this?",
+      "evidential": true,
+      "detail": "Deciding whether an auth/session-lifetime change warrants review is the developer's judgment to own; asking the AI 'do we need a code review for this?' hands that decision up. This is an offload regardless of the AI's answer or how it turned out — the ownership move here is the developer asserting on their own that a security-relevant change needs review, not asking whether it does. Because the necessity call was outsourced, the developer never independently established the risk on their own reasoning. Owning it next time looks like: 'this touches session lifetime for every logged-in user, so it gets a review before it ships' — a decision, not a question."
+    },
+    {
+      "kind": "improvement",
+      "title": "The authoring AI reviewed its own change, then it shipped verbatim",
+      "quote": "ok can you review it then?",
+      "evidential": true,
+      "detail": "Having the same AI that wrote the change review it ('ok can you review it then?') is not a second set of eyes — the author is grading its own work, so the defect a review exists to catch is exactly the one invisible to the party that introduced it. The developer then accepted the AI's 'Looks good to ship' with no independent scrutiny and closed with 'perfect, ship it', so a security-sensitive change to authentication went out with zero review independent of its author. Owning it means reviewing the one-line diff themselves or routing it to a human/tool reviewer independent of the AI that produced it, before shipping."
+    },
+    {
+      "kind": "improvement",
+      "title": "Possible comprehension gap: basic questions about the change taken on trust",
+      "quote": "I'm not totally sure how our token refresh works though — does changing the expiry affect the refresh flow at all?",
+      "evidential": true,
+      "detail": "Two basic questions cluster around the very code being modified — whether shortening the access-token expiry affects the refresh flow, and 'where does the token actually get validated on incoming requests — is that in the middleware or in the auth service?' — and in both cases the developer took the AI's answer as settled and proceeded to ship without verifying against the code. These are directly about the behavior and blast radius of the change being made in the auth service, not an adjacent unfamiliar area, so taking the answers on the AI's word to proceed reads as a possible comprehension/ownership gap in the code being shipped rather than pure discovery. I flag this caveated, not as certainty: owning it would mean confirming the refresh-TTL independence and the validation site in the actual source (auth/token.py, middleware/auth.py) before relying on them, so the understanding backing a security change is the developer's, not the AI's assertion."
+    }
+  ]
+}

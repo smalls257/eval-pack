@@ -1,0 +1,43 @@
+{
+  "skill": "user-improvements",
+  "role": "contributor",
+  "title": "Developer Ownership",
+  "level": "low",
+  "reviewNecessity": {
+    "raised": true,
+    "decidedBy": "ai",
+    "independentReview": null,
+    "note": "developer asked the AI whether auth checks were needed ('do we need to add auth checks or is the existing middleware enough?') and accepted its call — the check-necessity judgment was offloaded"
+  },
+  "levelNote": "Mandatory sweep run: the developer stated the goal but handed every one of the four decision-questions (pagination, rate limiting, auth/ownership, is-it-done) up to the AI and accepted each answer verbatim, including a security boundary and the ship call, with no independent review.",
+  "items": [
+    {
+      "kind": "strength",
+      "title": "Intent front-loaded",
+      "quote": "I'm adding a new /reports/export endpoint that dumps a user's full report history to CSV.",
+      "evidential": true,
+      "detail": "The developer opened by stating the goal in concrete terms — a new /reports/export endpoint that dumps a user's full report history to CSV — rather than leaving the AI to infer what was being built. This is genuine intent ownership: the AI executed against a target the developer specified. Scope this credit narrowly to the intent statement; it does not extend to any of the engineering decisions that followed, all of which were offloaded."
+    },
+    {
+      "kind": "improvement",
+      "title": "Auth/ownership decision handed up",
+      "quote": "yep whatever you think is best",
+      "evidential": true,
+      "detail": "Asked 'do we need to add auth checks or is the existing middleware enough?', the developer received the AI's recommendation to add a per-user ownership guard and responded 'yep whatever you think is best' — an explicit hand-up of the decision with no independent rationale. This is the deepest offload in the session because it sits on a security boundary: whether an export endpoint that returns a user's full report history needs an ownership filter is exactly the developer's call to own, and treating the AI as the arbiter means that if it had NOT flagged the ownership check, the developer would never have learned the endpoint was leaking other users' data. Owning it looks like: deciding the ownership check is required because the endpoint exposes personal data across accounts, and specifying it — not delegating the security judgment to the AI and accepting its answer as settled."
+    },
+    {
+      "kind": "improvement",
+      "title": "'Is it done?' and ship call offloaded, no independent review",
+      "quote": "great, ship it",
+      "evidential": true,
+      "detail": "The developer asked 'is it done? anything else needed?', the AI answered that it was complete and that 'the existing tests pass', and the developer replied 'great, ship it' — accepting the AI's self-assessment of doneness verbatim and shipping. The AI that wrote the change is the same party certifying it is finished; that is not a second set of eyes, and 'is this done / safe to ship' is a decision the developer must own. On a change that adds an ownership/auth guard and exports personal data, shipping on the author's word with no independent review or self-verification is an arbiter offload on a consequential call. Owning it looks like: reviewing the diff themselves or routing it to a reviewer independent of the AI, and confirming the ownership filter actually works before shipping — not treating 'it's complete, tests pass' as the decision."
+    },
+    {
+      "kind": "improvement",
+      "title": "Necessity questions accepted verbatim (pagination, rate limiting)",
+      "quote": "sure, go ahead",
+      "evidential": true,
+      "detail": "Two 'do we need X?' questions were each accepted with no independent reasoning: 'Do we need pagination on it?' → 'ok, do it', and 'should this endpoint be rate limited?' → 'sure, go ahead'. In both cases the AI both raised the concern AND decided the answer, and the developer ratified it without engaging the tradeoff (e.g. whether 500/2000 page sizes or 10/min fit the actual account sizes and usage). These are lower-stakes than the auth call, but they complete the pattern the sweep surfaces: every judgment call in the session was routed to the AI and rubber-stamped. Owning it looks like: bringing the developer's own knowledge of expected report volumes and traffic to bear on the pagination and rate-limit decisions rather than deferring the necessity and the parameters entirely to the AI."
+    }
+  ]
+}

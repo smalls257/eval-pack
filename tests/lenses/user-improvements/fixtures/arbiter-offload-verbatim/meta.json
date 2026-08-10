@@ -1,0 +1,6 @@
+{
+  "source": "synthetic \u2014 purpose-built marker fixture (NOT a real session)",
+  "pattern": "arbiter offload: developer routes every decision (pagination, rate limit, auth scope, done-ness) to the AI and accepts each verbatim ('ok do it','sure go ahead','whatever you think','ship it') with no independent reasoning",
+  "expected": "low/medium developer ownership; multiple arbiter-offload improvements",
+  "license": "authored for eval-pack; no third-party content"
+}
