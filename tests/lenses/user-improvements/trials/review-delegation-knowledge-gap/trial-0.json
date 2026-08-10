@@ -3,6 +3,12 @@
   "role": "contributor",
   "title": "Developer Ownership",
   "level": "medium",
+  "reviewNecessity": {
+    "raised": true,
+    "decidedBy": "ai",
+    "independentReview": false,
+    "note": "developer asked whether a code review was needed ('do we need a code review for this?') and then had the authoring AI review its own change — necessity and execution both offloaded, no independent reviewer"
+  },
   "levelNote": "Mandatory sweep run: the developer owned intent crisply (exact 24h to 1h change in the named service) but offloaded the entire due-diligence chain on a security-sensitive auth change — letting the AI decide a review was needed, routing that review back to the authoring AI, and shipping on its self-approval — which caps the level at medium despite the clear intent ownership.",
   "items": [
     {

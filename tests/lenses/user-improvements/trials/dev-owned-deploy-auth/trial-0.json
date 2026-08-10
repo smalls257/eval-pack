@@ -3,6 +3,10 @@
   "role": "contributor",
   "title": "User Feedback",
   "level": "high",
+  "reviewNecessity": {
+    "raised": false,
+    "note": "review/QA/check necessity was not discussed in this session"
+  },
   "levelNote": "The developer front-loaded intent and constraints, vetted the AI's diagnosis with concrete evidence, and personally diagnosed and owned the SSH-to-HTTPS auth fix rather than accepting the AI's account at face value.",
   "items": [
     {

@@ -3,6 +3,12 @@
   "role": "contributor",
   "title": "Developer Ownership",
   "level": "low",
+  "reviewNecessity": {
+    "raised": true,
+    "decidedBy": "ai",
+    "independentReview": null,
+    "note": "developer asked the AI whether auth checks were needed ('do we need to add auth checks or is the existing middleware enough?') and accepted its call — the check-necessity judgment was offloaded"
+  },
   "levelNote": "Mandatory sweep run: the developer stated the goal but handed every one of the four decision-questions (pagination, rate limiting, auth/ownership, is-it-done) up to the AI and accepted each answer verbatim, including a security boundary and the ship call, with no independent review.",
   "items": [
     {

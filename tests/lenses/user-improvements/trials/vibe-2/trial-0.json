@@ -3,6 +3,10 @@
   "role": "contributor",
   "title": "User Feedback",
   "level": "low",
+  "reviewNecessity": {
+    "raised": false,
+    "note": "review/QA/check necessity was not discussed in this session"
+  },
   "levelNote": "Beyond one clear constraint up front, the developer repeatedly issued vague fix requests with no symptom or evidence, restated the original spec instead of testing actual behavior, and never checked the AI's unverified runtime claims or the unrequested behavior change it slipped in.",
   "items": [
     {
