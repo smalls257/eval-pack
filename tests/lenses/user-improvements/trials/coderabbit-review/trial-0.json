@@ -3,6 +3,10 @@
   "role": "contributor",
   "title": "User Feedback",
   "level": "medium",
+  "reviewNecessity": {
+    "raised": false,
+    "note": "review/QA/check necessity was not discussed in this session"
+  },
   "levelNote": "The developer front-loaded sharp, evidence-backed bug reports and caught a real mistake (test.md) on their own, but twice accepted AI output at face value without follow-up scrutiny: a silently-collapsed commit plan and an unverified PR checklist.",
   "items": [
     {

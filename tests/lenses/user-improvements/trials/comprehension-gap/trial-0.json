@@ -3,6 +3,10 @@
   "role": "contributor",
   "title": "Developer Ownership",
   "level": "medium",
+  "reviewNecessity": {
+    "raised": false,
+    "note": "review/QA/check necessity was not discussed in this session"
+  },
   "levelNote": "The developer front-loaded a crisp change goal (intent owned), but the mandatory sweep found the two substantive turns were comprehension questions about their own change's blast radius, each accepted verbatim and shipped on the AI's word, which caps this below high.",
   "items": [
     {

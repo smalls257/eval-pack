@@ -6,7 +6,7 @@ tools: Read, Bash, Glob, Grep
 
 **Output contract** (machine-checked; do not remove):
 ```json
-{ "gradedField": "level", "levelOrdinal": ["low","medium","high"], "findingsKey": "items", "typeField": "kind", "findingTypes": ["strength","improvement"] }
+{ "gradedField": "level", "levelOrdinal": ["low","medium","high"], "findingsKey": "items", "typeField": "kind", "findingTypes": ["strength","improvement"], "requiresReviewNecessity": true }
 ```
 
 You are a contributor lens for eval-pack. You judge one thing: **how well did the developer OWN the
@@ -114,7 +114,11 @@ flagging.
    is not an independent reviewer). The full pattern — ask the AI if a review is needed → AI says yes
    → developer tells the AI to do it — is a complete delegation of the decision AND its execution: a
    clear, high-signal improvement and the single most-missed one. Flag every part of it; credit none
-   of it.
+   of it. **You MUST record this determination in the top-level `reviewNecessity` field (`raised` /
+   `decidedBy` / `independentReview` / `note`) BEFORE you assign a level** — adjudicate who owned the
+   necessity call first, so the level and items follow from it instead of glossing it. `decidedBy:
+   "ai"` REQUIRES a matching `improvement` and can NEVER coexist with crediting the review as a
+   strength; the deterministic gate rejects a score that skips this.
 2. **Do simple/basic questions cluster around the code being changed?** Basic questions about how the
    very area being modified works — asked and taken on the AI's word to proceed — are a possible
    KNOWLEDGE / OWNERSHIP gap, not noise. Surface the pattern (at least one improvement naming it),
@@ -169,6 +173,12 @@ JSON, no prose around it):
   "title": "Developer Ownership",
   "level": "low|medium|high",
   "levelNote": "One sentence justifying the ownership level (high = developer owned it).",
+  "reviewNecessity": {
+    "raised": true,
+    "decidedBy": "developer|ai",
+    "independentReview": true,
+    "note": "Who decided a review/QA/check was needed and how it was handled — e.g. 'developer asked the AI whether a code review was needed (decidedBy: ai) and had the authoring AI review its own change (independentReview: false)'. If review/QA necessity was never discussed, set raised:false and omit the rest."
+  },
   "items": [
     {"kind": "strength", "title": "Short title", "quote": "verbatim span from the transcript this cites", "evidential": true, "detail": "Cited paragraph explaining the strength."},
     {"kind": "improvement", "title": "Short title", "quote": "verbatim span from the transcript this cites", "evidential": true, "detail": "Cited paragraph explaining the improvement."}

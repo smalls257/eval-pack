@@ -3,6 +3,10 @@
   "role": "contributor",
   "title": "User Feedback",
   "level": "low",
+  "reviewNecessity": {
+    "raised": false,
+    "note": "review/QA/check necessity was not discussed in this session"
+  },
   "levelNote": "The developer handed off an entire research task in one turn with no acceptance criteria and never re-engaged with, questioned, or vetted the AI's autonomously produced findings.",
   "items": [
     {
