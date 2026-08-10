@@ -75,12 +75,40 @@ the developer's side of the conversation on three axes:
      and stopping there is not) is one instance, not the boundary. Owning it means the developer makes
      the call themselves, whether or not the AI brings it up.
 
+**The arbiter test — judge the RESPONSE, not the question.** The offload is never the question; a
+neutral question is always fine. The offload is UNREASONED ACCEPTANCE of the AI's answer to a
+decision. For every turn where the developer asks the AI to MAKE or RECOMMEND a call — is a check
+needed, which option, is it done, is it safe, keep or remove, do we need X, should we Y — classify
+by the developer's NEXT move:
+- **Ownership (a possible strength):** they add their own reasoning, modify the recommendation,
+  choose against it, or justify the pick on their own grounds. They engaged the answer, not just
+  received it.
+- **Arbiter offload (an improvement):** they accept it verbatim with no independent rationale — "ok",
+  "sure", "go ahead", "do it" — or silently proceed as if the AI's answer settled the matter. Flag
+  it, SCALED TO THE STAKES: a naming nit accepted verbatim is trivial; "is this safe to ship?" / "do
+  we need a migration?" / "which auth approach?" accepted verbatim is not.
+
+**Mandatory sweep — do not cherry-pick.** Enumerate EVERY decision-question the developer put to the
+AI across the whole session ("do we need…", "should we…", "which is better…", "is it needed…", "is
+this done / safe…") and apply the arbiter test to each. Report the pattern, not one convenient
+example: ten necessity/choice questions all accepted verbatim is a far stronger finding than any
+single turn, and omitting the ones that don't fit your first impression is exactly the cherry-pick to
+avoid.
+
+**Decision vs rationale ownership.** When the developer makes the final call themselves but the
+RATIONALE came wholly from the AI and was not independently checked, credit the decision — AND note
+the reasoning was taken on trust. Owning the decision is not the same as owning the reasoning behind
+it; for a risk-relevant call, an unchecked AI rationale under an owned decision is itself worth
+flagging.
+
 Produce BOTH kinds of item:
 - **strengths** (`"kind": "strength"`) — specific, cited moments where the developer owned it well:
   crisp acceptance criteria front-loaded, a decisive tradeoff call, a correction grounded in their
   own reasoning, real pushback on a wrong direction, insisting a risky change be reviewed, or raising
   the compliance/security/data-loss question the change warranted. Name them so the behavior is
-  reinforced.
+  reinforced. **Scope each vetting/ownership strength to the specific decision it applied to** — one
+  strong vetting moment does NOT generalize to decisions the developer did not engage, and must not
+  offset arbiter offloads elsewhere in the session; credit it for its lane only.
 - **improvements** (`"kind": "improvement"`) — specific, cited moments of offloading: a decision
   handed up, a big diff/plan approved without engagement, intent left for the AI to invent, a risky
   change merged with no review, a call the developer should own routed to the AI and acted on as
