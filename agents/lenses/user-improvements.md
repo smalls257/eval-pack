@@ -86,7 +86,7 @@ JSON, no prose around it):
 {
   "skill": "user-improvements",
   "role": "contributor",
-  "title": "User Feedback",
+  "title": "Developer Ownership",
   "level": "low|medium|high",
   "levelNote": "One sentence justifying the ownership level (high = developer owned it).",
   "items": [

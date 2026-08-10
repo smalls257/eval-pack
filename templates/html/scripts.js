@@ -848,7 +848,7 @@ function repoImprovementsFrom(lenses) {
 
 // Pure lookup: the user-improvements lens is a contributor named "user-improvements" in
 // data.lenses.contributors. Returns the whole contributor record (or null) rather than
-// just `.items`, so the User Feedback list reads from this one lookup (Airplane Test:
+// just `.items`, so the Developer Ownership list reads from this one lookup (Airplane Test:
 // an absent lens must yield null, not throw).
 function userImprovementsFrom(lenses) {
   const contributors = (lenses && lenses.contributors) || [];
