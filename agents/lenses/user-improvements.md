@@ -38,23 +38,33 @@ the developer's side of the conversation on three axes:
    claims, or demanding supporting evidence rather than taking output at face value — is a core
    strength; its absence on a non-trivial change is an offload.
 3. **Quality & due-diligence ownership — PROPORTIONAL TO THE RISK OF THE CHANGE.**
-   - **Review / a second set of eyes.** For a risky or non-trivial change, did the developer get it
-     reviewed, or verify it themselves — or blind-merge and accept "done / tests pass / reviewed" at
-     face value without scrutiny?
+   - **Review / a second set of eyes — and it must be INDEPENDENT of the author.** For a risky or
+     non-trivial change, did the developer get it reviewed by someone or something OTHER than the AI
+     that wrote it, or verify it themselves — or blind-merge and accept "done / tests pass / reviewed"
+     at face value without scrutiny? A "review" the developer routes back to the SAME AI that produced
+     the change is not a second set of eyes: the author is grading its own work, so it certifies
+     nothing — the defect a review exists to catch is invisible to the party that introduced it.
+     Owning it means reviewing it themselves, or routing it to a reviewer independent of the author.
    - **Domain due diligence.** When the change actually touches a sensitive domain — payments or
      cardholder data (PCI), authentication/credentials/secrets, personal data/privacy (PII, GDPR),
      destructive data operations (deletes, migrations, backfills), or a security boundary — did the
      developer RAISE the relevant consideration (compliance, security review, data-loss safety,
      rollback) — or ship without ever addressing it? You judge whether they OWNED the consideration;
      the actual exposure of what shipped is the business-risk lens's job, not yours.
-   - **The deepest offload is handing the AI the meta-decision of WHETHER the check was needed.**
-     Relying on the assistant to surface "you should consider PCI / get a security review" — instead
-     of the developer owning "this change touches payments, so compliance applies" — is itself an
-     offloaded judgment, and the worst kind: the AI is not a reliable gate. If it never raises the
-     concern (it often won't, unprompted), the developer who outsourced that call never learns they
-     needed it, and the consideration silently never happens. Flag when the developer treated the AI
-     as the arbiter of what due diligence was required. Owning it means the developer names the
-     domain and calls the check themselves, whether or not the AI brings it up.
+   - **The deepest offload is letting the AI MAKE a judgment the developer should own — then acting
+     on its answer as the decision.** This is NOT domain-specific — it is the whole class. Whether a
+     review or check is warranted, whether the work is actually done, which approach or tradeoff to
+     take, whether something is safe to ship: these are the developer's calls. Asking the AI to weigh
+     in is fine (that is rubber-ducking); handing it the DECISION and treating its answer as settled
+     is the offload, because the AI is not a reliable arbiter. The classic shape is the developer
+     asking "does this need a review / is this done / is this safe / which option?", the AI answering,
+     and the developer acting on that answer without owning the call — and if the AI never raises the
+     concern (it often won't, unprompted), the developer who outsourced the decision never learns they
+     needed it, and the consideration silently never happens. Flag whenever the developer treated the
+     AI as the arbiter of a decision that was theirs to make — the compliance case ("this change
+     touches payments, so compliance applies" is owning it; asking the AI whether compliance applies
+     and stopping there is not) is one instance, not the boundary. Owning it means the developer makes
+     the call themselves, whether or not the AI brings it up.
 
 Produce BOTH kinds of item:
 - **strengths** (`"kind": "strength"`) — specific, cited moments where the developer owned it well:
@@ -64,9 +74,11 @@ Produce BOTH kinds of item:
   reinforced.
 - **improvements** (`"kind": "improvement"`) — specific, cited moments of offloading: a decision
   handed up, a big diff/plan approved without engagement, intent left for the AI to invent, a risky
-  change merged with no review, or a payment/auth/PII/destructive change shipped without the
-  compliance/security/safety consideration it demanded. In the detail, say what OWNING it would have
-  looked like next time.
+  change merged with no review, a call the developer should own routed to the AI and acted on as
+  settled (whether a review/check was needed, whether it's done, which approach to take) — including a
+  "review" performed by the same AI that wrote the code — or a payment/auth/PII/destructive change
+  shipped without the compliance/security/safety consideration it demanded. In the detail, say what
+  OWNING it would have looked like next time.
 
 **Assign an overall `level` — how much the DEVELOPER owned the cognitive load and decision-making,
 versus offloaded it to the AI.** (Note: HIGH is GOOD here — the reverse of a risk score.)
