@@ -120,13 +120,18 @@ Produce BOTH kinds of item:
 **Assign an overall `level` — how much the DEVELOPER owned the cognitive load and decision-making,
 versus offloaded it to the AI.** (Note: HIGH is GOOD here — the reverse of a risk score.)
 - **high** — the developer owned the intent, the key decisions, and the due diligence the risk
-  warranted; the AI executed. Strengths dominate; few or no offloaded-judgment moments.
-- **medium** — mixed: owned some, offloaded some judgment (a decision handed up, or a check left
-  to the AI to decide was needed).
+  warranted; the AI executed. Requires BOTH clear ownership AND a mandatory sweep that genuinely came
+  up thin. Strength VOLUME does not earn high: a session full of strengths that still carries real
+  arbiter offloads on consequential decisions is NOT high.
+- **medium** — mixed: owned some, offloaded some judgment (a decision handed up, a check left to the
+  AI to decide was needed, a consequential recommendation accepted verbatim). One or more real
+  arbiter offloads on non-trivial calls caps the level here even amid many strengths.
 - **low** — pervasive offloading: intent left for the AI to invent, decisions handed up, blanket
   approval of large plans/diffs. Vibecoding.
-Also write a one-sentence `levelNote` justifying the level. Base the level ONLY on the same cited
-evidence as your items — do not inflate it.
+Also write a one-sentence `levelNote` justifying the level, and state in it that the mandatory sweep
+was run. Base the level ONLY on the same cited evidence as your items — do not inflate it, and do NOT
+default to high: LLM judges skew generous, so apply EQUAL rigor to finding real offloads as to
+avoiding false ones. Strengths never offset unaddressed offloads.
 
 Write your result to `PACK_DIR/lenses/user-improvements.json` EXACTLY matching this schema (valid
 JSON, no prose around it):
@@ -188,8 +193,11 @@ Rules:
   neutral at best. The same applies to a plan/approach the AI proposed earlier and the developer now
   cites back: ownership lives in the developer's reasoning about it, never in the document's mere
   presence.
-- Balanced and honest: do not manufacture strengths to seem kind or problems to seem thorough. An
-  empty `items` list is a valid, positive result — it means the developer drove the work well.
+- Balanced and honest — in BOTH directions: do not manufacture strengths to seem kind, and do not
+  suppress real improvements to seem generous. An empty improvements list is valid ONLY after the
+  mandatory sweep genuinely finds none — it is not a default, and "empty is positive" is never a
+  license to skip the sweep. An all-strengths result on a substantive session should make you re-run
+  the arbiter sweep before you trust it. A strength does not cancel an offload; report both.
 - Scope to the developer's interaction and ownership. Repo tooling/structure/docs belongs to
   `repo-improvements`; verification of claims belongs to `verification-rigor`; the actual
   business/compliance exposure of the shipped work belongs to `business-risk`; ask-vs-outcome
