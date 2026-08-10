@@ -57,7 +57,7 @@ This prints a JSON array; each item has `sessionId`, `transcriptPath`, `source`
 (`archive`/`discovered`), `branches`, `firstPrompt`, `timeRange`, `msgCount`, and `relevant`
 (true when its branches include the current branch `${BRANCH}`).
 
-- **Interactive run (default for `/eval-pack:generate` and `/eval-pack:review`):** if the array is
+- **Interactive run (default for `/eval-pack-next:generate` and `/eval-pack-next:review`):** if the array is
   non-empty, present the candidates as a checklist — **pre-check the `relevant: true`** ones (same
   branch) and leave the rest unchecked. Show first prompt + branch + time range + message count per
   item. Ask the user to confirm or edit. The user MAY pick none. Collect the `transcriptPath` of
@@ -462,4 +462,4 @@ Tell the user:
 - Key flags detected
 - The `Open: file://…/index.html` path that `render_html.py` printed — they can open it directly in a browser, no unzip needed
 - That the committed zip in `<outputDir>/` is the portable copy for PRs
-- That they can run `/eval-pack:review` to create a PR with the eval pack attached
+- That they can run `/eval-pack-next:review` to create a PR with the eval pack attached

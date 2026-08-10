@@ -44,7 +44,7 @@ A Claude Code plugin that generates eval packs — polished HTML reports capturi
 ## Requirements
 
 - **Python 3** — required by the generation scripts (`extract_metrics.py`, `detect_patterns.py`, `extract_tools.py`, `render_html.py`); JSON parsing and zip packaging use the Python standard library, so no extra CLI tools are needed
-- **gh** CLI — required by `/eval-pack:review` to create PRs and post comments
+- **gh** CLI — required by `/eval-pack-next:review` to create PRs and post comments
 
 ## Install
 
@@ -52,13 +52,13 @@ In Claude Code, run:
 
 ```
 /plugin marketplace add smalls257/eval-pack
-/plugin install eval-pack@eval-pack
+/plugin install eval-pack-next@eval-pack-next
 ```
 
 Then run the setup skill to wire up the gitignore:
 
 ```
-/eval-pack:setup
+/eval-pack-next:setup
 ```
 
 ### Distribute to your team
@@ -78,14 +78,14 @@ To distribute the marketplace config to everyone who clones your repo, commit `.
 }
 ```
 
-Each dev still needs to run `/plugin marketplace add smalls257/eval-pack` and `/plugin install eval-pack@eval-pack` once to install the plugin.
+Each dev still needs to run `/plugin marketplace add smalls257/eval-pack` and `/plugin install eval-pack-next@eval-pack-next` once to install the plugin.
 
 ## Usage
 
 ### Generate an eval pack
 
 ```
-/eval-pack:generate
+/eval-pack-next:generate
 ```
 
 Produces a self-contained zip in `.eval-packs/<session-id>.zip`. Extract and open `index.html` in a browser.
@@ -93,14 +93,14 @@ Produces a self-contained zip in `.eval-packs/<session-id>.zip`. Extract and ope
 ### Generate + create PR
 
 ```
-/eval-pack:review
+/eval-pack-next:review
 ```
 
 Generates the eval pack, commits the zip to the current branch, and creates (or updates) a PR.
 
 ### Agent auto-generation
 
-Agents can invoke `/eval-pack:generate` autonomously when they judge work is PR-ready. No hooks required — the agent calls the skill like any other.
+Agents can invoke `/eval-pack-next:generate` autonomously when they judge work is PR-ready. No hooks required — the agent calls the skill like any other.
 
 ## Configuration
 
@@ -108,7 +108,7 @@ eval-pack is configured per-repo via `.eval-pack.json` (committed) and `.eval-pa
 (gitignored, per-developer). Layering, lowest to highest: bundled defaults < `extends` presets <
 `.eval-pack.json` < `.eval-pack.local.json` < `CLAUDE_PLUGIN_OPTION_*` env. Validation is
 fail-loud: an unknown key, bad type, bad regex, or missing referenced file halts generation with
-a precise error. Run `/eval-pack:setup` for a guided start. **Full per-key reference (every
+a precise error. Run `/eval-pack-next:setup` for a guided start. **Full per-key reference (every
 option, type, default, and constraint):** [`docs/configuration.md`](docs/configuration.md).
 
 ```json
@@ -251,7 +251,7 @@ a nonzero exit — becomes that same red flag; it can't vanish silently.
 1. Edit `.eval-pack.json` (rubric, stance, detectors, lenses, thresholds…).
 2. Instant check: `python3 <plugin>/scripts/resolve_config.py . --check` — a bad key/regex/band
    halts here, not mid-run (or just run step 3; it validates first).
-3. `/eval-pack:tune` — re-evaluates the latest pack with your new config in minutes: recorded
+3. `/eval-pack-next:tune` — re-evaluates the latest pack with your new config in minutes: recorded
    facts (transcript, metrics, tests) are reused; only patterns, the evaluator, lenses, and the
    report re-run. Each tune appends a **round**, so the report shows your before/after.
    **Iterating on one lens? Re-run just that lens** — e.g. "tune only the sycophancy lens" (or
@@ -262,7 +262,7 @@ a nonzero exit — becomes that same red flag; it can't vanish silently.
 
 ## How It Works
 
-1. Dev (or agent) runs `/eval-pack:generate`
+1. Dev (or agent) runs `/eval-pack-next:generate`
 2. Scripts extract metrics and detect heuristic patterns from the transcript
 3. Claude runs appropriate tests, captures screenshots and logs
 4. The configured judgment lenses run (the eight bundled lenses, all default-on: requirement-drift,
@@ -271,7 +271,7 @@ a nonzero exit — becomes that same red flag; it can't vanish silently.
 5. The evaluator synthesizes a single completion/confidence verdict from the lens findings and
    heuristic flags — it does not re-judge a dimension a lens already owns
 6. HTML report is rendered with all data, zipped to `.eval-packs/<session-id>.zip`
-7. `/eval-pack:review` commits the zip to the branch and creates a PR
+7. `/eval-pack-next:review` commits the zip to the branch and creates a PR
 8. Reviewer downloads zip from the branch, extracts, opens `index.html`
 
 ### Lenses are default-on, and default-on means mandatory
@@ -285,10 +285,10 @@ ground where a configured lens is allowed to just not show up.
 
 ## Output
 
-`/eval-pack:generate` writes a portable `.zip` into your `outputDir` (default `.eval-packs/`)
+`/eval-pack-next:generate` writes a portable `.zip` into your `outputDir` (default `.eval-packs/`)
 **and** an uncompressed, openable copy into your system temp directory. The command prints an
 `Open: file://…/index.html` path — open it directly in a browser, no unzip required. The zip is
-what `/eval-pack:review` commits to a PR branch.
+what `/eval-pack-next:review` commits to a PR branch.
 
 The analysis is written by an independent `eval-pack-evaluator` sub-agent, not by the agent that
 did the work, so the evaluation is not self-graded. When the `analysis` option is `false`, the
@@ -296,7 +296,7 @@ pack renders an explicit "analysis disabled" banner instead of an AI evaluation.
 
 ## Ticket linking
 
-`/eval-pack:review` adds a `## Ticket` reference to the PR body. It auto-detects a ticket key
+`/eval-pack-next:review` adds a `## Ticket` reference to the PR body. It auto-detects a ticket key
 matching `[A-Z][A-Z0-9]+-[0-9]+` (e.g. `PROJ-123`) from the branch name or this branch's commit
 messages; if none is found it asks once (answer with a key, a full URL, or `none`). Set
 `ticketBaseUrl` to render detected keys as clickable links. The reference is added when the PR is

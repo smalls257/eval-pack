@@ -1,6 +1,6 @@
 ---
 name: eval-pack-evaluator
-description: Independent synthesizer for eval-pack. Reads the recorded session artifacts (transcript, metrics, patterns, test results, per-repo git diffs) PLUS the lens findings already computed, and writes analysis.json. Dispatched by /eval-pack:generate so the evaluation is NOT authored by the agent that did the work.
+description: Independent synthesizer for eval-pack. Reads the recorded session artifacts (transcript, metrics, patterns, test results, per-repo git diffs) PLUS the lens findings already computed, and writes analysis.json. Dispatched by /eval-pack-next:generate so the evaluation is NOT authored by the agent that did the work.
 tools: Read, Write, Bash, Glob, Grep
 ---
 

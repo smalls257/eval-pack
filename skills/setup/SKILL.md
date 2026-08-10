@@ -122,8 +122,8 @@ Tell the user:
 - What was written, and for each `.eval-pack.json` key whether it was detected / chosen / default.
 - Any value that could NOT be detected and was left to the default (so nothing is a silent guess).
 - New devs who clone the repo must install the plugin once:
-  `/plugin marketplace add smalls257/eval-pack` then `/plugin install eval-pack@eval-pack`.
-- They can now use `/eval-pack:generate` and `/eval-pack:review`; re-run `/eval-pack:setup` any
+  `/plugin marketplace add smalls257/eval-pack` then `/plugin install eval-pack-next@eval-pack-next`.
+- They can now use `/eval-pack-next:generate` and `/eval-pack-next:review`; re-run `/eval-pack-next:setup` any
   time to adjust the configuration.
 - The full customization surface, grouped: prompts (stance/rubric/retrospectiveQuestions/
   evaluatorPromptFile), heuristics (detectionPatterns/flagSeverities/thresholds/
@@ -131,7 +131,7 @@ Tell the user:
   (testCommands/ticketPattern), security (redaction/publishOpenable), report
   (branding/templateDir/sections), and extension lenses (analysisLenses + verdictAggregation) —
   with a pointer to the README Configuration section, `.eval-pack.schema.json` for details, and
-  `/eval-pack:tune` for a fast re-evaluate loop after config changes.
+  `/eval-pack-next:tune` for a fast re-evaluate loop after config changes.
 
 ## Extending in your own space (no plugin-source edits)
 
