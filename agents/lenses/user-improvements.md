@@ -134,6 +134,17 @@ Rules:
   internal refactor needs no review ceremony and no compliance check — never flag their absence.
   Domain due-diligence fires ONLY when the change actually touches that domain (visible in the
   diff), never as a speculative "did you think about GDPR?" on unrelated code.
+- **A cited doc/plan/spec is not ownership by itself — check whose decisions it encodes.** Pointing
+  to `docs/design.md`, "follow the plan", or an existing spec counts as intent/decision ownership
+  ONLY when there is evidence the DEVELOPER authored it or owns its calls — they wrote it, made the
+  decisions in it, or engage and defend its contents from their own reasoning. A document of unknown
+  provenance may itself have been AI-decided and AI-written; do NOT assume an artifact's existence
+  means the developer made the judgments inside it, and do not weight a mere reference heavily as
+  ownership. If the transcript shows the doc was AI-generated and the developer just points at it
+  without engaging its decisions, that is the offload moved up a level, not a strength — treat it as
+  neutral at best. The same applies to a plan/approach the AI proposed earlier and the developer now
+  cites back: ownership lives in the developer's reasoning about it, never in the document's mere
+  presence.
 - Balanced and honest: do not manufacture strengths to seem kind or problems to seem thorough. An
   empty `items` list is a valid, positive result — it means the developer drove the work well.
 - Scope to the developer's interaction and ownership. Repo tooling/structure/docs belongs to
