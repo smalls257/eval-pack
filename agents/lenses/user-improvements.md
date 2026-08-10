@@ -102,14 +102,19 @@ it; for a risk-relevant call, an unchecked AI rationale under an owned decision 
 flagging.
 
 **Two checks that are easy to miss — run them explicitly, every session:**
-1. **Who decided a review/QA/check was needed?** If the developer asked the AI "do we need a review? /
-   should this be reviewed? / does this need tests?" and acted on the AI's answer, the developer
-   OFFLOADED the necessity judgment — flag it, EVEN IF a review then happened. Owning it means the
-   developer decides the change warrants review. Do NOT record "a review happened" as a strength when
-   the developer neither decided it was needed NOR obtained one INDEPENDENT of the author (an AI
-   reviewing the code it just wrote is not a second set of eyes). Complete delegation — "is a code
-   review required?" answered by the AI and accepted — is a clear improvement, not a neutral question,
-   and it is the single most-missed offload: check for it deliberately.
+1. **Who decided a review/QA/check was needed? — asking the AI is ITSELF the offload.** Deciding
+   whether a change warrants review is the DEVELOPER's judgment to own. If the developer asked the AI
+   "do we need a review? / should this be reviewed? / does this need tests?", that question IS the
+   offload: the developer handed a decision that was theirs to the AI, which should not be making that
+   call at all. This is **ALWAYS an `improvement`, NEVER a strength** — regardless of what the AI
+   answered, whether a review then happened, or how it turned out. Do NOT credit "the developer raised
+   the review question" or "a review happened" as ownership — those are the exact misreads to avoid;
+   the ONLY ownership move here is the developer DECIDING on their own that the change needs review
+   (asserting it, not asking). Having the AI then perform the review compounds the offload (the author
+   is not an independent reviewer). The full pattern — ask the AI if a review is needed → AI says yes
+   → developer tells the AI to do it — is a complete delegation of the decision AND its execution: a
+   clear, high-signal improvement and the single most-missed one. Flag every part of it; credit none
+   of it.
 2. **Do simple/basic questions cluster around the code being changed?** Basic questions about how the
    very area being modified works — asked and taken on the AI's word to proceed — are a possible
    KNOWLEDGE / OWNERSHIP gap, not noise. Surface the pattern (at least one improvement naming it),
@@ -122,9 +127,12 @@ flagging.
 Produce BOTH kinds of item:
 - **strengths** (`"kind": "strength"`) — specific, cited moments where the developer owned it well:
   crisp acceptance criteria front-loaded, a decisive tradeoff call, a correction grounded in their
-  own reasoning, real pushback on a wrong direction, insisting a risky change be reviewed, or raising
-  the compliance/security/data-loss question the change warranted. Name them so the behavior is
-  reinforced. **Scope each vetting/ownership strength to the specific decision it applied to** — one
+  own reasoning, real pushback on a wrong direction, the developer DECIDING on their own that a risky
+  change warrants review and getting an INDEPENDENT (non-author) review, or raising the
+  compliance/security/data-loss question the change warranted. Name them so the behavior is
+  reinforced. **A review is a strength ONLY when the developer owned the decision that it was needed
+  and the reviewer was independent of the author — asking the AI whether a review is needed, or having
+  the AI review its own code, is never a strength (see check 1 above).** **Scope each vetting/ownership strength to the specific decision it applied to** — one
   strong vetting moment does NOT generalize to decisions the developer did not engage, and must not
   offset arbiter offloads elsewhere in the session; credit it for its lane only.
 - **improvements** (`"kind": "improvement"`) — specific, cited moments of offloading: a decision
