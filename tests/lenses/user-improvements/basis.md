@@ -1,6 +1,6 @@
 # user-improvements (Developer Ownership) — evaluation basis
 
-Judges how well the DEVELOPER owned intent, decisions, and risk-proportional due diligence versus offloaded judgment to the AI (vibecoding). HIGH = dev drives, AI executes. Fixtures: a real MIT Claude Code session where the dev vets the AI's diagnosis and owns an auth fix (HIGH), a 943-turn ccexport Claude Code session where the dev drives intent/decisions/risk while the AI executes (HIGH, `marc-big`), a daaain/claude-code-log MIT session where the dev front-loads sharp evidence-backed asks but accepts some AI output unscrutinized (MEDIUM, `coderabbit-review`), a WildChat 'make my login better' auth rewrite with no security concern (LOW, risky), a single-turn 'search + summarize' offload (LOW), and a WildChat 'act as a python expert' vibecoding session that offloads judgment (LOW, `vibe-2`). Plus two SYNTHETIC marker fixtures (purpose-built, not real sessions; see each `meta.json`): `arbiter-offload-verbatim` (LOW — every decision, incl. an auth/ownership boundary, accepted verbatim: "ok, do it", "sure, go ahead", "whatever you think", "ship it") and `comprehension-gap` (MEDIUM — the dev owns intent but ships a log-format change while asking whether it affects unrelated webhook/invoice subsystems, taking the AI's answer on trust). A third, `review-delegation-knowledge-gap` (MEDIUM), pins the two most-missed signals: the developer offloads the whether-a-code-review-is-needed decision AND has the authoring AI review its own change, while asking basic questions about the auth code being changed — intent is owned (one strength) but the whole due-diligence chain is offloaded. These pin the arbiter-test, comprehension, and review-necessity signals so the gate regression-locks them.
+Judges how well the DEVELOPER owned intent, decisions, and risk-proportional due diligence versus offloaded judgment to the AI (vibecoding). HIGH = dev drives, AI executes. Fixtures: a real MIT Claude Code session where the dev vets the AI's diagnosis and owns an auth fix (HIGH), a 943-turn ccexport Claude Code session where the dev drives intent/decisions/risk while the AI executes (HIGH, `marc-big`), a daaain/claude-code-log MIT session where the dev front-loads sharp evidence-backed asks but accepts some AI output unscrutinized (MEDIUM, `coderabbit-review`), a WildChat 'make my login better' auth rewrite with no security concern (LOW, risky), a single-turn 'search + summarize' request where the dev owns intent on a no-risk task (HIGH — execution delegation, not an offload; `vibecoded-research-offload`), and a WildChat 'act as a python expert' session where the dev owns intent and independently tests the AI's output but offloads one correctness call (MEDIUM, `vibe-2`). Plus two SYNTHETIC marker fixtures (purpose-built, not real sessions; see each `meta.json`): `arbiter-offload-verbatim` (LOW — every decision, incl. an auth/ownership boundary, accepted verbatim: "ok, do it", "sure, go ahead", "whatever you think", "ship it") and `comprehension-gap` (LOW — the dev owns intent but ships a log-format change while asking whether it affects unrelated webhook/invoice subsystems, taking the AI's answer on trust; intent ownership does not offset the offloaded judgment + comprehension on a payments-adjacent change). A third, `review-delegation-knowledge-gap` (LOW), pins the two most-missed signals: the developer offloads the whether-a-code-review-is-needed decision AND has the authoring AI review its own change, while asking basic questions about the auth code being changed — intent is owned (one strength) but the whole due-diligence chain is offloaded. These pin the arbiter-test, comprehension, and review-necessity signals so the gate regression-locks them.
 
 **Fairness:** rubber-ducking/discovery is engaged ownership, not an offload (see the rubber-ducking-is-fine claim + the HIGH fixture's exploratory turns). **Provenance caveat:** the single source is an internal design principle (vibecoding), not an external citation; the offline gate checks basis<->ledger title agreement.
 
@@ -24,7 +24,8 @@ Judges how well the DEVELOPER owned intent, decisions, and risk-proportional due
         "dev-owned-deploy-auth",
         "vibecoded-auth-rewrite",
         "marc-big",
-        "coderabbit-review"
+        "coderabbit-review",
+        "vibe-2"
       ]
     },
     {
@@ -45,9 +46,7 @@ Judges how well the DEVELOPER owned intent, decisions, and risk-proportional due
         "vibecoding-decay"
       ],
       "covers": [
-        "vibecoded-auth-rewrite",
-        "vibecoded-research-offload",
-        "vibe-2"
+        "vibecoded-auth-rewrite"
       ]
     },
     {
@@ -78,6 +77,16 @@ Judges how well the DEVELOPER owned intent, decisions, and risk-proportional due
       ],
       "covers": [
         "review-delegation-knowledge-gap"
+      ]
+    },
+    {
+      "id": "execution-delegation-is-fine",
+      "statement": "Delegating EXECUTION — a scoped research/summarize task, or a specified piece of work — while owning the intent and scope, with no engineering judgment handed over and no risk domain touched, is healthy use of the tool, NOT an offload. Proportionate to a no-risk task, an absence of review ceremony is correct, so such a session is HIGH ownership, not low. The offload is handing over JUDGMENT, not using the AI to do specified work.",
+      "sources": [
+        "vibecoding-decay"
+      ],
+      "covers": [
+        "vibecoded-research-offload"
       ]
     }
   ],

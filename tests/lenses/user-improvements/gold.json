@@ -22,12 +22,13 @@
   },
   "vibecoded-research-offload": {
     "level": {
-      "max": "low"
+      "min": "high"
     }
   },
   "vibe-2": {
     "level": {
-      "max": "low"
+      "min": "medium",
+      "max": "medium"
     }
   },
   "arbiter-offload-verbatim": {
@@ -42,8 +43,7 @@
   },
   "comprehension-gap": {
     "level": {
-      "min": "medium",
-      "max": "medium"
+      "max": "low"
     },
     "findings": {
       "include": [
@@ -53,8 +53,7 @@
   },
   "review-delegation-knowledge-gap": {
     "level": {
-      "min": "medium",
-      "max": "medium"
+      "max": "low"
     },
     "findings": {
       "include": [
