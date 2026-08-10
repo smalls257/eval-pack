@@ -1,6 +1,6 @@
 # user-improvements (Developer Ownership) — evaluation basis
 
-Judges how well the DEVELOPER owned intent, decisions, and risk-proportional due diligence versus offloaded judgment to the AI (vibecoding). HIGH = dev drives, AI executes. Fixtures: a real MIT Claude Code session where the dev vets the AI's diagnosis and owns an auth fix (HIGH), a 943-turn ccexport Claude Code session where the dev drives intent/decisions/risk while the AI executes (HIGH, `marc-big`), a daaain/claude-code-log MIT session where the dev front-loads sharp evidence-backed asks but accepts some AI output unscrutinized (MEDIUM, `coderabbit-review`), a WildChat 'make my login better' auth rewrite with no security concern (LOW, risky), a single-turn 'search + summarize' offload (LOW), and a WildChat 'act as a python expert' vibecoding session that offloads judgment (LOW, `vibe-2`). Plus two SYNTHETIC marker fixtures (purpose-built, not real sessions; see each `meta.json`): `arbiter-offload-verbatim` (LOW — every decision, incl. an auth/ownership boundary, accepted verbatim: "ok, do it", "sure, go ahead", "whatever you think", "ship it") and `comprehension-gap` (MEDIUM — the dev owns intent but ships a log-format change while asking whether it affects unrelated webhook/invoice subsystems, taking the AI's answer on trust). These pin the arbiter-test and comprehension signals so the gate regression-locks them.
+Judges how well the DEVELOPER owned intent, decisions, and risk-proportional due diligence versus offloaded judgment to the AI (vibecoding). HIGH = dev drives, AI executes. Fixtures: a real MIT Claude Code session where the dev vets the AI's diagnosis and owns an auth fix (HIGH), a 943-turn ccexport Claude Code session where the dev drives intent/decisions/risk while the AI executes (HIGH, `marc-big`), a daaain/claude-code-log MIT session where the dev front-loads sharp evidence-backed asks but accepts some AI output unscrutinized (MEDIUM, `coderabbit-review`), a WildChat 'make my login better' auth rewrite with no security concern (LOW, risky), a single-turn 'search + summarize' offload (LOW), and a WildChat 'act as a python expert' vibecoding session that offloads judgment (LOW, `vibe-2`). Plus two SYNTHETIC marker fixtures (purpose-built, not real sessions; see each `meta.json`): `arbiter-offload-verbatim` (LOW — every decision, incl. an auth/ownership boundary, accepted verbatim: "ok, do it", "sure, go ahead", "whatever you think", "ship it") and `comprehension-gap` (MEDIUM — the dev owns intent but ships a log-format change while asking whether it affects unrelated webhook/invoice subsystems, taking the AI's answer on trust). A third, `review-delegation-knowledge-gap` (MEDIUM), pins the two most-missed signals: the developer offloads the whether-a-code-review-is-needed decision AND has the authoring AI review its own change, while asking basic questions about the auth code being changed — intent is owned (one strength) but the whole due-diligence chain is offloaded. These pin the arbiter-test, comprehension, and review-necessity signals so the gate regression-locks them.
 
 **Fairness:** rubber-ducking/discovery is engaged ownership, not an offload (see the rubber-ducking-is-fine claim + the HIGH fixture's exploratory turns). **Provenance caveat:** the single source is an internal design principle (vibecoding), not an external citation; the offline gate checks basis<->ledger title agreement.
 
@@ -68,6 +68,16 @@ Judges how well the DEVELOPER owned intent, decisions, and risk-proportional due
       ],
       "covers": [
         "comprehension-gap"
+      ]
+    },
+    {
+      "id": "review-necessity-is-ownership",
+      "statement": "Deciding whether a change warrants review/QA is the developer's judgment; asking the AI whether a review is needed and acting on its answer offloads it — even if a review then happens — and a review performed by the author (the AI that wrote the code) is not an independent second set of eyes. Basic questions clustering around the code being changed are a possible comprehension/ownership gap that must be surfaced, not left silent.",
+      "sources": [
+        "vibecoding-decay"
+      ],
+      "covers": [
+        "review-delegation-knowledge-gap"
       ]
     }
   ],

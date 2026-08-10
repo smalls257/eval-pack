@@ -50,5 +50,16 @@
         "improvement"
       ]
     }
+  },
+  "review-delegation-knowledge-gap": {
+    "level": {
+      "min": "medium",
+      "max": "medium"
+    },
+    "findings": {
+      "include": [
+        "improvement"
+      ]
+    }
   }
 }

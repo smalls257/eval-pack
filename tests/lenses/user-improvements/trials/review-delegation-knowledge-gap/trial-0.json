@@ -1,0 +1,37 @@
+{
+  "skill": "user-improvements",
+  "role": "contributor",
+  "title": "Developer Ownership",
+  "level": "medium",
+  "levelNote": "Mandatory sweep run: the developer owned intent crisply (exact 24h to 1h change in the named service) but offloaded the entire due-diligence chain on a security-sensitive auth change — letting the AI decide a review was needed, routing that review back to the authoring AI, and shipping on its self-approval — which caps the level at medium despite the clear intent ownership.",
+  "items": [
+    {
+      "kind": "strength",
+      "title": "Precise, front-loaded intent",
+      "quote": "I need to change the session token expiry from 24h to 1h in our auth service",
+      "evidential": true,
+      "detail": "In the opening turn the developer specified the goal exactly — which value changes (session token expiry), from what to what (24h to 1h), and in which component (the auth service). This is real intent ownership: nothing about the acceptance criteria was left for the AI to invent, and the subsequent 'go ahead and make the expiry change' is delegation of already-specified EXECUTION, which is the correct use of the tool and not an offload. Credit is scoped to intent-setting on this one change; it does not extend to the due-diligence decisions the developer later handed up."
+    },
+    {
+      "kind": "improvement",
+      "title": "Review necessity handed to the AI to decide",
+      "quote": "do we need a code review for this?",
+      "evidential": true,
+      "detail": "Rather than deciding for themselves that a change to authentication/session lifetime warrants review, the developer asked the AI whether a review was needed and then acted on its 'Yes' (the next turn is 'ok can you review it then?'). This is the most-missed offload: the necessity judgment on a risk-relevant call was delegated to the AI, which is not a reliable arbiter. Owning it would look like the developer stating the call themselves — 'this touches auth and every logged-in user, so it gets a review' — independent of whether the AI raised the concern. That a review then nominally happened does not convert this into a strength, because the developer neither decided it was needed nor obtained an independent one."
+    },
+    {
+      "kind": "improvement",
+      "title": "Security change reviewed by its own author, then shipped on that self-approval",
+      "quote": "ok can you review it then?",
+      "evidential": true,
+      "detail": "The developer routed the review of a security-sensitive auth change back to the very AI that wrote it, and then shipped on the strength of that self-review ('perfect, ship it' after the AI's 'Looks good to ship'). An author grading its own work is not a second set of eyes — the defect a review exists to catch is exactly the one invisible to the party that introduced it, so this certifies nothing. Accepting 'Looks good to ship' verbatim on a change to session lifetime is an arbiter offload scaled to high stakes. Owning it would mean reviewing the diff themselves or routing it to a reviewer independent of the author before it ships."
+    },
+    {
+      "kind": "improvement",
+      "title": "Possible comprehension gap about the auth flow being changed",
+      "quote": "does changing the expiry affect the refresh flow at all?",
+      "evidential": true,
+      "detail": "Two basic questions about how the very system being modified works cluster around this change and are taken on the AI's word to proceed: whether shortening access-token expiry affects the refresh flow (turn 1) and where tokens are actually validated on incoming requests — middleware or auth service (turn 3). These are the core mechanics of the token lifecycle the developer is shipping a security change to, and the answers were accepted as truth with no independent verification before proceeding. This may indicate limited ownership of the code itself rather than genuine learning of an unfamiliar area: the reasoning about blast radius (refresh, validation) was taken on trust. Owning it would mean confirming those mechanics from the code — reading auth/token.py and middleware/auth.py — so the developer, not the AI, can vouch for the change's impact on a security boundary."
+    }
+  ]
+}
