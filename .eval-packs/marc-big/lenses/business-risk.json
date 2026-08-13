@@ -1,0 +1,14 @@
+{
+  "skill": "business-risk",
+  "role": "contributor",
+  "title": "Business Risk",
+  "level": "low",
+  "notes": "Blast radius is a single developer's machine and reversibility is high: ccexport is a personal Ruby CLI that reads Claude Code JSONL logs non-destructively and writes new Markdown/HTML files, with no service, billing, deployment, or third-party data surface to harm if shipped as-is.",
+  "mitigation": [
+    "Add a redaction pass (or a --redact flag) that strips secret-shaped strings and drops the thinking-block \"signature\" blobs before writing Markdown/HTML, since the transcript shows exported output (VIBE.md/VIBE.html) being committed into the repo as examples with no scrubbing.",
+    "Anonymize absolute filesystem paths in output (the JSONL \"cwd\" carries values like /Users/marcheiligers/Projects/ccexport) so a shared export does not leak the author's local username and directory layout.",
+    "Ensure the ERB preview template HTML-escapes all conversation content by default; the recurring 'not escaped properly resulting in bad output' and backticks-in-backticks bugs show untrusted log text reaching the template, which matters once an HTML preview is shared rather than only opened locally.",
+    "Add a README caution that exported conversations may contain source, credentials, or private paths and should be reviewed before committing or sharing, alongside the note about the VIBE.md/VIBE.html examples."
+  ],
+  "mainRisk": "Exported logs can contain secrets and private paths, yet the tool ships no redaction while its own README encourages committing an exported conversation as an example — so a user who exports and publishes a secret-bearing session could leak credentials, though the exposure is user-mediated and the export is deletable."
+}

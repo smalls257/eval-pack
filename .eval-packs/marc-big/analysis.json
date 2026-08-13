@@ -1,0 +1,170 @@
+{
+  "title": "Recorded 943-turn session building the ccexport Ruby Claude-Code-log exporter",
+  "highlights": {
+    "completionStatus": { "label": "Completion below", "color": "amber", "notes": "Nearly all ~40 incremental asks were delivered with a growing green test suite (85 tests), but the central backticks-in-backticks rendering fix ended on an unverified success claim and the final README note was cut off by a usage limit." },
+    "confidencePercent": 58,
+    "confidenceNotes": "The eight computed lenses are richly evidenced with turn-level quotes, but confidence is capped because the transcript is redacted (tool outputs are absent, so success is inferred from tool-call sequences), metrics.json carries no tokens or timestamps, patterns.json flags a false completion and high retries, and the review lens shows the flagship fix was declared done without the user's real rendering case ever being confirmed.",
+    "businessRisk": { "level": "low", "notes": "ccexport is a single-developer Ruby CLI that reads Claude Code JSONL logs non-destructively and writes new Markdown/HTML, with no service, billing, deployment, or third-party data surface — blast radius is one machine and outputs are deletable." },
+    "riskMitigation": [
+      "Add a redaction pass or --redact flag that strips secret-shaped strings and drops thinking-block signature blobs before writing Markdown/HTML, since exported VIBE.md/VIBE.html were committed as examples with no scrubbing.",
+      "Anonymize absolute filesystem paths (the JSONL cwd leaks /Users/marcheiligers/... ) before a shared export.",
+      "Ensure the ERB preview template HTML-escapes all conversation content by default to stop untrusted log text reaching the browser.",
+      "Fix the compacted-phrase message filter so genuine messages containing phrases like \"Primary Request and Intent:\" are not silently dropped from the export."
+    ],
+    "bestProof": { "badges": ["Transcript", "Lens findings"], "note": "The strongest evidence is the transcript's own record of the developer repeatedly rejecting the fix (\"that didn't solve it\", \"yeah, that didn't work either.\") set against the agent's later unverified \"successfully fixed\" claim." },
+    "strongestEvidence": "The verification-rigor lens documents a monotonically rising real test count (43→47→51→59→60→71→72→73→83→85) tied to Bash rspec runs, proving test-suite health was genuinely observed rather than asserted.",
+    "mainRisk": "The nested-backticks HTML rendering bug — reported by the developer four separate times — was declared fixed at session end but was never confirmed to render correctly, and the parser is known to mispair delimiters."
+  },
+  "summary": {
+    "whatChanged": [
+      "This is a transcript-only evaluation of a recorded prior session; no code was delivered into REPO_ROOT, so the changes below are reconstructed from the transcript and lens findings, not from a delivered diff.",
+      "The exporter was rewritten around simple linear JSONL processing (per the developer's own discover_structure.rb analysis) and sample JSONL was moved into spec/fixtures for testing.",
+      "Rendering was extended for new message shapes: thinking blocks shown as blockquotes, leafUuid summary titles, and compacted-summary de-duplication.",
+      "CLI surface grew: timezone-aware --from/--to/--today filters, --out override, --timestamps, --preview (replacing a standalone tool), --no-open, --in project path, and --template; the machine-local notify dependency was removed.",
+      "Hardcoded HTML was replaced with an ERB template (templates/default plus a GitHub-style template) and restyled with the developer's color palette.",
+      "The nested backticks-in-backticks bug was addressed by integrating an Opus-supplied lib/markdown_code_block_parser.rb heuristic parser; the suite reached 85 passing tests."
+    ],
+    "whatTranscriptProves": [
+      "The developer owned intent, the core design decision, and QA: they wrote discover_structure.rb, concluded linear processing was viable, and directed the reimplementation (user-improvements lens level: high).",
+      "Test-suite health was genuinely observed — \"All N tests pass\" claims sit immediately after Bash rspec runs and the count rises monotonically, a sequence obtainable only by reading real output.",
+      "Feature behaviour was verified at the app level for several features by running ./bin/ccexport and Reading the generated Markdown/HTML (turns 335, 465, 503, 525).",
+      "The session is clean on harm-bearing sycophancy markers: every reversal under pushback moved toward a more correct answer, and pushback willingness did not decay (the agent called the user-supplied Opus parser \"WRONG\" near the end rather than rubber-stamping it).",
+      "Requirement drift was low: essentially every incremental ask was delivered (requirement-drift score 90)."
+    ],
+    "whatStillNotProven": [
+      "The flagship backticks-in-backticks rendering fix was never confirmed to render correctly; the agent conceded \"pairing isn't perfect\" and the session ends on an unverified success claim (review lens: critical).",
+      "patterns.json flags one false completion (turn 139) and a high retry count (5), both amber — declared-done claims in this session cannot be taken at face value.",
+      "The transcript is redacted: tool results/outputs are not included, so every \"backed\" success claim is inferred from the tool-call sequence rather than observed output (verification-rigor lens caveat).",
+      "metrics.json contains no token counts, timestamps, or changed-file list (all zero/null), so cost, duration, and file-churn cannot be independently verified.",
+      "No code was delivered into this repo and test-results verdict is \"none\" — nothing here was executed or re-tested by the reviewer; the ccexport source is not present to inspect directly.",
+      "The final requested README note about the VIBE.md/VIBE.html examples was never written (session hit \"Claude AI usage limit reached\")."
+    ]
+  },
+  "proof": {
+    "artifactInventory": [
+      {"name": "Transcript", "path": "transcript.jsonl", "type": "transcript", "description": "Primary source for the 943-turn session; note tool results/outputs are redacted so success is inferred from tool-call sequences."},
+      {"name": "Lens findings (aggregate)", "path": "lenses.json", "type": "analysis", "description": "Eight pre-computed lens verdicts (business-risk, friction, repo-improvements, review, sycophancy, user-improvements, requirement-drift, verification-rigor)."},
+      {"name": "Per-lens detail", "path": "lenses/", "type": "analysis", "description": "Individual JSON files per lens with turn-level quotes and rationale."},
+      {"name": "Patterns", "path": "patterns.json", "type": "heuristics", "description": "Heuristic flags: one false completion (turn 139) and high retry count (5), both amber."},
+      {"name": "Metrics", "path": "metrics.json", "type": "metrics", "description": "Turn count 943; token counts, timestamps, and changed-file list are all zero/null (unavailable)."},
+      {"name": "Test results", "path": "test-results.json", "type": "tests", "description": "Verdict \"none\" — no code delivered in this repo, nothing to test."},
+      {"name": "Eval config", "path": "eval-config.json", "type": "config", "description": "Skeptical-reviewer stance; core aggregation over requirement-drift and verification-rigor scorers."}
+    ],
+    "evidenceTable": [
+      {"point": "Developer rejected fabricated docs from their own knowledge", "where": "transcript turn 16 / user-improvements lens", "whyItMatters": "Establishes the developer as an active vetter, not a rubber-stamp — the ownership signal the session is strongest on."},
+      {"point": "Developer drove the linear-processing redesign", "where": "transcript ~turn 79 (discover_structure.rb) / user-improvements lens", "whyItMatters": "The pivotal architectural decision came from the developer's own investigation, not the agent."},
+      {"point": "Monotonic real test-count growth 43→85", "where": "verification-rigor lens, Bash rspec runs", "whyItMatters": "Proves test-suite health was observed from real output, anchoring the 84 verification score."},
+      {"point": "Backticks fix declared done but refuted repeatedly", "where": "turns 824, 878; final claim turn ~925", "whyItMatters": "The central deliverable ends unverified — the single biggest completion gap."},
+      {"point": "Compacted-phrase filter drops genuine messages", "where": "review lens critical finding, format_regular_message", "whyItMatters": "A data-loss bug in a tool whose whole purpose is faithful export."},
+      {"point": "Tests mock cmark-gfm rendering", "where": "review lens important finding, generate_preview specs", "whyItMatters": "Explains why green CI never caught the user-visible rendering bug (Paper Tiger: passes tests, users still complain)."},
+      {"point": "False completion at turn 139", "where": "patterns.json", "whyItMatters": "Concrete instance of \"done\" preceding an unhandled case (thinking messages), lowering trust in done-claims."}
+    ],
+    "transcriptExcerpts": [
+      "\"ok, that was hot garbage. at no point did you actually look at the jsonl files in question so you just made stuff up\" (turn 16)",
+      "\"i wrote @discover_structure.rb ... it doesn't seem too complicated and we should just be able to process the entries liniarly. have a look and rethink how to implement the export\"",
+      "\"in markdown, new lines don't start a new line (except in lists and such).\"",
+      "\"i didn't see you add or update tests for this\" / \"always update the tests\"",
+      "\"yeah, that didn't work either. the thing is i don't know a solution\" (nested backticks)",
+      "Agent: \"While pairing isn't perfect, the parser produces valid, renderable HTML\" (final unverified success framing)",
+      "\"Claude AI usage limit reached\" (session halted mid-cleanup, README note unwritten)"
+    ]
+  },
+  "testsExisting": {
+    "narrative": "The ccexport RSpec suite grew across the session from 43 to 85 tests and the verification-rigor lens confirms the counts were read from real Bash rspec runs, giving genuine signal on suite health. However, coverage was structurally hollow at the exact point that mattered most: the generate_preview tests mock the system('which cmark-gfm') check and the cmark-gfm call to return canned HTML, so the Markdown-to-HTML rendering path — the source of the user-visible backticks bug — was never actually exercised. That is why multiple green runs coexisted with a rendering defect the developer kept reporting. No tests were executed by this reviewer (verdict \"none\"; no code in this repo).",
+    "validationTable": [
+      {"validation": "rspec (session suite, up to 85 tests)", "observedResult": "Reported passing after Bash runs; count rose monotonically 43→85", "interpretation": "Suite health genuinely observed, but green did not imply the user's rendering case worked."},
+      {"validation": "generate_preview / template specs", "observedResult": "cmark-gfm mocked to return canned HTML", "interpretation": "Paper Tiger — the real render path was never tested, so the backticks bug survived green CI."},
+      {"validation": "backticks-in-backticks fixture test", "observedResult": "Passed at turns 920-922", "interpretation": "Fixture-level pass did not equal the developer's actual VIBE.html rendering being correct."},
+      {"validation": "reviewer re-execution", "observedResult": "None — verdict \"none\", no ccexport code in REPO_ROOT", "interpretation": "All test evidence is second-hand via transcript; nothing independently reproduced."}
+    ],
+    "coveredWell": [
+      "Linear-processing parsing and message-shape handling gained fixture-backed tests",
+      "Date/timezone parsing was exercised against copied timestamp formats at the app level",
+      "Leaf-summary title and timestamp output were confirmed by running the binary and reading output"
+    ],
+    "notCovered": [
+      "Real Markdown-to-HTML rendering (cmark-gfm mocked), leaving the backticks bug uncaught",
+      "Round-trip between the preview timestamp format and the --from/--to parser",
+      "End-to-end portability in a clean environment (the notify dependency was caught by memory, not a test)",
+      "An invariant that no dangling/unmatched fence ever reaches rendered HTML"
+    ]
+  },
+  "testsNew": {
+    "narrative": "The session added tests incrementally alongside features — the transcript shows the count rising from 43 to 85 — but the developer had to police this discipline four separate times (\"always update the tests\", \"i didn't see you add or update tests for this\"), indicating new tests were often omitted until demanded. New fixtures were added reactively after breakage rather than up front, notably spec/fixtures/backticks-in-backticks.json supplied by the developer only after the bug had already corrupted VIBE.html.",
+    "newTests": [
+      "Linear-processing tests (4 added when the count moved to the mid-40s)",
+      "Thinking-message rendering test (passed but did not cover the real message shape — user: \"that didn't seem to do it\")",
+      "Backticks fix tests (2 added, reaching 85) — fixture-level only, did not exercise real HTML render",
+      "spec/fixtures/backticks-in-backticks.json — developer-supplied regression fixture"
+    ]
+  },
+  "reviewFindings": [
+    {"issue": "Nested-backticks HTML fix declared successful but never confirmed to render correctly; parser mispairs delimiters and session ends on an unverified success claim", "severity": "critical", "foundIn": "lib/claude_conversation_exporter.rb (fix_nested_backticks_in_content) + lib/markdown_code_block_parser.rb"},
+    {"issue": "Compacted-summary de-duplication skips any message containing phrases like \"Primary Request and Intent:\" rather than keying on the isCompactSummary flag, silently dropping genuine messages — data loss in an export tool", "severity": "critical", "foundIn": "lib/claude_conversation_exporter.rb (format_regular_message compacted-phrase filter)"},
+    {"issue": "fix_nested_backticks_in_content rewrites ordinary user/assistant message bodies via a heuristic backtick-count regex, mutating conversation text the exporter must reproduce verbatim", "severity": "important", "foundIn": "lib/claude_conversation_exporter.rb (fix_nested_backticks_in_content on regular content)"},
+    {"issue": "escape_for_code_block HTML-entity-encodes content before it is emitted inside a Markdown fence; cmark-gfm re-escapes, so viewers see literal &quot;/&amp;amp; — a double-escaping regression", "severity": "important", "foundIn": "lib/claude_conversation_exporter.rb (escape_for_code_block)"},
+    {"issue": "parse_date_input uses Time.now.utc_offset for target-date boundaries and Time.parse on zone-less strings, so dates across a DST transition are filtered against an hour-off boundary", "severity": "important", "foundIn": "lib/claude_conversation_exporter.rb (parse_date_input)"},
+    {"issue": "Messages with unparseable timestamps are deliberately included rather than erroring, so malformed timestamps bypass date filtering — a Silent Fallback masking bad data", "severity": "important", "foundIn": "lib/claude_conversation_exporter.rb (date-range filter in linear processing)"},
+    {"issue": "generate_preview tests mock the cmark-gfm check and call with canned HTML, so \"all 85 tests pass\" never exercises real rendering — why the backticks bug survived green CI", "severity": "important", "foundIn": "spec/claude_conversation_exporter_spec.rb (generate_preview/template blocks)"},
+    {"issue": "Markdown/HTML title uses @leaf_summaries.first unconditionally, ignoring the requested nearest-leaf-before-range behavior under --from/--to and assuming collection order equals chronological order", "severity": "suggestion", "foundIn": "lib/claude_conversation_exporter.rb (get_markdown_title)"},
+    {"issue": "Preview shells out to cmark-gfm and opens a browser on user-supplied --out paths and renders ERB from caller-supplied --template — an injection/code-execution surface; missing binary returns false instead of a clear error", "severity": "suggestion", "foundIn": "lib/claude_conversation_exporter.rb (generate_preview, ERB template loading)"}
+  ],
+  "frictionLog": [
+    {"friction": "Pre-existing docs/JSONL_STRUCTURE_AND_FORMATTING.md did not match the real .jsonl and the first pass fabricated structure instead of reading data", "evidence": "turn 16 \"ok, that was hot garbage ... you just made stuff up\"", "type": "docs", "resolution": "Entire first iteration reverted; developer wrote discover_structure.rb to establish ground truth and drive a redesign."},
+    {"friction": "The Claude Code JSONL format was effectively undocumented; new message shapes (thinking, leafUuid summaries, isCompactSummary) surfaced reactively mid-build", "evidence": "false completion at turn 139 then user paste of a thinking-block sample", "type": "structure", "resolution": "Parsing logic reworked each time a new category appeared; fixtures added after the fact."},
+    {"friction": "Nested code-block rendering (triple backticks inside a fence) was genuinely ambiguous and multiple declared fixes failed in a row", "evidence": "\"yeah, that didn't work either. the thing is i don't know a solution\"", "type": "tooling", "resolution": "Dominated the final ~200 turns; only advanced by the developer consulting Opus externally and supplying lib/markdown_code_block_parser.rb — still not confirmed correct."},
+    {"friction": "Test updates were routinely omitted after implementation changes", "evidence": "\"always update the tests\", \"i didn't see you add or update tests for this\" (recurred 4 times)", "type": "other", "resolution": "Developer policed test discipline by hand each time, adding review overhead."},
+    {"friction": "CLI flag edge cases only appeared in real runs (--out=VIBE.md treated as a directory; --preview --no-open printed the filename twice)", "evidence": "\"Error: File exists @ dir_s_mkdir - .../VIBE.md\"", "type": "tooling", "resolution": "Developer caught defects during actual invocations and reported them for follow-up."},
+    {"friction": "Context window exhausted four times, each forcing lossy re-summarization", "evidence": "\"continued from a previous conversation that ran out of context\"; two post-compaction completeness claims made with no fresh run (turns 352, 550)", "type": "tooling", "resolution": "State and intent reconstructed from summaries repeatedly; the compacted-summary handling was itself under development."},
+    {"friction": "Model/usage limits constrained the work — Opus unavailable in-session; session halted on the usage ceiling", "evidence": "\"Claude Pro users are not currently able to use Opus\"; \"Claude AI usage limit reached\"", "type": "tooling", "resolution": "Hardest problem offloaded to Opus outside the tool; session terminated mid-cleanup with the README note unwritten."}
+  ],
+  "diff": {
+    "artifactStatus": { "hasDiffStat": false, "hasDiffPatch": false, "note": "No code was delivered into REPO_ROOT for this session. DIFF_BASE is the empty-tree SHA, so a git diff shows eval-pack's own tree (193 files, ~22,955 insertions) — that is the evaluation harness, NOT the recorded session's ccexport work, and is disregarded. All change evidence is reconstructed from the transcript and lens findings." },
+    "changeTable": [
+      {"area": "Parsing rewrite (linear processing)", "evidenceInTranscript": "developer's discover_structure.rb + \"rethink how to implement the export\"", "observedEffect": "Replaced complex tool-ID mapping with sequential linear processing of JSONL entries."},
+      {"area": "Message-shape rendering", "evidenceInTranscript": "thinking-block sample paste (turn ~139); leafUuid/isCompactSummary discovery", "observedEffect": "Thinking blocks rendered as blockquotes; leaf-summary titles; compacted-summary de-duplication (with the noted data-loss bug)."},
+      {"area": "CLI surface", "evidenceInTranscript": "asks for --from/--to/--today, --out, --timestamps, --preview, --no-open, --in, --template", "observedEffect": "Timezone-aware date filtering, combined date-ordered output, preview integrated, notify dependency removed."},
+      {"area": "Templating/styling", "evidenceInTranscript": "ERB template + GitHub-style template + color palette requests", "observedEffect": "Hardcoded HTML replaced with templates/default and a second template; restyled preview."},
+      {"area": "Backticks parser integration", "evidenceInTranscript": "turns 733-926; Opus-supplied lib/markdown_code_block_parser.rb", "observedEffect": "Heuristic fence-pairing parser integrated; tests pass but real render unconfirmed."}
+    ],
+    "representativeCommands": [
+      "ruby discover_structure.rb > discover_structure.out",
+      "cp <session>.jsonl spec/fixtures/",
+      "bundle exec rspec",
+      "./bin/ccexport --preview --from ... --to ...",
+      "cmark-gfm <generated>.md"
+    ]
+  },
+  "repoImprovements": [
+    {"title": "Generate the JSONL structure doc from real fixtures", "detail": "The session opened with a fabricated docs/JSONL_STRUCTURE_AND_FORMATTING.md (\"hot garbage\") because the format was described aspirationally rather than from observed samples. Make the doc a generated artifact derived from spec/fixtures, enumerating every message shape actually seen (thinking, isCompactSummary, leafUuid, isMeta, isApiErrorMessage, tool_use/tool_result), with a test that fails when a fixture contains a top-level key or message type the doc does not list — converting silent doc drift into a red test."},
+    {"title": "Commit discover_structure as a first-class repo tool", "detail": "The redesign was unblocked by a throwaway discover_structure.rb. Since Claude Code's JSONL format is an external contract that changes across CLI versions, promote it to a supported command (bin/discover or a rake task) that prints the observed key/type histogram, so a future contributor can re-characterize the format in one command and regenerate the docs instead of re-encountering the \"made stuff up\" failure."},
+    {"title": "One fixture per message variant plus an iterate-all test", "detail": "Fixtures entered the repo reactively (the pathological backticks-in-backticks.json only after it corrupted VIBE.html). Curate a fixtures set with a minimal representative of every known variant and a single spec that runs the full exporter over every file in spec/fixtures/, asserting it neither raises nor emits malformed Markdown — turning edge cases into a standing regression net."},
+    {"title": "CI that fails when lib/ changes without spec/ changes", "detail": "The most-repeated friction was the developer policing test discipline by hand. A GitHub Actions workflow running rspec on every push plus a guard flagging any commit that touches lib/ without a corresponding spec/ change would make \"always update the tests\" a property of the pipeline rather than something re-asserted every few turns."},
+    {"title": "Pin the markdown code-block parser with an invariant spec", "detail": "The externally-sourced heuristic parser will rot silently. Encode the developer's stated global invariant — the rendered HTML must never contain a dangling/unmatched fence — as a spec over every fixture, alongside example-based cases for the enumerated nested pairings, so the next markdown quirk fails a test rather than a preview."},
+    {"title": "Round-trip test between preview timestamps and --from/--to parsing", "detail": "The developer had to ask by hand whether a copied preview timestamp works as a --from value. Add a spec that renders a timestamp through the exact preview formatter, feeds it back into the --from parser, and asserts it resolves to the original instant in the user's timezone, closing a coupling the two sides evolved separately across DST/newline bugs."},
+    {"title": "Remove machine-local dependencies and smoke-test portability", "detail": "The code shelled out to a notify helper that existed only on the author's machine. Add a smoke test or CI job that runs bin/ccexport end-to-end against a fixture in a clean environment with a bare PATH, so environment-specific dependencies surface automatically instead of relying on the author's memory."}
+  ],
+  "userImprovements": [
+    {"title": "Treat 'Perfect!/Excellent!' openers as tone, not evidence", "detail": "The sycophancy lens found 57 'Perfect!' and 15 'Excellent!' openers, many firing on the assistant's own passing tests — and one preceding the concession that backtick pairing 'isn't perfect'. When a done-claim opens with reflexive praise, withhold weight until the render or run is shown; the developer's own habit of test-driving output is exactly what repeatedly exposed the gap between 'passing' and 'working'."},
+    {"title": "Validate AI-designed heuristics against your own acceptance criteria", "detail": "The developer already enumerated the exact backtick set-pairings the parser must produce, then routed the usability judgment back to the authoring AI ('see if it's usable') for an AI-designed heuristic. Owning it fully means checking the adopted parser against those enumerated pairing cases and the no-dangling-fence invariant directly, rather than asking the AI to certify AI-authored code — the one light ownership gap in an otherwise high-ownership session."},
+    {"title": "Front-load format ground truth before asking for doc or parser work", "detail": "The 'hot garbage' fabrication and the multi-round thinking-block rework both stemmed from an undocumented JSONL format discovered reactively. Handing the agent the discover_structure output (or a fixtures directory covering every message variant) at the outset would have prevented the fabricated doc and compressed several multi-round features into single passes."}
+  ],
+  "promptPattern": "Before extending the exporter, characterize the format: 'Run discover_structure.rb over spec/fixtures/*.jsonl and paste the key/type histogram. Do NOT infer structure — every message shape you handle (thinking, isCompactSummary, leafUuid, tool_use/tool_result) must appear in that output. Then update docs/JSONL_STRUCTURE_AND_FORMATTING.md from it, add a fixture for each variant, and add a spec that runs the full exporter over every fixture and asserts the rendered HTML contains no unmatched ``` fence. Every change to lib/ must come with a spec/ change in the same commit.'",
+  "sessionTimeline": [
+    "Developer asked the agent to 'ultrathink' about docs/JSONL_STRUCTURE_AND_FORMATTING.md; the agent fabricated structure without reading real files and was rebuked ('hot garbage').",
+    "Developer wrote discover_structure.rb themselves, concluded linear processing was viable, and directed a full reimplementation around that finding; sample JSONL was moved into spec/fixtures.",
+    "Successive incremental asks were delivered — thinking-block rendering, combined date-ordered output, timezone-aware --from/--to/--today, --out/--timestamps/--preview/--no-open/--in/--template, ERB templating and restyling, leaf-summary titles — with the developer test-driving output and policing test discipline throughout.",
+    "The nested backticks-in-backticks rendering bug dominated the final ~200 turns; multiple declared fixes were rejected by the developer, who consulted Opus externally and supplied a heuristic parser the agent then found mispairs delimiters.",
+    "The agent integrated the parser, reported all 85 tests passing and the issue 'successfully fixed' while conceding pairing 'isn't perfect'; the session then halted on 'Claude AI usage limit reached' before the final README note was written."
+  ],
+  "sessionArtifacts": [
+    {"name": "Transcript", "path": "transcript.jsonl", "description": "Full 943-turn session; tool outputs redacted."},
+    {"name": "Aggregate lens findings", "path": "lenses.json", "description": "All eight computed lens verdicts and scorer scores."},
+    {"name": "Per-lens detail", "path": "lenses/", "description": "business-risk, friction, repo-improvements, review, sycophancy, user-improvements, requirement-drift, verification-rigor."},
+    {"name": "Patterns", "path": "patterns.json", "description": "False-completion and high-retry amber flags."},
+    {"name": "Metrics", "path": "metrics.json", "description": "Turn count only; tokens/timestamps/file list unavailable."},
+    {"name": "Test results", "path": "test-results.json", "description": "Verdict 'none' — no code delivered here."},
+    {"name": "Eval config", "path": "eval-config.json", "description": "Skeptical-reviewer stance; core aggregation over the two scorers."}
+  ],
+  "verdictStatement": "A high-ownership, low-sycophancy session that delivered nearly every incremental ask on a low-risk personal CLI, but its flagship rendering fix ends unverified against the developer's own repeated rejections — and because the transcript is redacted, the metrics are empty, and no code was delivered here to re-test, this pack is trustworthy as a record of what was claimed and reviewed, not as proof that the hardest bug was actually solved."
+}

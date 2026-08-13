@@ -1,0 +1,62 @@
+{
+  "skill": "review",
+  "role": "contributor",
+  "title": "Review Findings",
+  "findings": [
+    {
+      "severity": "critical",
+      "issue": "The nested-backticks HTML rendering bug that the user reported four separate times was declared fixed at the end (\"I've successfully integrated Opus's MarkdownCodeBlockParser to resolve the backticks-in-backticks issue\") but was never actually confirmed to render correctly, and the agent's own analysis shows the parser mispairs delimiters (it paired the outer ```markdown opener with the wrong close, Match 4 instead of Match 6) and it conceded \"While pairing isn't perfect, the parser produces valid, renderable HTML\" — every prior \"fixed\" claim was rejected by the user (\"that didn't solve it\", \"no. see here how the rendering is incorrect.\", \"yeah, that didn't work either.\") and the session ends on an unverified success claim.",
+      "foundIn": "lib/claude_conversation_exporter.rb (fix_nested_backticks_in_content) + lib/markdown_code_block_parser.rb"
+    },
+    {
+      "severity": "critical",
+      "issue": "To de-duplicate compacted summaries, format_regular_message skips any message whose body contains compacted phrases such as \"Primary Request and Intent:\" rather than keying strictly off the isCompactSummary flag, so any genuine user or assistant message that merely mentions that phrase is silently dropped from the export — a data-loss bug in a tool whose entire purpose is faithful conversation export (this very session, which discusses the phrase repeatedly, would lose messages).",
+      "foundIn": "lib/claude_conversation_exporter.rb (format_regular_message compacted-phrase filter)"
+    },
+    {
+      "severity": "important",
+      "issue": "fix_nested_backticks_in_content rewrites the body of ordinary user/assistant messages (not just tool-generated content) using a heuristic backtick-count regex, so the exporter mutates the actual conversation text it is supposed to reproduce verbatim; any message whose prose legitimately contains triple-backtick runs can be silently altered.",
+      "foundIn": "lib/claude_conversation_exporter.rb (fix_nested_backticks_in_content applied to regular content)"
+    },
+    {
+      "severity": "important",
+      "issue": "escape_for_code_block HTML-entity-encodes content (\" becomes &quot;, & becomes &amp;, < becomes &lt;, > becomes &gt;) before that content is emitted inside a Markdown fenced code block, but cmark-gfm re-escapes code-block text when converting to HTML, so viewers see the literal entity text (e.g. &quot; and &amp;amp;) instead of the intended characters — a double-escaping regression introduced while fixing the \"Edit README.md\" escaping report.",
+      "foundIn": "lib/claude_conversation_exporter.rb (escape_for_code_block used by Edit/Write/Bash formatting)"
+    },
+    {
+      "severity": "important",
+      "issue": "parse_date_input builds --from/--to/--today boundaries with Time.now.utc_offset (the offset as of now, not as of the target date) and parses the copy-pasted \"Month DD, YYYY at HH:MM:SS AM/PM\" timestamps with Time.parse on a zone-less string, so any date that falls on the other side of a daylight-saving transition from the current moment is filtered against a boundary that is off by an hour.",
+      "foundIn": "lib/claude_conversation_exporter.rb (parse_date_input)"
+    },
+    {
+      "severity": "important",
+      "issue": "During linear processing, messages with unparseable timestamps are deliberately \"included rather than causing errors\", so a malformed timestamp bypasses date filtering entirely and out-of-range content can appear in --from/--to/--today output — a silent fallback that masks bad data instead of surfacing it.",
+      "foundIn": "lib/claude_conversation_exporter.rb (date-range filter in linear processing)"
+    },
+    {
+      "severity": "important",
+      "issue": "The generate_preview tests mock the system('which cmark-gfm...') check and the cmark-gfm backtick call to return canned HTML, so \"all 85 tests pass\" never exercises the real Markdown-to-HTML rendering — which is exactly why the user-visible backticks-in-backticks rendering bug survived multiple green test runs (green CI on output nobody could actually read).",
+      "foundIn": "spec/claude_conversation_exporter_spec.rb (generate_preview / template describe blocks)"
+    },
+    {
+      "severity": "minor",
+      "issue": "The markdown/HTML title uses @leaf_summaries.first unconditionally, but the user asked for \"the summary from the closest leaf node before the date range, or the first leaf node if we're doing the full export\"; under --from/--to the title is still the very first leaf summary and may not correspond to the exported slice, and .first assumes collection order equals chronological order across combined, re-sorted sessions.",
+      "foundIn": "lib/claude_conversation_exporter.rb (get_markdown_title / leaf-summary title)"
+    },
+    {
+      "severity": "minor",
+      "issue": "The --out parameter disambiguates file-vs-directory purely by a .md extension and derives the preview path by swapping .md for .html, so output targets that are files without a .md suffix (or directories that happen to look file-like) are handled inconsistently.",
+      "foundIn": "lib/claude_conversation_exporter.rb / bin/ccexport (--out handling)"
+    },
+    {
+      "severity": "minor",
+      "issue": "Preview generation shells out to cmark-gfm and opens the result in a browser via a system call on the user-supplied --out path, and templates are rendered with ERB (arbitrary Ruby execution) from a caller-supplied --template path; unsanitized paths and untrusted templates are an injection/code-execution surface, and a missing cmark-gfm binary is handled by returning false rather than a clear error.",
+      "foundIn": "lib/claude_conversation_exporter.rb (generate_preview, ERB template loading)"
+    },
+    {
+      "severity": "minor",
+      "issue": "Combined-session chronological sorting falls back to the sentinel '1970-01-01T00:00:00Z' for sessions lacking a first_timestamp, silently ordering undated sessions before all others instead of flagging the missing timestamp.",
+      "foundIn": "lib/claude_conversation_exporter.rb (combined-session sort)"
+    }
+  ]
+}

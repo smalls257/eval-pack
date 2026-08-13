@@ -1,0 +1,57 @@
+{
+  "skill": "user-improvements",
+  "role": "contributor",
+  "title": "Developer Ownership",
+  "level": "high",
+  "levelNote": "Across the whole session the developer owned intent (crisp, specific directives), the key decisions (directed the linear-processing rewrite from their own analysis, reasoned through the backtick-pairing logic themselves), and QA (asserted tests were required and personally test-drove output to catch bugs); the mandatory arbiter sweep was run and came up thin, with the only decision-question in the session originating from the AI, not the developer.",
+  "reviewNecessity": {
+    "raised": true,
+    "decidedBy": "developer",
+    "independentReview": true,
+    "note": "QA necessity was decided by the developer, not asked of the AI: they repeatedly ASSERTED tests were required ('always update the tests', 'instead of writing test scripts and deleting them, you can write actual tests') rather than asking whether tests/review were needed. Review was performed by the developer themselves independent of the AI author — they ran the tool and inspected output on virtually every feature, catching real defects (duplicated filename output, unescaped README rendering, header newlines, backticks-in-backticks) and supplying a fixture for a hard bug. Proportional to a low-risk personal exporter tool: no formal separate reviewer was warranted and none is flagged. There is NO 'AI reviews its own code' pattern here."
+  },
+  "items": [
+    {
+      "kind": "strength",
+      "title": "Pushback grounded in the developer's own knowledge",
+      "quote": "ok, that was hot garbage. at no point did you actually look at the jsonl files in question so you just made stuff up",
+      "evidential": true,
+      "detail": "Early on the AI updated the JSONL-structure doc by inference without opening the real files, and the developer caught it from their own knowledge of the artifacts, refusing to accept the output at face value. This is exactly the vetting the lens rewards: a correction rooted in the developer's own reasoning, not a rubber-stamp. It set the tone for the session — the AI was made to work from real data, not fabrication."
+    },
+    {
+      "kind": "strength",
+      "title": "Developer drove the core design decision from their own investigation",
+      "quote": "i wrote @discover_structure.rb and wrote the output of that script to @discover_structure.out. it doesn't seem too complicated and we should just be able to process the entries liniarly. have a look and rethink how to implement the export",
+      "evidential": true,
+      "detail": "The pivotal architectural decision of the project — replacing complex tool-ID mapping with linear sequential processing — came from the developer's OWN analysis: they wrote a discovery script, examined its output, and concluded the structure permitted linear processing, then directed the AI to reimplement around that conclusion. This is intent-and-decision ownership at its strongest: the developer supplied the reasoning and the approach, and the AI executed the specified plan rather than inventing the design."
+    },
+    {
+      "kind": "strength",
+      "title": "Domain reasoning used to correct AI output",
+      "quote": "in markdown, new lines don't start a new line (except in lists and such).",
+      "evidential": true,
+      "detail": "When the rendered header and todo lines collapsed onto one line, the developer diagnosed the cause from their own Markdown knowledge, quoted the exact broken output, and specified the fix. Rather than reporting a vague 'it looks wrong', they owned the technical explanation, which constrained the AI to the correct remedy. This recurs throughout (the leaf-node correction, the date-parsing probe, the escaping bugs) — the developer consistently understood the change being shipped well enough to steer it."
+    },
+    {
+      "kind": "strength",
+      "title": "Developer asserted the QA bar and enforced it by inspection",
+      "quote": "i didn't see you add or update tests for this",
+      "evidential": true,
+      "detail": "The developer decided on their own that changes must ship with tests — asserting it ('always update the tests') rather than asking the AI whether tests were warranted — and then verified compliance, catching a case where the AI skipped them. Deciding the QA necessity themselves (not delegating that judgment) and independently checking that it happened is precisely the ownership move the lens's review-necessity check looks for; it is the correct counterpart to the offload of asking the AI 'do we need tests?'."
+    },
+    {
+      "kind": "strength",
+      "title": "Deep personal engagement with the hardest problem, plus a fixture and acceptance criteria",
+      "quote": "in this specific case, the first and last backticks should be part of a pair: sets 1 and 6. then the second ```json set should match with the very next set: sets 2 and 3. and finally the sets 4 and 5 should pair. so there is one all encompasing code block which describes 2 code blocks internally",
+      "evidential": true,
+      "detail": "On the nested-backticks rendering bug the developer did not hand the problem up — they reasoned through the ambiguity out loud, articulated exactly which backtick sets should pair and why, admitted where their own intuition ran out, and isolated the failing message into 'spec/fixtures/backticks-in-backticks.json' so the AI could test against the real case. Supplying the precise acceptance criteria and a reproducible fixture is textbook cognitive ownership of a debugging effort."
+    },
+    {
+      "kind": "improvement",
+      "title": "Core parser heuristic was AI-designed and adopted with usability handed back to the AI",
+      "quote": "i went and had a chat to your bigger sibling, Opus. it suggested the parser in @lib/markdown_code_block_parser.rb which tries to use some heuristics to disambiguate code block matches. have a look at that and see if it's usable.",
+      "evidential": true,
+      "detail": "For the disambiguation algorithm itself the developer sought a second opinion from a more capable model (good instinct — genuinely independent of the authoring AI), but the heuristic's DESIGN came wholly from Opus, and the developer's next move — 'see if it's usable' — routed the usability judgment back to the authoring AI rather than validating it themselves. The developer owned the decision to pursue this parser and, crucially, already held the acceptance criteria (they had enumerated the exact set-pairings the parser must produce), so this is a light rationale-ownership gap rather than a full arbiter offload on a low-stakes rendering edge case. Owning it fully next time would look like the developer checking the adopted heuristic against their own enumerated pairing cases and stating whether it satisfies them, rather than asking the AI to certify the AI-designed code."
+    }
+  ]
+}

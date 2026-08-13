@@ -1,0 +1,27 @@
+{
+  "falseCompletions": [
+    {
+      "turn": 139,
+      "agentClaim": "Done, Mr Moo! I've successfully implemented the simplified linear processing approach based on your structure analysis:\n",
+      "userResponse": "ok, there's a new type of message we need to handle, when you're thinking. it looks like this: `{ \"type\": \"thinking\", \"t"
+    }
+  ],
+  "retryCount": 5,
+  "scopeDrift": false,
+  "partialSession": false,
+  "flags": [
+    {
+      "id": "falseCompletions",
+      "level": "amber",
+      "label": "False completions",
+      "count": 1
+    },
+    {
+      "id": "highRetry",
+      "level": "amber",
+      "label": "High retry count",
+      "count": 5
+    }
+  ],
+  "suppressedFlags": []
+}
