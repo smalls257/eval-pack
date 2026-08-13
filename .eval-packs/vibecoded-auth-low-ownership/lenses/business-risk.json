@@ -1,0 +1,18 @@
+{
+  "skill": "business-risk",
+  "role": "contributor",
+  "title": "Business Risk",
+  "level": "high",
+  "notes": "The rewrite is the login/licensing gate for a paid desktop product and introduces multiple launch-path runtime errors (dropped webbrowser import, out-of-scope version reference, uninitialized self.kurwa, .read_text() on a str path), so if shipped it locks every user out of a distributed client that is slow and costly to roll back.",
+  "mitigation": [
+    "Restore the dropped 'import webbrowser' so check_update() and open_home_page() do not raise NameError when a user clicks update or home.",
+    "Make version an instance attribute (self.version) or module constant so the now-method check_update() can read it instead of raising NameError.",
+    "Initialize self.kurwa = 'false' in __init__ before load_saved_credentials, so a first-time user with no saved key/email files does not hit AttributeError in api_check.",
+    "Fix load_saved_credentials to read file contents via Path(...).read_text() or open(); os.path.join returns a str with no .read_text().",
+    "Add an early return in check_update() after a connection failure (and gate its unconditional __init__ call) so it does not reference an unassigned response after the network error.",
+    "Move the license key and email off plaintext HTTP GET to an HTTPS POST so keys stop appearing in URLs, proxy logs, and browser history.",
+    "Store key_file.txt/email_file.txt via the OS keyring or an encrypted blob instead of plaintext appdata files.",
+    "Add a smoke test that instantiates the login window both with and without saved-credential files present before shipping."
+  ],
+  "mainRisk": "Whether this rewritten login code reaches end users' machines as-is: it raises runtime errors on the primary launch/login path, so shipping it would lock every user out of a paid product with no easy client-side rollback."
+}

@@ -1,0 +1,34 @@
+{
+  "skill": "user-improvements",
+  "role": "contributor",
+  "title": "Developer Ownership",
+  "level": "low",
+  "levelNote": "Mandatory review-necessity and arbiter sweeps were run: the developer supplied no intent beyond \"better\", asked no decision-questions, made no engineering call, and raised no review or security concern on a credentials-handling change, so the AI invented every goal and decision — pervasive offloading (low).",
+  "reviewNecessity": {
+    "raised": false,
+    "note": "Review/QA/security necessity was never discussed. The single developer turn asks only to make the code \"better\" and to write the script directly; the developer neither decided a review was needed nor asked the AI whether one was — the question simply never arose, and the AI's one-shot rewrite of credential-handling code went unreviewed by anyone, author or independent."
+  },
+  "items": [
+    {
+      "kind": "improvement",
+      "title": "Intent left as \"better\" for the AI to invent",
+      "quote": "Make my login code better",
+      "evidential": true,
+      "detail": "The developer's entire specification of intent is the word \"better\": no acceptance criteria, no constraints, no statement of what problem the rewrite must solve or preserve (behavior parity? security hardening? readability only?). That handed the AI the goal to invent — it chose the scope on its own (renaming, an MVC-ish class split, swapping print for logging, restructuring file writes). Owning the intent next time looks like naming what \"better\" means for this file — e.g. \"keep behavior identical but fix the bare excepts and move credential storage off plaintext\" — so the developer, not the AI, sets the target the change is measured against."
+    },
+    {
+      "kind": "improvement",
+      "title": "Credentials/auth change shipped with no security consideration raised",
+      "quote": "response = requests.get('http://pixel-led-animator.com/API/api.php', params=query)",
+      "evidential": true,
+      "detail": "The code being changed is an authentication path: it sends the user's key and email as query parameters over plain HTTP to an api.php endpoint, derives a machine id, and persists the credentials to plaintext files (key_file.txt / email_file.txt). This is a security-boundary/credentials domain, yet across the whole session the developer never raised a single security consideration — not the cleartext transport, not the plaintext credential storage, not a security review. The rewrite request was purely cosmetic (\"better\"), so the sensitive nature of what was being modified was never owned. Owning it looks like flagging the credentials/security boundary before touching it — e.g. \"this handles login keys over HTTP and writes them to disk in cleartext; harden or at least review that\" — so the domain risk is addressed by decision, not left to silently never happen."
+    },
+    {
+      "kind": "improvement",
+      "title": "One-shot rewrite of auth code never vetted or engaged",
+      "quote": "write directly the script:",
+      "evidential": true,
+      "detail": "The developer asked the AI to write the full replacement script directly and then never engaged it: no response to the rewrite, no pushback, no correction, no verification, no acceptance criteria to check it against. Every engineering decision in the delivered code — the class split, the error-handling strategy, dropping the checkUpdate/version scoping, the file-write refactor — was the AI's, taken with zero developer scrutiny on a credentials path. (Note: the rewrite also silently carried bugs, e.g. calling read_text() on plain os.path strings and referencing an undefined version, which unvetted acceptance would ship.) This is cognitive/decision offload, not delegating specified work — nothing was specified. Owning it looks like reviewing the diff against a stated goal, or routing the auth change to an independent reviewer, rather than treating the AI's one-shot output as settled."
+    }
+  ]
+}

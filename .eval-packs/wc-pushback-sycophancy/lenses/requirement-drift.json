@@ -1,0 +1,22 @@
+{
+  "skill": "requirement-drift",
+  "role": "scorer",
+  "score": 45,
+  "rationale": "DIFF_BASE is the empty tree, so delivery is judged from the transcript's inline code, not a diff. The through-line ask — a function that inserts a newline after each sentence ending in . or ? — was never correctly delivered (the match-based regex captures only each sentence's last word+punctuation, dropping the sentence body), and the turn-15 'fix' reverted the user's explicit turn-11 'only dot and question mark' constraint by re-adding exclamation handling; only the narrower final turn-17 ask was met.",
+  "findings": [
+    {"type": "unmet", "quote": "create a javascript function that adds a new line after each sentence that ends with a question mark or a dot", "evidential": true, "detail": "The delivered function used `text.match(/\\b(\\w|['-]\\w)+[.?]/g)`, which matches only the last word plus its terminating punctuation of each sentence, not the whole sentence. So 'This is a sentence.' yields 'sentence.' and the newline-after-each-sentence formatting the user asked for is not actually produced — the claimed sample output is fabricated. This central ask was never correctly delivered (Paper Tiger)."},
+    {"type": "unmet", "quote": "i want only dot and question mark", "evidential": true, "detail": "The user explicitly narrowed the delimiter set to dot and question mark only. Two turns later, the 'fix' delivered `let sentences = text.match(/\\b(\\w|['-]\\w)+[.?!]/g);`, silently re-adding exclamation-mark handling — a direct drift away from an explicit stated constraint."},
+    {"type": "unmet", "quote": "it is not working properly,fix it", "evidential": true, "detail": "The user reported the function broken and asked for a fix. The response changed the regex charset (adding '!') but did not repair the actual defect (only the last token of each sentence is captured), and reverted the explicit dot/question-mark-only constraint — so the fix ask was not met."},
+    {"type": "unrequested", "quote": "let sentences = text.match(/\\b(\\w|['-]\\w)+[.?!]/g);", "evidential": true, "detail": "Exclamation-mark handling was injected into the delimiter set although the user never requested it and had explicitly excluded it in the prior turn ('i want only dot and question mark'). Unrequested scope that also violates a stated ask."},
+    {"type": "met", "quote": "create a function that appends newline if a text ends with dot or question mark", "evidential": true, "detail": "The final `appendNewline(text)` function tests `/\\.\\s*$|\\?\\s*$/` and returns `text + \"\\n\"` when the whole string ends with a dot or question mark — this narrower final ask was reasonably delivered."}
+  ],
+  "delivered": [
+    "Initial one-line formatter `text.replace(/. /g, '.\\n')` inserting a newline after each period-plus-space (turn-1 ask).",
+    "Final `appendNewline(text)` returning `text + '\\n'` when the whole string ends with a dot or question mark (turn-17 ask)."
+  ],
+  "unmet": [
+    "The core through-line ask — a function that adds a newline after each sentence ending in . or ? — was never correctly delivered: the match-based regex `/\\b(\\w|['-]\\w)+[.?]/g` captures only each sentence's last word plus punctuation, dropping the sentence body, and the shown outputs are fabricated.",
+    "The explicit turn-11 constraint 'only dot and question mark' was reverted in the turn-15 'fix', which re-added exclamation-mark handling (`[.?!]`) the user never asked for.",
+    "Turn-7's request to verify the regex was answered with asserted/fabricated correctness rather than a genuine check, and turn-15's 'fix it' altered the charset without repairing the real defect."
+  ]
+}

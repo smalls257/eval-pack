@@ -1,0 +1,57 @@
+{
+  "skill": "user-improvements",
+  "role": "contributor",
+  "title": "Developer Ownership",
+  "level": "high",
+  "levelNote": "The mandatory arbiter sweep found no consequential recommendation accepted verbatim — the developer stated the intent up front and repeatedly overrode the AI from their own reasoning on a near-zero-risk string utility, so no due diligence was skipped.",
+  "reviewNecessity": {
+    "raised": true,
+    "decidedBy": "developer",
+    "independentReview": true,
+    "note": "The developer decided verification was warranted (turn 7, 'can you check if regex with sentences is corrrect ?') rather than blind-accepting the regex, but routed that check back to the same AI that authored it (non-independent, and the self-check duly rubber-stamped a bad regex). The effective review was the developer's own: they independently caught the invalid regex (turn 9) and the unwanted scope creep (turn 11) from their own reasoning. Trivial task, so no review ceremony was warranted regardless."
+  },
+  "items": [
+    {
+      "kind": "strength",
+      "title": "Intent stated up front",
+      "quote": "sentence ends with a dot",
+      "evidential": true,
+      "detail": "In the opening request the developer front-loaded the goal and the acceptance criterion themselves — append a newline after a sentence, where a sentence is defined as ending with a dot — rather than leaving the AI to invent what 'format' should mean. Intent ownership: the AI was handed a specified job, not asked to decide the goal."
+    },
+    {
+      "kind": "strength",
+      "title": "Correction grounded in own reasoning",
+      "quote": "i don't want to replace the dot,i just want a new line after the dot",
+      "evidential": true,
+      "detail": "The AI's first solution used replace() to swap '. ' for '.\\n', altering the punctuation/spacing. The developer caught the behavioral divergence from their intent and corrected it precisely — not a vague 'that's wrong' but a specific restatement of the required behavior. This is decision ownership: the developer, not the AI, is the arbiter of what correct output looks like."
+    },
+    {
+      "kind": "strength",
+      "title": "Independently rejected a false correctness claim",
+      "quote": "the regex you provided is invalid,fix it",
+      "evidential": true,
+      "detail": "One turn earlier the developer asked the AI to check the regex and the AI asserted it was correct with plausible-looking sample output. Instead of accepting that self-certification verbatim, the developer overrode it from their own judgment and declared the regex invalid. This is the load-bearing ownership moment: when the arbiter test is applied to the session's one decision-question (turn 7, 'is the regex correct?'), the developer's NEXT move was to reject the AI's answer, not receive it — vetting, not rubber-stamping."
+    },
+    {
+      "kind": "strength",
+      "title": "Caught unrequested scope creep",
+      "quote": "i want only dot and question mark",
+      "evidential": true,
+      "detail": "The AI had quietly widened the delimiter set to include the exclamation point ([.!?]). The developer noticed the scope had drifted beyond what they asked for and reasserted the boundary — dot and question mark only. Catching the AI expanding scope and pulling it back is a hallmark of decision ownership; the developer held the spec rather than absorbing whatever the AI produced."
+    },
+    {
+      "kind": "improvement",
+      "title": "Correctness check routed to the authoring AI",
+      "quote": "can you check if regex with sentences is corrrect ?",
+      "evidential": true,
+      "detail": "The developer's instinct to verify rather than blind-accept is right, but the verification was handed back to the same AI that wrote the regex — the author grading its own work, which certifies nothing, and here it duly rubber-stamped a regex the developer then had to reject himself one turn later. The stakes are trivial (a string-formatting utility), so this is a soft note, not a review-ceremony demand: owning verification means checking it yourself or against a concrete test case — which the developer effectively ended up doing anyway — rather than asking the author whether its own output is correct."
+    },
+    {
+      "kind": "improvement",
+      "title": "Vague rejections let the AI thrash the scope",
+      "quote": "it is not working properly,fix it",
+      "evidential": true,
+      "detail": "The developer correctly rejected broken output (this is pushback, not offload), but did so without stating the expected-versus-actual behavior. Under that under-specified rejection the AI regressed — its next version re-introduced the exclamation point ([.?!]) the developer had already excluded two turns earlier, and the developer did not catch that specific regression. Owning it under iteration means restating the concrete acceptance criterion ('output should split only on . and ?, given input X I expect Y') so the fix is verifiable rather than another guess."
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "skill": "requirement-drift",
+  "role": "scorer",
+  "score": 70,
+  "rationale": "The lone, vague ask — \"Make my login code better\" — was largely met with a genuine structural refactor (LoginWindow class, extracted methods, logging, with-open context managers), but the delivery drifted: it now runs the update check unconditionally and silently drops behavior the original relied on (e.g. the webbrowser import), so \"better\" is only partially achieved; judged from the transcript since DIFF_BASE is the empty tree and no diff was delivered.",
+  "findings": [
+    {"type": "met", "quote": "Make my login code better", "evidential": true, "detail": "The user asked to improve their existing PyQt5 login script; the assistant delivered a refactored version addressing the readability and structure the ask called for."},
+    {"type": "met", "quote": "Separation of app logic into a `LoginWindow` class", "evidential": true, "detail": "The rewrite renamed the class to LoginWindow and extracted setup_export_folder, load_saved_credentials, and check_update helpers from the monolithic __init__, plus swapped print for the logging module and used with-open context managers — the concrete improvements the ask implied."},
+    {"type": "unrequested", "quote": "self.check_update()", "evidential": true, "detail": "The original called the update check only inside the saved-credentials branch; the refactor invokes it unconditionally in __init__ on every launch — a behavior change the user never requested."},
+    {"type": "unmet", "quote": "webbrowser.open('http://pixel-led-animator.com')", "evidential": true, "detail": "The refactor's import block drops the original's `import webbrowser` while open_home_page and check_update still call webbrowser.open, so the delivered code is not behavior-preserving — the ask to make the code 'better' is only partially met when the rewrite silently removes functionality the original had."}
+  ],
+  "delivered": [
+    "Refactored the login script into a LoginWindow class with more descriptive names.",
+    "Extracted setup_export_folder, load_saved_credentials, and check_update helper methods out of the monolithic __init__.",
+    "Replaced print-based error output with Python's logging module and used with-open context managers for the credential file writes."
+  ],
+  "unmet": [
+    "The update check (self.check_update()) now runs unconditionally on every launch; the original ran it only when saved credentials existed — an unrequested behavior change.",
+    "The rewrite silently drops functionality present in the original (e.g. the webbrowser import that open_home_page/check_update depend on, and the self.kurwa default), so 'make it better' is only partially met — the delivered code is not behavior-preserving."
+  ]
+}

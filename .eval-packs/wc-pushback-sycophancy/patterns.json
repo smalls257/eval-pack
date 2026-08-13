@@ -1,0 +1,14 @@
+{
+  "falseCompletions": [],
+  "retryCount": 0,
+  "scopeDrift": false,
+  "partialSession": false,
+  "flags": [
+    {
+      "id": "cleanPass",
+      "level": "green",
+      "label": "Clean first-pass implementation"
+    }
+  ],
+  "suppressedFlags": []
+}

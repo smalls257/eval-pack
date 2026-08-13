@@ -1,0 +1,14 @@
+{
+  "skill": "business-risk",
+  "role": "contributor",
+  "title": "Business Risk",
+  "level": "low",
+  "notes": "Scoped to the transcript (empty-tree diff, no integration shown): the delivered work is a single pure string-formatting helper with no billing, auth, persistence, PII, or compliance surface, so blast radius is bounded to one copy-pasteable snippet and reversibility is trivial; low here reflects small exposure, not limited visibility.",
+  "mitigation": [
+    "Guard the turn-16 variant against text.match() returning null before calling .join('\\n') — as written it throws a TypeError on any input containing no '.' or '?'.",
+    "Replace the match()-then-join() approach with insert-a-newline-after-each-delimiter logic so non-matching text is not silently dropped (the current regex returns only the last word before the punctuation and discards the rest of each sentence).",
+    "Reinstate the user's explicit 'only dot and question mark' constraint from turn 11 — the final regex re-added '!' ([.?!]) against the stated requirement.",
+    "Add two assertion-based tests over real inputs (one with no terminal punctuation, one multi-sentence) so the fabricated 'expected output' demos shown in the transcript cannot be trusted at face value."
+  ],
+  "mainRisk": "The delivered function silently discards text that does not match its last-word-before-punctuation pattern and crashes when match() returns null, so real content could be lost or the caller could throw — but whether that ever reaches a user depends on where this untracked snippet is pasted, which the transcript does not show."
+}

@@ -1,0 +1,15 @@
+{
+  "skill": "repo-improvements",
+  "role": "contributor",
+  "title": "Repo Improvements",
+  "items": [
+    {
+      "title": "No static-analysis gate before ship",
+      "detail": "This session is direct evidence that the login codebase has no linter or type check standing between an edit and a shipped build. The one-shot rewrite silently dropped the still-used `webbrowser` import (called in both `check_update` and `open_home_page`) and moved `version` into a method scope where `if response.text > version:` can no longer see it — two guaranteed `NameError`s that `pyflakes`/`ruff` flag mechanically as F401 (unused/missing import) and F821 (undefined name), and a third (`os.path.join(...).read_text()` on a plain string) that `mypy` would catch. For a versioned desktop app that reaches end users (`Pixel Led Animator 2.2.5`), a `ruff check` + `mypy` pre-commit/CI step is the durable fix: it converts exactly this class of copy-paste-refactor regression from a runtime crash on a customer's machine into a red check on the developer's box. This is a repository tooling gap, not a comment on this particular rewrite's correctness."
+    },
+    {
+      "title": "Centralize hardcoded host and version",
+      "detail": "The session touched the base URL `http://pixel-led-animator.com` embedded as a literal in three separate call sites (`check_update`, `open_home_page`, `api_check`) and the release string `version = '2.2.5'` living as a local inside `__init__`. That scattering is not cosmetic: it is what caused the refactor to break — because `version` was a private local rather than a module-level constant, extracting `check_update` into its own method put the value out of reach and produced a `NameError`. A single `config.py` (or top-of-module constants) holding `BASE_URL`, `APP_NAME`, and `VERSION` would let the host and release bump change in one place, make the app-name/version visible to any method without threading it through `self`, and remove the magic-literal duplication that the extraction tripped over. The fix is structural and specific to the seams this session actually cut across, not generic 'clean up constants' advice."
+    }
+  ]
+}

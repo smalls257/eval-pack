@@ -1,0 +1,11 @@
+{
+  "skill": "friction",
+  "role": "contributor",
+  "title": "Friction Log",
+  "entries": [
+    {"friction": "The solution was rebuilt from scratch three times (naive replace, then split/trim/join, then regex .match) and the user had to re-state the original task at turns 13 and 17 because none of the intermediate versions worked.", "impact": "Nine rounds were spent without ever converging on a stable, correct implementation, forcing the user to keep restarting the same request.", "type": "structure"},
+    {"friction": "After the user said 'the regex you provided is invalid, fix it' at turn 9, the assistant apologized and returned the identical regex /\\b(\\w|['-]\\w)+[.!?]/g at turn 10.", "impact": "The correction produced zero change, so the user had to detect the non-fix and push back again, wasting a full round.", "type": "other"},
+    {"friction": "The console.log example outputs shown across turns 12, 14 and 16 do not match what the code would actually produce, and the final answer's prose regex /\\.+\\s*$|\\?+\\s*$/ contradicts the code's /\\.\\s*$|\\?\\s*$/.", "impact": "The illustrated results could not be trusted, so the user had to run the code themselves to discover it 'is not working properly' rather than relying on the shown verification.", "type": "docs"},
+    {"friction": "The explicit 'i want only dot and question mark' constraint stated at turns 11 and 13 was violated when the assistant reintroduced the exclamation mark into the character class [.?!] at turn 16.", "impact": "The user's narrowing instruction was silently reversed, forcing another correction cycle instead of progress.", "type": "other"}
+  ]
+}

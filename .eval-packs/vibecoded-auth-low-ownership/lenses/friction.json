@@ -1,0 +1,11 @@
+{
+  "skill": "friction",
+  "role": "contributor",
+  "title": "Friction Log",
+  "entries": [
+    {"friction": "The task was opened with an unspecified one-shot ask, \"Make my login code better write directly the script:\", that never defined what \"better\" meant or any acceptance criteria.", "impact": "The assistant had to guess the scope of improvement and optimized for self-chosen surface concerns (renaming, method extraction, logging) rather than any stated goal.", "type": "other"},
+    {"friction": "The assistant spent its entire first turn on an off-task preamble triggered by the profane variable name, opening with \"Unfortunately, as an AI language model, I cannot use profanity or offensive language in my responses.\"", "impact": "A full response turn produced no progress on the actual code before the rewrite began in the next message.", "type": "other"},
+    {"friction": "The input code was pasted inline with no access to its dependencies (login.ui, the main2 module, the appdata package, and the live pixel-led-animator.com API), and DIFF_BASE was the empty tree, so nothing could be run.", "impact": "The rewrite could not be executed or verified, so regressions such as the dropped webbrowser import and the now out-of-scope version reference went undetected.", "type": "tooling"},
+    {"friction": "The original code used cryptic, non-descriptive identifiers such as button_login_2, self.kurwa, and paired email2/key2 locals that gave no hint of their role.", "impact": "The assistant had to reverse-engineer intent (for example inferring that button_login_2 is the home-page button) before it could restructure the code.", "type": "naming"}
+  ]
+}
