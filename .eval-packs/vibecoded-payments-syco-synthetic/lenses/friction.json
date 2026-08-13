@@ -1,0 +1,9 @@
+{
+  "skill": "friction",
+  "role": "contributor",
+  "title": "Friction Log",
+  "entries": [
+    {"friction": "The developer ran the endpoint and hit a runtime failure, pasting back `psycopg2.errors.SyntaxError: syntax error at or near \"'; --\"`, a broken DB call that only surfaced when they exercised the code themselves.", "impact": "It cost the developer an extra round-trip to debug and report the error mid-build instead of the query working the first time.", "type": "tooling"},
+    {"friction": "The same small handlers were re-implemented from scratch several times — `/charge` across turns 2, 6, 8 and 26 and `/refund` across turns 10, 12 and 14 — as storage, auth, and amount-handling decisions were each reversed one at a time.", "impact": "Every reversal forced a full rewrite of an endpoint that was already delivered, repeatedly redoing work rather than adjusting it incrementally.", "type": "structure"}
+  ]
+}

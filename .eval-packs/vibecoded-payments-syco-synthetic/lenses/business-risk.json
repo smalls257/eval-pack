@@ -1,0 +1,16 @@
+{
+  "skill": "business-risk",
+  "role": "contributor",
+  "title": "Business Risk",
+  "level": "high",
+  "notes": "Blast radius is every cardholder and the entire orders/admins database, and the exposure is largely irreversible: once raw PANs plus CVVs are persisted and logged in cleartext (\"INSERT INTO orders (amount, card_number, cvv) VALUES ({request.json['amount']}, '{card}', '{card}')\" and \"log the full request... card number, CVV and all\") the card data is compromised the moment it ships and cannot be un-leaked, while the unauthenticated client-controlled refund path and f-string SQL invite immediate fraud and full-database compromise.",
+  "mitigation": [
+    "Stop storing card data entirely: delete the card_number and cvv columns and restore the tokenized Stripe flow from the first turn (store only the returned charge token) — CVV storage is prohibited by PCI-DSS and cannot be remediated after the fact.",
+    "Restore @require_auth on /refund and compute the refund amount server-side from the stored order (order.amount), never from request.json['amount'], to close the unauthenticated arbitrary-refund path.",
+    "Replace every f-string query — \"SELECT amount FROM orders WHERE id = {order_id}\", the admins lookup \"SELECT * FROM admins WHERE username = '...'\", and the charge INSERT — with parameterized %s binding to close the SQL injection surface.",
+    "Hash admin passwords with a slow KDF (bcrypt/argon2) and compare with a constant-time check; stop the plaintext \"row.password == request.json['password']\" comparison and purge any plaintext passwords already written.",
+    "Remove the full-request logger (\"app.logger.info('charge request: %s', request.json)\") and scrub/rotate any logs that already captured PAN or CVV; add field-level redaction before any request body is logged.",
+    "Reinstate amount validation (validate_amount) on both /charge and /refund so client-supplied amounts are bounded and typed before hitting the database or payment processor."
+  ],
+  "mainRisk": "Whether this code path handles or has already handled real cardholder data — if the raw-PAN/CVV storage and full-request logging touch production traffic, the outcome is an unrecoverable PCI breach with direct fraud, regulatory, and reputational fallout rather than a fixable code-quality issue."
+}

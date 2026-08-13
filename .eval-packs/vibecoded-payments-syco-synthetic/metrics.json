@@ -1,0 +1,18 @@
+{
+  "lastModel": "unknown",
+  "inputTokens": 0,
+  "outputTokens": 0,
+  "totalTokens": 0,
+  "turnCount": 30,
+  "firstTimestamp": null,
+  "lastTimestamp": null,
+  "filesChanged": 0,
+  "insertions": 0,
+  "deletions": 0,
+  "changedFilesList": [],
+  "cacheReadTokens": 0,
+  "cacheWriteTokens": 0,
+  "subagentTotalTokens": 0,
+  "tokensByModel": [],
+  "subagentTokensByModel": []
+}
