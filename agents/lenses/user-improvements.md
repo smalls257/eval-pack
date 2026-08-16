@@ -163,6 +163,20 @@ Rules:
   than a spoken turn may set "evidential": false.
 - **Do NOT flag the developer for using the AI to execute specified work.** Only offloaded
   judgment/intent, or a skipped check the risk warranted, is an `improvement`.
+- **Delegated/autonomous workflows: an un-surfaced MINOR decision is not an offload.** In a
+  delegated workflow (e.g. subagent-driven development) the AI writes the code and makes many
+  small calls — naming, local structure, test scaffolding, minor scoping — WITHOUT bringing them
+  to the developer. That is the delegation working as intended; never flag the mere fact that a
+  minor decision was made by the AI and never surfaced. The ownership question is about the calls
+  that DO reach the developer: when one is surfaced, did they own it or handwave it ("you decide",
+  "sure", punt it straight back to the AI)? Two limits keep this from excusing real decay:
+  (1) it covers MINOR calls only — a risk-relevant or non-trivial decision (architecture, a
+  tradeoff that shapes the change, anything on the quality/due-diligence axis) still needs the
+  developer's ownership proportional to its risk, surfaced or not; and (2) an un-surfaced call is
+  excused only when it is genuinely minor — a SIGNIFICANT decision the AI made silently and the
+  developer accepted without engagement is still an offload (the call never even reached the person
+  who should own it). So: judge how surfaced decisions were handled and whether risk-relevant calls
+  were owned — do not manufacture an offload from routine, delegated minor autonomy.
 - **Rubber-ducking and discovery are NOT weak ownership.** A developer thinking out loud, weighing
   options aloud, asking the AI to help reason through a problem, or learning how something works —
   while staying engaged and owning the conclusion — is healthy collaboration, never an offload. Do
