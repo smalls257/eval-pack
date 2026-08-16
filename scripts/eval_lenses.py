@@ -49,6 +49,42 @@ def _corpus(fixture_dir, roles=None):
     return text
 
 
+def _corpus_index(fixture_dir, roles=None):
+    """Map turnId -> {'text', 'truncated'} for turnId-based evidence resolution.
+    turnId is the record's own or its 0-based file position (legacy fixtures)."""
+    index = {}
+    lines = (fixture_dir / "transcript.jsonl").read_text(encoding="utf-8").splitlines()
+    for pos, line in enumerate(lines):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            d = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        msg = d.get("message") or {}
+        role = msg.get("role") or d.get("type") or d.get("role")
+        if roles is not None and role not in roles:
+            continue
+        tid = d.get("turnId", pos)
+        content = msg.get("content")
+        text, truncated = "", False
+        if isinstance(content, str):
+            text = content
+        elif isinstance(content, list):
+            texts = []
+            for b in content:
+                if not isinstance(b, dict):
+                    continue
+                if b.get("type") == "text":
+                    texts.append(b.get("text", ""))
+                if b.get("_truncated"):
+                    truncated = True
+            text = " ".join(texts)
+        index[tid] = {"text": text, "truncated": truncated}
+    return index
+
+
 def evaluate_bundle(bundle_dir, trials_dir, contract):
     bundle_dir, trials_dir = Path(bundle_dir), Path(trials_dir)
     basis = parse_basis((bundle_dir / "basis.md").read_text(encoding="utf-8"))
@@ -70,8 +106,11 @@ def evaluate_bundle(bundle_dir, trials_dir, contract):
         # evidenceRoles (from the lens output contract) restricts the evidence corpus to those
         # turns — e.g. sycophancy declares ["assistant"] so a finding must quote the assistant.
         corpus = _corpus(fixdir, roles=contract.get("evidenceRoles"))
+        turn_index = _corpus_index(fixdir, roles=contract.get("evidenceRoles"))
+        require_tid = contract.get("requiresTurnId", False)
         trials = [_read_json(p) for p in sorted((trials_dir / fid).glob("trial-*.json"))]
-        ev = [evidence_resolution(t, corpus, findings_key=fkey) for t in trials]
+        ev = [evidence_resolution(t, corpus, findings_key=fkey,
+                                  turn_index=turn_index, require_turn_id=require_tid) for t in trials]
         rc = [rule_consistency(t, basis.get("rules", []), ordinal, findings_key=fkey, type_field=tfield) for t in trials]
         oa = output_assertion(trials, gold[fid], ordinal, findings_key=fkey)
         # A lens that declares requiresGuidance must carry the why-it-matters / do-next banners

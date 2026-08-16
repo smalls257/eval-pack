@@ -160,5 +160,25 @@ class TestEvalLenses(unittest.TestCase):
         r = eval_lenses.evaluate_bundle(bundle, base / "tr", C)
         self.assertFalse(r["passed"], "hallucinated items quote must fail evidence-resolution via findingsKey routing")
 
+    def test_corpus_index_maps_turnid_to_text(self):
+        fx = self.tmp / "idx"; fx.mkdir(parents=True)
+        (fx / "transcript.jsonl").write_text(
+            '{"turnId":5,"type":"assistant","message":{"role":"assistant","content":"ASST five"}}\n'
+            '{"turnId":6,"type":"assistant","message":{"role":"assistant",'
+            '"content":[{"type":"tool_result","content":"clipped","_truncated":true}]}}\n')
+        idx = eval_lenses._corpus_index(fx)
+        self.assertIn("ASST five", idx[5]["text"])
+        self.assertFalse(idx[5]["truncated"])
+        self.assertTrue(idx[6]["truncated"])
+
+    def test_corpus_index_falls_back_to_position_without_turnid(self):
+        fx = self.tmp / "idx2"; fx.mkdir(parents=True)
+        (fx / "transcript.jsonl").write_text(
+            '{"type":"assistant","message":{"role":"assistant","content":"first"}}\n'
+            '{"type":"assistant","message":{"role":"assistant","content":"second"}}\n')
+        idx = eval_lenses._corpus_index(fx)
+        self.assertIn("first", idx[0]["text"])
+        self.assertIn("second", idx[1]["text"])
+
 if __name__ == "__main__":
     unittest.main()
