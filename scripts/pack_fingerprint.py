@@ -42,7 +42,7 @@ def compute(pack_dir, lenses, diff_base):
 def decide_reuse(prior, current):
     if not prior or not isinstance(prior, dict):
         return {"reuseAll": False, "reuse": set(), "rerun": set(current["perLens"])}
-    if prior.get("whole") == current.get("whole"):
+    if "whole" in prior and "whole" in current and prior["whole"] == current["whole"]:
         return {"reuseAll": True, "reuse": set(current["perLens"]), "rerun": set()}
     prior_p = prior.get("perLens") or {}
     reuse = {s for s, k in current["perLens"].items() if prior_p.get(s) == k}
@@ -62,6 +62,8 @@ def _run_decide(prior_path, current_path):
     current = _read_json_or_none(current_path)
     if current is None:
         raise SystemExit("pack_fingerprint --decide: unreadable current fingerprint: {}".format(current_path))
+    if not isinstance(current, dict) or "perLens" not in current:
+        raise SystemExit("pack_fingerprint --decide: current fingerprint is missing 'perLens': {}".format(current_path))
     decision = decide_reuse(prior, current)
     out = {
         "reuseAll": decision["reuseAll"],
