@@ -35,7 +35,7 @@ def _load(path):
 
 
 def merge(paths):
-    """Return merged, deduped, time-ordered entries from the given paths."""
+    """Return merged, deduped, time-ordered entries, each stamped with a monotonic turnId."""
     seen = set()
     entries = []
     for path in paths:
@@ -47,6 +47,8 @@ def merge(paths):
                 seen.add(uid)
             entries.append(entry)
     entries.sort(key=lambda e: e.get("timestamp") or "")
+    for i, e in enumerate(entries):
+        e["turnId"] = i  # canonical citation coordinate: assigned after ordering, not from source
     return entries
 
 
