@@ -90,13 +90,14 @@ fi
 "$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/pack_fingerprint.py" "${PACK_DIR}" \
     --config "${PACK_DIR}/eval-config.json" --diff-base "${DIFF_BASE}"
 DECISION=$("$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/pack_fingerprint.py" \
-    --decide "${PACK_DIR}/pack-fingerprint.prev.json" "${PACK_DIR}/pack-fingerprint.json" 2>/dev/null \
-    || echo '{"reuseAll": false, "reuse": [], "rerun": []}')
+    --decide "${PACK_DIR}/pack-fingerprint.prev.json" "${PACK_DIR}/pack-fingerprint.json")
 ```
 
 **Fail-safe:** if no prior `pack-fingerprint.json` existed (or it was unreadable), `--decide`
 already returns `reuseAll: false` with an empty `reuse` set — dispatch ALL lenses and the
-evaluator, never reuse on uncertainty.
+evaluator, never reuse on uncertainty. (`--decide` hard-fails loudly, by design, if the
+freshly-written CURRENT fingerprint is malformed — a real bug worth surfacing, not something to
+paper over with a shell fallback.)
 
 This is exactly the point of `tune`: editing `.eval-pack.json` (a rubric, a stance, a
 `frictionCategories` list, a lens's `model`) is a config change, and `resolve_config.py` folds the

@@ -307,49 +307,6 @@ Compute the diff base the same way as Step 0:
 
 Create the lens output dir: `mkdir -p "${PACK_DIR}/lenses"`.
 
-**Delta reuse — compute the fingerprint and decide what to skip.** The pack dir PERSISTS across
-runs of the same session (a re-generate), so a `pack-fingerprint.json` from the previous run may
-already be sitting in `${PACK_DIR}`. `pack_fingerprint.py` WRITES `pack-fingerprint.json` when it
-computes — if you compute the fresh one first, you clobber the prior and every later comparison
-becomes prior-equals-current, which would always report full reuse and nothing would ever re-run.
-So preserve the prior BEFORE computing:
-
-```bash
-if [ -f "${PACK_DIR}/pack-fingerprint.json" ]; then
-    mv "${PACK_DIR}/pack-fingerprint.json" "${PACK_DIR}/pack-fingerprint.prev.json"
-fi
-"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/pack_fingerprint.py" "${PACK_DIR}" \
-    --config "${PACK_DIR}/eval-config.json" --diff-base "${DIFF_BASE}"
-DECISION=$("$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/pack_fingerprint.py" \
-    --decide "${PACK_DIR}/pack-fingerprint.prev.json" "${PACK_DIR}/pack-fingerprint.json" 2>/dev/null \
-    || echo '{"reuseAll": false, "reuse": [], "rerun": []}')
-```
-
-**Fail-safe:** if `${PACK_DIR}/pack-fingerprint.prev.json` does not exist (first-ever generate for
-this pack), or it is unreadable, `--decide` already returns `reuseAll: false` with an empty
-`reuse` set — dispatch ALL lenses and the evaluator, never reuse on uncertainty. A fresh generate
-is therefore byte-identical to today's full-dispatch behavior.
-
-**C1 — whole-match fast path.** If `DECISION.reuseAll` is `true`, the fingerprint's `whole` key
-covers every lens's inputs AND the evaluator agent file AND the resolved config (see
-`pack_fingerprint.py compute()`), so nothing observable to any lens or the evaluator has changed.
-Skip ALL lens dispatches AND the Step 4.5 evaluator dispatch entirely; keep the on-disk
-`${PACK_DIR}/analysis.json` and every `${PACK_DIR}/lenses/<skill>.json` as-is. Still write a reused
-cost sidecar for every configured lens PLUS `eval-pack-evaluator` (if `analysis` is enabled) —
-`{"skill": "<skill>", "tokens": 0, "model": "n/a (reused)", "reused": true}` — so the ledger shows
-the saved spend. Then skip the rest of Step 4 (view building, lens dispatch loop,
-`assemble_lenses.py`) and, within Step 4.5, everything except the **Aggregate cost** sub-step
-(still run `pack_cost.py` — see that step's C1 note), then proceed to Step 5.
-
-**C2 — per-lens match.** Otherwise (`reuseAll` is `false`), for each configured lens: if its
-`skill` is in `DECISION.reuse` AND `${PACK_DIR}/lenses/<skill>.json` already exists on disk, SKIP
-dispatching that lens — keep its on-disk result — and write its cost sidecar as
-`{"skill": "<skill>", "tokens": 0, "model": "n/a (reused)", "reused": true}` instead of the normal
-cost sidecar. Every other lens (in `DECISION.rerun`, or not present on disk despite being listed as
-reusable) dispatches normally below, with its normal cost sidecar. The Step 4.5 evaluator ALWAYS
-re-runs in this branch — its inputs are the lens outputs, which may have changed even when only
-some lenses re-ran.
-
 **Build the transcript views (cost lever).** Compute the set of views the enabled lenses declare
 (each lens's frontmatter `inputs.transcript`, default `full`) and materialize only those, once:
 
@@ -363,6 +320,55 @@ some lenses re-ran.
             "${PACK_DIR}/transcript.jsonl" "${PACK_DIR}/views" $VIEWS \
             --tool-result-trunc-len "$(jq -r '.toolResultTruncLen // 400' "${PACK_DIR}/eval-config.json")"
     fi
+
+**Delta reuse — compute the fingerprint and decide what to skip.** This MUST run AFTER the view
+build above, never before: `pack_fingerprint.py` hashes each lens's ACTUAL input bytes off
+`${PACK_DIR}/views/<view>.jsonl`, and those files were just rewritten from the current
+`transcript.jsonl`. Computing the fingerprint first would hash the STALE prior-run view files —
+byte-identical to what the prior fingerprint already recorded — and falsely mark a view-scoped
+lens reusable even though the transcript changed underneath it. The pack dir also PERSISTS across
+runs of the same session (a re-generate), so a `pack-fingerprint.json` from the previous run may
+already be sitting in `${PACK_DIR}`. `pack_fingerprint.py` WRITES `pack-fingerprint.json` when it
+computes — if you compute the fresh one first, you clobber the prior and every later comparison
+becomes prior-equals-current, which would always report full reuse and nothing would ever re-run.
+So preserve the prior BEFORE computing:
+
+```bash
+if [ -f "${PACK_DIR}/pack-fingerprint.json" ]; then
+    mv "${PACK_DIR}/pack-fingerprint.json" "${PACK_DIR}/pack-fingerprint.prev.json"
+fi
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/pack_fingerprint.py" "${PACK_DIR}" \
+    --config "${PACK_DIR}/eval-config.json" --diff-base "${DIFF_BASE}"
+DECISION=$("$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/pack_fingerprint.py" \
+    --decide "${PACK_DIR}/pack-fingerprint.prev.json" "${PACK_DIR}/pack-fingerprint.json")
+```
+
+**Fail-safe:** if `${PACK_DIR}/pack-fingerprint.prev.json` does not exist (first-ever generate for
+this pack), or it is unreadable, `--decide` already returns `reuseAll: false` with an empty
+`reuse` set — dispatch ALL lenses and the evaluator, never reuse on uncertainty. A fresh generate
+is therefore byte-identical to today's full-dispatch behavior. (`--decide` hard-fails loudly, by
+design, if the freshly-written CURRENT fingerprint is malformed — that is a real bug worth
+surfacing, not a condition to paper over with a fallback.)
+
+**C1 — whole-match fast path.** If `DECISION.reuseAll` is `true`, the fingerprint's `whole` key
+covers every lens's inputs AND the evaluator agent file AND the resolved config (see
+`pack_fingerprint.py compute()`), so nothing observable to any lens or the evaluator has changed.
+Skip ALL lens dispatches AND the Step 4.5 evaluator dispatch entirely; keep the on-disk
+`${PACK_DIR}/analysis.json` and every `${PACK_DIR}/lenses/<skill>.json` as-is. Still write a reused
+cost sidecar for every configured lens PLUS `eval-pack-evaluator` (if `analysis` is enabled) —
+`{"skill": "<skill>", "tokens": 0, "model": "n/a (reused)", "reused": true}` — so the ledger shows
+the saved spend. Then skip the rest of Step 4 (the lens dispatch loop, `assemble_lenses.py`) and,
+within Step 4.5, everything except the **Aggregate cost** sub-step (still run `pack_cost.py` — see
+that step's C1 note), then proceed to Step 5.
+
+**C2 — per-lens match.** Otherwise (`reuseAll` is `false`), for each configured lens: if its
+`skill` is in `DECISION.reuse` AND `${PACK_DIR}/lenses/<skill>.json` already exists on disk, SKIP
+dispatching that lens — keep its on-disk result — and write its cost sidecar as
+`{"skill": "<skill>", "tokens": 0, "model": "n/a (reused)", "reused": true}` instead of the normal
+cost sidecar. Every other lens (in `DECISION.rerun`, or not present on disk despite being listed as
+reusable) dispatches normally below, with its normal cost sidecar. The Step 4.5 evaluator ALWAYS
+re-runs in this branch — its inputs are the lens outputs, which may have changed even when only
+some lenses re-ran.
 
 For each lens, resolve its TRANSCRIPT path: if the lens declares `full` (or declares nothing),
 TRANSCRIPT = `${ABS_PACK_DIR}/transcript.jsonl`; otherwise TRANSCRIPT =
