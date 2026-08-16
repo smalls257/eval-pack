@@ -46,6 +46,8 @@ def project_record(record, view, tool_result_trunc_len):
     `turnId` is always preserved on a kept record (the citation coordinate)."""
     if view == "full":
         return record
+    if view not in VIEWS:
+        raise ValueError("unknown view {!r}; expected one of {}".format(view, VIEWS))
     if record.get("type") in DROPPABLE_TYPES:
         return None
 

@@ -1,12 +1,12 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 import transcript_views as tv  # noqa: E402
 
-USER_TEXT = {"turnId": 0, "type": "user",
-             "message": {"role": "user", "content": [{"type": "text", "text": "hi"}]}}
 ASSISTANT = {"turnId": 1, "type": "assistant",
              "message": {"role": "assistant", "content": [
                  {"type": "thinking", "thinking": "hmm"},
@@ -49,3 +49,8 @@ def test_activity_keeps_tool_use_and_truncates_tool_result():
 
 def test_activity_drops_structural_noise():
     assert tv.project_record(NOISE, "activity", 400) is None
+
+
+def test_unknown_view_raises():
+    with pytest.raises(ValueError):
+        tv.project_record(ASSISTANT, "bogus", 400)
