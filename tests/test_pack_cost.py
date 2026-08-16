@@ -30,3 +30,34 @@ def test_malformed_sidecar_is_a_recorded_gap_not_zero(tmp_path):
     out = pack_cost.aggregate(tmp_path)
     e = next(x for x in out["perLens"] if x["skill"] == "friction")
     assert e["tokens"] is None and "gap" in e   # recorded gap, never silent 0
+    # Finding 3: gap rows carry the same key set as normal rows so a
+    # downstream consumer can do entry["model"] unconditionally.
+    assert e["model"] is None and e["reused"] is None
+
+
+def test_malformed_evaluator_sidecar_is_not_silently_lost(tmp_path):
+    (tmp_path / "lenses").mkdir()
+    (tmp_path / "lenses" / "eval-pack-evaluator.cost.json").write_text("{not json", encoding="utf-8")
+    out = pack_cost.aggregate(tmp_path)
+    # evaluatorTokens stays numeric (0), but the gap must be recorded
+    # somewhere a caller can see it — not silently collapsed to "cost 0".
+    assert out["evaluatorTokens"] == 0
+    assert "eval-pack-evaluator" in out["gaps"]
+    assert all(e["skill"] != "eval-pack-evaluator" for e in out["perLens"])
+
+
+def test_missing_sidecar_for_expected_lens_is_a_recorded_gap(tmp_path):
+    _sidecar(tmp_path, "sycophancy", 100)
+    out = pack_cost.aggregate(tmp_path, expected_skills=["sycophancy", "friction"])
+    lenses = {e["skill"]: e for e in out["perLens"]}
+    assert lenses["sycophancy"]["tokens"] == 100
+    assert lenses["friction"]["tokens"] is None
+    assert lenses["friction"]["gap"] == "missing sidecar"
+    assert "friction" in out["gaps"]
+
+
+def test_expected_skills_none_keeps_backcompat_behavior(tmp_path):
+    _sidecar(tmp_path, "sycophancy", 100)
+    out = pack_cost.aggregate(tmp_path)
+    assert [e["skill"] for e in out["perLens"]] == ["sycophancy"]
+    assert out["gaps"] == []

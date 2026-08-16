@@ -15,32 +15,47 @@ from pathlib import Path
 _EVALUATOR = "eval-pack-evaluator"
 
 
+def _gap(skill, reason):
+    # Every gap row carries the same key set as a normal row (model, reused)
+    # so downstream consumers can do entry["model"] unconditionally instead
+    # of branching on whether the row is a gap.
+    return {"skill": skill, "tokens": None, "gap": reason, "model": None, "reused": None}
+
+
 def _read_sidecar(path):
     try:
         d = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        return {"skill": path.stem[:-5] if path.stem.endswith(".cost") else path.stem,
-                "tokens": None, "gap": "unreadable sidecar ({})".format(exc)}
+        skill = path.stem[:-5] if path.stem.endswith(".cost") else path.stem
+        return _gap(skill, "unreadable sidecar ({})".format(exc))
     tokens = d.get("tokens")
     if not isinstance(tokens, int) or isinstance(tokens, bool):
-        return {"skill": d.get("skill", path.stem), "tokens": None,
-                "gap": "non-integer tokens"}
+        return _gap(d.get("skill", path.stem), "non-integer tokens")
     return {"skill": d.get("skill", path.stem), "tokens": tokens,
             "model": d.get("model"), "reused": bool(d.get("reused", False))}
 
 
-def aggregate(pack_dir):
+def aggregate(pack_dir, expected_skills=None):
     pack = Path(pack_dir)
     lens_dir = pack / "lenses"
     entries = []
     if lens_dir.is_dir():
         for f in sorted(lens_dir.glob("*.cost.json")):
             entries.append(_read_sidecar(f))
+    if expected_skills is not None:
+        seen = {e["skill"] for e in entries}
+        for skill in expected_skills:
+            if skill not in seen:
+                entries.append(_gap(skill, "missing sidecar"))
     per_lens = [e for e in entries if e["skill"] != _EVALUATOR]
-    evaluator = next((e["tokens"] for e in entries
-                      if e["skill"] == _EVALUATOR and isinstance(e["tokens"], int)), 0)
+    evaluator_entry = next((e for e in entries if e["skill"] == _EVALUATOR), None)
+    evaluator = evaluator_entry["tokens"] if evaluator_entry and isinstance(evaluator_entry["tokens"], int) else 0
     total = sum(e["tokens"] for e in entries if isinstance(e["tokens"], int))
-    return {"perLens": per_lens, "evaluatorTokens": evaluator, "totalTokens": total}
+    # Top-level gaps list covers EVERY sidecar that resolved to a gap, whether
+    # it's a perLens entry or the evaluator's own sidecar — evaluatorTokens
+    # defaulting to 0 on a gap must never be the only signal a caller sees.
+    gaps = [e["skill"] for e in entries if e["tokens"] is None]
+    return {"perLens": per_lens, "evaluatorTokens": evaluator, "totalTokens": total, "gaps": gaps}
 
 
 def main(argv=None):
@@ -49,7 +64,7 @@ def main(argv=None):
     args = ap.parse_args(argv)
     out = aggregate(args.pack_dir)
     (Path(args.pack_dir) / "pack-cost.json").write_text(json.dumps(out, indent=2), encoding="utf-8")
-    gaps = [e["skill"] for e in out["perLens"] if e["tokens"] is None]
+    gaps = out["gaps"]
     print("pack-cost.json: {} lenses, total {} tokens{}".format(
         len(out["perLens"]), out["totalTokens"],
         "" if not gaps else " (gaps: {})".format(", ".join(gaps))))
