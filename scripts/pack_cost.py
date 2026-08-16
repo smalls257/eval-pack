@@ -61,8 +61,12 @@ def aggregate(pack_dir, expected_skills=None):
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Aggregate per-lens eval-pack cost")
     ap.add_argument("pack_dir")
+    ap.add_argument("--expect-skills", default=None,
+                     help="Comma-separated skill names expected to have a sidecar; any without "
+                          "one becomes a recorded gap (catches a lens that crashed before writing).")
     args = ap.parse_args(argv)
-    out = aggregate(args.pack_dir)
+    expected_skills = args.expect_skills.split(",") if args.expect_skills else None
+    out = aggregate(args.pack_dir, expected_skills=expected_skills)
     (Path(args.pack_dir) / "pack-cost.json").write_text(json.dumps(out, indent=2), encoding="utf-8")
     gaps = out["gaps"]
     print("pack-cost.json: {} lenses, total {} tokens{}".format(

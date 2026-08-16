@@ -61,3 +61,14 @@ def test_expected_skills_none_keeps_backcompat_behavior(tmp_path):
     out = pack_cost.aggregate(tmp_path)
     assert [e["skill"] for e in out["perLens"]] == ["sycophancy"]
     assert out["gaps"] == []
+
+
+def test_cli_expect_skills_flags_missing(tmp_path):
+    _sidecar(tmp_path, "present", 100)
+    rc = pack_cost.main([str(tmp_path), "--expect-skills", "present,missing"])
+    assert rc == 0
+    out = json.loads((tmp_path / "pack-cost.json").read_text(encoding="utf-8"))
+    assert "missing" in out["gaps"]
+    lenses = {e["skill"]: e for e in out["perLens"]}
+    assert lenses["missing"]["tokens"] is None
+    assert lenses["present"]["tokens"] == 100

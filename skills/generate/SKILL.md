@@ -331,6 +331,11 @@ Then for each lens `{skill, role, model?}`, dispatch it as a SEPARATE subagent o
 artifacts. Each lens WRITES its result to `${PACK_DIR}/lenses/<id>.json` (the assembler collects
 these). Pass only artifact locations — never your own reasoning.
 
+After each lens subagent returns, record its cost: write `${ABS_PACK_DIR}/lenses/<skill>.cost.json`
+= `{"skill": "<skill>", "tokens": <the subagent_tokens from the Agent result>, "model": "<the model
+used>", "reused": false}`. This is a mechanical copy of the integer the Agent result reported — do
+not compute it.
+
 **Per-lens model (cost/quality tuning):** if a lens entry has a `model` (`opus`|`sonnet`|`haiku`|
 `fable`), pass it as the `Agent` tool's `model` argument for THAT lens's dispatch. If `model` is
 absent, omit the argument so the lens inherits the session model. This lets you run judgment-heavy
@@ -457,6 +462,11 @@ Wait for the agent to finish. Confirm `${ABS_PACK_DIR}/analysis.json` exists and
 fails again, stop and tell the user the analysis step failed. Do NOT write the
 analysis yourself as a fallback — that reintroduces the bias this step exists to remove.
 
+After the evaluator subagent returns, record its cost the same way as each lens: write
+`${ABS_PACK_DIR}/lenses/eval-pack-evaluator.cost.json` = `{"skill": "eval-pack-evaluator",
+"tokens": <the subagent_tokens from the Agent result>, "model": "<the model used>", "reused":
+false}`. Mechanical copy of the reported integer — do not compute it.
+
 Then run the deterministic contract gate — it checks the analysis and test results against the
 resolved config (retrospective answers, rubric band, test-command proof, and — now that lenses
 have already run — the friction taxonomy check against `lenses/friction.json`):
@@ -494,6 +504,24 @@ pack.mkdir(parents=True, exist_ok=True)
 }), encoding="utf-8")
 PY
 ```
+
+**Aggregate cost (runs in both branches above).** Combine every lens/evaluator cost sidecar into
+one deterministic file — never computed by hand, only aggregated from the sidecars each dispatch
+already wrote:
+
+Build the expected-skills list from the same `analysisLenses` skills read in Step 4 (the skills you
+actually dispatched), plus `eval-pack-evaluator` if analysis was enabled (omit it if analysis was
+disabled — it was never dispatched, so expecting it would manufacture a false gap). Join them with
+commas and pass as `--expect-skills`; this is the fail-safe that turns a lens or evaluator that
+crashed before writing its sidecar into a recorded gap instead of a silent omission:
+
+```bash
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/pack_cost.py" "${PACK_DIR}" \
+  --expect-skills "<comma-joined list of the dispatched lens skills plus eval-pack-evaluator>"
+```
+
+This writes `${PACK_DIR}/pack-cost.json` — `perLens`, `evaluatorTokens`, `totalTokens`, and any
+`gaps` — which the report reads to show cost per lens and in total.
 
 ## Step 5: Render HTML
 
