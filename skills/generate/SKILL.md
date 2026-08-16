@@ -385,6 +385,12 @@ lens knows how to fetch full turn bodies on demand:
 Non-skeleton lenses' dispatch prompt is unchanged — they receive only the generic prompt above,
 with no RAW_TRANSCRIPT and no pull recipe.
 
+**Pre-turnId fallback.** If `${ABS_PACK_DIR}/transcript.jsonl` lacks a `turnId` on its first data
+record (a pack built via the context-reconstruction fallback in Step 1), do NOT hand a skeleton
+lens the skeleton view — pull-by-turnId can't work; pass its `TRANSCRIPT` as the raw
+`${ABS_PACK_DIR}/transcript.jsonl` instead, so it reads the full transcript directly. Look-back
+never breaks; it just degrades to reading the whole transcript for that one lens.
+
 A **third-party** lens is dispatched as its named skill/agent; instruct it to write the same
 `{skill, role, score|title, rationale|findings}` shape to `lenses/<skill>.json`. A `contributor`
 adds an attributed section and MUST NOT touch the verdict; a `scorer` returns a 0–100 `score` that

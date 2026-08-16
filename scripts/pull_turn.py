@@ -55,6 +55,8 @@ def pull(transcript_path, turn_id, field=None):
         elif block_type == "tool_result":
             c = b.get("content")
             parts.append(c if isinstance(c, str) else json.dumps(c))
+    # Multiple blocks of the same field in one turn are joined and returned as one string
+    # (Claude Code emits at most one tool_result per turn today, so this is latent).
     return "\n".join(parts)
 
 
@@ -68,6 +70,9 @@ def main(argv=None):
         sys.stdout.write(pull(args.transcript, args.turn_id, field=args.field))
         return 0
     except KeyError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    except FileNotFoundError as exc:
         print(str(exc), file=sys.stderr)
         return 2
 

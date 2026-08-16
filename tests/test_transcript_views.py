@@ -154,3 +154,37 @@ def test_skeleton_summarizes_tool_result_no_body():
 
 def test_skeleton_is_a_known_view():
     assert "skeleton" in tv.VIEWS
+
+
+THINKING_ONLY = {"turnId": 7, "type": "assistant",
+    "message": {"role": "assistant", "content": [
+        {"type": "thinking", "thinking": "just planning, no text or tools"}]}}
+
+def test_skeleton_drops_thinking_only_record():
+    assert tv.project_record(THINKING_ONLY, "skeleton", 400) is None
+
+
+TOOL_USE_NO_SALIENT_KEY = {"turnId": 8, "type": "assistant",
+    "message": {"role": "assistant", "content": [
+        {"type": "tool_use", "name": "TodoWrite", "input": {"todos": [{"content": "x"}]}}]}}
+
+def test_skeleton_tool_use_without_salient_key_still_emits_empty_digest():
+    out = tv.project_record(TOOL_USE_NO_SALIENT_KEY, "skeleton", 400)
+    tu = out["message"]["content"][0]
+    assert tu["type"] == "tool_use"
+    assert tu["digest"] == ""
+    assert "inputBytes" in tu
+
+
+RESULT_REC_LIST_CONTENT = {"turnId": 9, "type": "user",
+    "message": {"role": "user", "content": [
+        {"type": "tool_result",
+         "content": [{"type": "text", "text": "structured output line"}],
+         "is_error": False}]}}
+
+def test_skeleton_summarizes_structured_list_tool_result():
+    out = tv.project_record(RESULT_REC_LIST_CONTENT, "skeleton", 400)
+    b = out["message"]["content"][0]
+    assert b["type"] == "tool_result"
+    assert b["bytes"] > 0
+    assert b["isError"] is False

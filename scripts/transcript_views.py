@@ -53,8 +53,6 @@ def _summarize_tool_result(block):
             "bytes": len(text), "isError": bool(block.get("is_error", False))}
 
 
-_SKELETON_BLOCKS = frozenset({"text", "tool_use", "tool_result"})  # thinking excluded
-
 # Top-level record keys kept by non-full views. Everything else — toolUseResult
 # (Claude Code's untruncated duplicate of every tool result) and transport metadata
 # (uuid, sessionId, cwd, gitBranch, requestId, ...) — is dropped as noise no lens grades.

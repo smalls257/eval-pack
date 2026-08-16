@@ -43,3 +43,9 @@ def test_cli_prints_body(tmp_path):
     r = subprocess.run([sys.executable, str(SCRIPTS/"pull_turn.py"), str(p), "6", "--field", "tool_result"],
                        capture_output=True, text=True)
     assert r.returncode == 0 and "FAILED" in r.stdout
+
+def test_cli_missing_transcript_exits_2(tmp_path):
+    missing = tmp_path / "does-not-exist.jsonl"
+    r = subprocess.run([sys.executable, str(SCRIPTS/"pull_turn.py"), str(missing), "6", "--field", "text"],
+                       capture_output=True, text=True)
+    assert r.returncode == 2 and r.stderr.strip()
