@@ -4,12 +4,15 @@ Views (append-only vocabulary):
   full          - identity; the raw record unchanged.
   conversation  - real user + assistant text + thinking. No tool payloads, no structural noise.
   activity      - conversation + tool_use (name/input) + truncated tool_result + exit codes.
+  skeleton      - structure + summaries only: text verbatim, tool_use digested, tool_result
+                  summarized (first/last line + size), thinking dropped. No bodies — built
+                  for pull-on-demand retrieval.
 """
 import copy
 import json
 from pathlib import Path
 
-VIEWS = ("full", "conversation", "activity")
+VIEWS = ("full", "conversation", "activity", "skeleton")
 VIEW_VERSION = "1.0.0"
 
 # Top-level record types that are pure structure/noise — dropped by every non-full view.
@@ -21,6 +24,36 @@ DROPPABLE_TYPES = frozenset({
 # Content-block types kept by each non-full view.
 _CONVERSATION_BLOCKS = frozenset({"text", "thinking"})
 _ACTIVITY_BLOCKS = frozenset({"text", "thinking", "tool_use", "tool_result"})
+
+_MAX_DIGEST = 200
+_MAX_SUMMARY_LINE = 200
+
+
+def _digest_tool_use(block):
+    """tool_use -> name + salient identifier + input size (no full body)."""
+    inp = block.get("input")
+    ident = ""
+    if isinstance(inp, dict):
+        for k in ("command", "file_path", "path", "pattern", "url", "query", "prompt"):
+            if inp.get(k):
+                ident = str(inp[k]); break
+    return {"type": "tool_use", "name": block.get("name"),
+            "digest": ident[:_MAX_DIGEST],
+            "inputBytes": len(_json_len_safe(inp))}
+
+
+def _summarize_tool_result(block):
+    """tool_result -> status + first/last non-empty line + total size (no body)."""
+    content = block.get("content")
+    text = content if isinstance(content, str) else _json_len_safe(content)
+    lines = [ln for ln in text.splitlines() if ln.strip()]
+    first = lines[0][:_MAX_SUMMARY_LINE] if lines else ""
+    last = lines[-1][:_MAX_SUMMARY_LINE] if len(lines) > 1 else ""
+    return {"type": "tool_result", "first": first, "last": last,
+            "bytes": len(text), "isError": bool(block.get("is_error", False))}
+
+
+_SKELETON_BLOCKS = frozenset({"text", "tool_use", "tool_result"})  # thinking excluded
 
 # Top-level record keys kept by non-full views. Everything else — toolUseResult
 # (Claude Code's untruncated duplicate of every tool result) and transport metadata
@@ -58,6 +91,29 @@ def project_record(record, view, tool_result_trunc_len):
         raise ValueError("unknown view {!r}; expected one of {}".format(view, VIEWS))
     if record.get("type") in DROPPABLE_TYPES:
         return None
+
+    if view == "skeleton":
+        out = copy.deepcopy(record)
+        msg = out.get("message")
+        content = msg.get("content") if isinstance(msg, dict) else None
+        if isinstance(content, list):
+            projected = []
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                bt = block.get("type")
+                if bt == "text":
+                    projected.append(block)
+                elif bt == "tool_use":
+                    projected.append(_digest_tool_use(block))
+                elif bt == "tool_result":
+                    projected.append(_summarize_tool_result(block))
+                # thinking and anything else: dropped
+            if not projected:
+                return None
+            msg["content"] = projected
+        # string content (plain user/assistant text) kept as-is
+        return {k: v for k, v in out.items() if k in _KEEP_TOP}
 
     keep_blocks = _CONVERSATION_BLOCKS if view == "conversation" else _ACTIVITY_BLOCKS
     out = copy.deepcopy(record)

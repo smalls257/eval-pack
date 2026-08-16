@@ -121,3 +121,36 @@ def test_emit_header_records_kept_top_level_fields_for_non_full_view(tmp_path):
     paths = tv.emit_views(_emit_records(), ["conversation"], tmp_path, 400, "abc123")
     header = json.loads(paths["conversation"].read_text().splitlines()[0])
     assert header["_keptTopLevelFields"] == ["turnId", "type", "message", "timestamp"]
+
+
+ASSIST_FULL = {"turnId": 5, "type": "assistant", "toolUseResult": {"x": "y"},
+    "message": {"role": "assistant", "content": [
+        {"type": "thinking", "thinking": "planning"},
+        {"type": "text", "text": "Running the tests now."},
+        {"type": "tool_use", "name": "Bash", "input": {"command": "pytest tests/ -q", "description": "run tests"}}]}}
+RESULT_REC = {"turnId": 6, "type": "user",
+    "message": {"role": "user", "content": [
+        {"type": "tool_result", "content": "collecting...\n" + "x"*5000 + "\n3 passed in 1.2s", "is_error": False}]}}
+
+def test_skeleton_keeps_text_digests_tooluse_drops_thinking():
+    out = tv.project_record(ASSIST_FULL, "skeleton", 400)
+    kinds = [b["type"] for b in out["message"]["content"]]
+    assert kinds == ["text", "tool_use"]          # thinking dropped
+    tu = out["message"]["content"][1]
+    assert tu["name"] == "Bash"
+    assert tu["digest"] == "pytest tests/ -q"      # command as digest
+    assert "inputBytes" in tu
+    assert "toolUseResult" not in out             # top-level stripped
+    assert out["turnId"] == 5
+
+def test_skeleton_summarizes_tool_result_no_body():
+    out = tv.project_record(RESULT_REC, "skeleton", 400)
+    b = out["message"]["content"][0]
+    assert b["type"] == "tool_result"
+    assert b["last"].strip() == "3 passed in 1.2s"  # last line preserved
+    assert b["bytes"] > 5000                          # size recorded
+    assert "x"*5000 not in json.dumps(b)              # body NOT included
+    assert b["isError"] is False
+
+def test_skeleton_is_a_known_view():
+    assert "skeleton" in tv.VIEWS
