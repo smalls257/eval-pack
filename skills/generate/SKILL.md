@@ -323,7 +323,9 @@ Create the lens output dir: `mkdir -p "${PACK_DIR}/lenses"`.
 
 For each lens, resolve its TRANSCRIPT path: if the lens declares `full` (or declares nothing),
 TRANSCRIPT = `${ABS_PACK_DIR}/transcript.jsonl`; otherwise TRANSCRIPT =
-`${ABS_PACK_DIR}/views/<view>.jsonl`.
+`${ABS_PACK_DIR}/views/<view>.jsonl`. If the lens's declared view is `skeleton`, also pass
+RAW_TRANSCRIPT = `${ABS_PACK_DIR}/transcript.jsonl` — the pull source. For non-skeleton lenses,
+omit it.
 
 Then for each lens `{skill, role, model?}`, dispatch it as a SEPARATE subagent over the read-only
 artifacts. Each lens WRITES its result to `${PACK_DIR}/lenses/<id>.json` (the assembler collects
@@ -370,6 +372,18 @@ is big (each lens reads it).
 > `${DIFF_BASE}`. TRANSCRIPT is `<resolved per-lens transcript path>`. Read the artifacts (read the
 > transcript from TRANSCRIPT), then write your result to `${ABS_PACK_DIR}/lenses/<skill>.json` per
 > your schema.
+
+If the lens's declared view is `skeleton`, append the pull recipe to that dispatch prompt so the
+lens knows how to fetch full turn bodies on demand:
+
+> TRANSCRIPT is `${ABS_PACK_DIR}/views/skeleton.jsonl` (a skeleton — every turn's text, tool-call
+> digests, and one-line result summaries; no bodies). RAW_TRANSCRIPT is
+> `${ABS_PACK_DIR}/transcript.jsonl`. To read a turn's full body, run `"$PYTHON"
+> "${CLAUDE_PLUGIN_ROOT}/scripts/pull_turn.py" "$RAW_TRANSCRIPT" <turnId> --field
+> <text|thinking|tool_input|tool_result>`. Pull selectively.
+
+Non-skeleton lenses' dispatch prompt is unchanged — they receive only the generic prompt above,
+with no RAW_TRANSCRIPT and no pull recipe.
 
 A **third-party** lens is dispatched as its named skill/agent; instruct it to write the same
 `{skill, role, score|title, rationale|findings}` shape to `lenses/<skill>.json`. A `contributor`
