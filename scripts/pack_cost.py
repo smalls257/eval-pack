@@ -65,7 +65,9 @@ def main(argv=None):
                      help="Comma-separated skill names expected to have a sidecar; any without "
                           "one becomes a recorded gap (catches a lens that crashed before writing).")
     args = ap.parse_args(argv)
-    expected_skills = args.expect_skills.split(",") if args.expect_skills else None
+    expected_skills = None
+    if args.expect_skills:
+        expected_skills = [s.strip() for s in args.expect_skills.split(",") if s.strip()] or None
     out = aggregate(args.pack_dir, expected_skills=expected_skills)
     (Path(args.pack_dir) / "pack-cost.json").write_text(json.dumps(out, indent=2), encoding="utf-8")
     gaps = out["gaps"]

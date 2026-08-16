@@ -72,3 +72,24 @@ def test_cli_expect_skills_flags_missing(tmp_path):
     lenses = {e["skill"]: e for e in out["perLens"]}
     assert lenses["missing"]["tokens"] is None
     assert lenses["present"]["tokens"] == 100
+
+
+def test_cli_expect_skills_strips_whitespace_and_drops_empty_tokens(tmp_path):
+    # Orchestrator prose composes this list; a natural rendering is "a, b, " —
+    # comma-space and/or a trailing comma. Neither should produce a false gap
+    # (unstripped "present" != " present") or a bogus "" gap entry.
+    _sidecar(tmp_path, "present", 100)
+    rc = pack_cost.main([str(tmp_path), "--expect-skills", "present, missing,"])
+    assert rc == 0
+    out = json.loads((tmp_path / "pack-cost.json").read_text(encoding="utf-8"))
+    assert "missing" in out["gaps"]
+    assert "present" not in out["gaps"]
+    assert "" not in out["gaps"]
+
+
+def test_cli_expect_skills_all_empty_value_behaves_like_no_flag(tmp_path):
+    _sidecar(tmp_path, "present", 100)
+    rc = pack_cost.main([str(tmp_path), "--expect-skills", ","])
+    assert rc == 0
+    out = json.loads((tmp_path / "pack-cost.json").read_text(encoding="utf-8"))
+    assert out["gaps"] == []

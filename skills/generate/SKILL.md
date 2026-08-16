@@ -331,11 +331,6 @@ Then for each lens `{skill, role, model?}`, dispatch it as a SEPARATE subagent o
 artifacts. Each lens WRITES its result to `${PACK_DIR}/lenses/<id>.json` (the assembler collects
 these). Pass only artifact locations — never your own reasoning.
 
-After each lens subagent returns, record its cost: write `${ABS_PACK_DIR}/lenses/<skill>.cost.json`
-= `{"skill": "<skill>", "tokens": <the subagent_tokens from the Agent result>, "model": "<the model
-used>", "reused": false}`. This is a mechanical copy of the integer the Agent result reported — do
-not compute it.
-
 **Per-lens model (cost/quality tuning):** if a lens entry has a `model` (`opus`|`sonnet`|`haiku`|
 `fable`), pass it as the `Agent` tool's `model` argument for THAT lens's dispatch. If `model` is
 absent, omit the argument so the lens inherits the session model. This lets you run judgment-heavy
@@ -402,6 +397,11 @@ adds an attributed section and MUST NOT touch the verdict; a `scorer` returns a 
 reaches the verdict only through the declared `verdictAggregation` rule. If a lens errors or writes
 malformed output, leave a note in `lenses/<skill>.json` — the assembler quarantines it as a
 failure and the eval continues (never crashes, never silently vanishes).
+
+After EVERY lens subagent returns — first-party or third-party — record its cost: write
+`${ABS_PACK_DIR}/lenses/<skill>.cost.json` = `{"skill": "<skill>", "tokens": <the subagent_tokens
+from the Agent result>, "model": "<the model used>", "reused": false}`. This is a mechanical copy
+of the integer the Agent result reported — do not compute it.
 
 Then assemble the results and compute the aggregated verdict with the tested script (the math is
 not done by hand — that keeps the verdict auditable):
@@ -509,11 +509,13 @@ PY
 one deterministic file — never computed by hand, only aggregated from the sidecars each dispatch
 already wrote:
 
-Build the expected-skills list from the same `analysisLenses` skills read in Step 4 (the skills you
-actually dispatched), plus `eval-pack-evaluator` if analysis was enabled (omit it if analysis was
+Build the expected-skills list by RE-READING `analysisLenses` from `${PACK_DIR}/eval-config.json`
+— the same source Step 4 read, not memory of what you dispatched ~180 lines earlier — and take each
+entry's `skill`, plus `eval-pack-evaluator` if analysis was enabled (omit it if analysis was
 disabled — it was never dispatched, so expecting it would manufacture a false gap). Join them with
-commas and pass as `--expect-skills`; this is the fail-safe that turns a lens or evaluator that
-crashed before writing its sidecar into a recorded gap instead of a silent omission:
+commas (no surrounding spaces needed — the script strips whitespace and drops empty tokens) and
+pass as `--expect-skills`; this is the fail-safe that turns a lens or evaluator that crashed before
+writing its sidecar into a recorded gap instead of a silent omission:
 
 ```bash
 "$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/pack_cost.py" "${PACK_DIR}" \
