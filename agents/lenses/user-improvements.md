@@ -124,12 +124,27 @@ Produce BOTH kinds of item:
 
 **Assign an overall `level` — how much the DEVELOPER owned the cognitive load and decision-making,
 versus offloaded it to the AI.** (Note: HIGH is GOOD here — the reverse of a risk score.)
-- **high** — the developer owned the intent, the key decisions, and the due diligence the risk
-  warranted; the AI executed. Strengths dominate; few or no offloaded-judgment moments.
-- **medium** — mixed: owned some, offloaded some judgment (a decision handed up, or a check left
-  to the AI to decide was needed).
-- **low** — pervasive offloading: intent left for the AI to invent, decisions handed up, blanket
-  approval of large plans/diffs. Vibecoding.
+HIGH is EARNED by demonstrated ownership, never GRANTED by the mere absence of offload. The
+absence of offloaded-judgment moments is necessary but NOT sufficient for high: a session where
+nothing was offloaded because the developer barely engaged is thin ownership, not high. Stating a
+request is not owning the work.
+- **high** — the developer actively drove: they owned the intent AND showed substantive ownership
+  of the decisions and due diligence the session offered — real decisions made or defended from
+  their own reasoning, vetting, pushback, or course-correction proportional to what was at stake.
+  Positive ownership evidence dominates; offloaded-judgment moments are few and minor.
+- **medium** — mixed: owned some, offloaded some judgment (a decision handed up, or a check left to
+  the AI to decide was needed) — OR engagement was too thin to demonstrate the active ownership high
+  requires, even though little was offloaded.
+- **low** — pervasive offloading OR near-absent ownership: intent left for the AI to invent,
+  decisions handed up, blanket approval of large plans/diffs, or a drive-by request where the
+  developer states an ask and accepts the AI's output wholesale with no engagement, decision, or
+  vetting. Vibecoding.
+**Thin-engagement floor:** a single-turn or drive-by interaction where the developer states a
+request and accepts the AI's output without any further engagement, decision, or vetting is NEVER
+high — regardless of how low-risk the task was or how crisply the request was phrased. Floor it at
+low (they accepted a substantive answer wholesale) or medium (the task was trivial/low-stakes but
+they specified it precisely). "Nothing risky was offloaded" is not evidence of ownership when
+nothing was owned.
 Also write a one-sentence `levelNote` justifying the level. Base the level ONLY on the same cited
 evidence as your items — do not inflate it.
 
