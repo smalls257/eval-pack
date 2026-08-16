@@ -100,10 +100,12 @@ freshly-written CURRENT fingerprint is malformed — a real bug worth surfacing,
 paper over with a shell fallback.)
 
 This is exactly the point of `tune`: editing `.eval-pack.json` (a rubric, a stance, a
-`frictionCategories` list, a lens's `model`) is a config change, and `resolve_config.py` folds the
-whole resolved config into the fingerprint's `whole` key — so a config edit correctly forces a
-re-run rather than being silently reused. Only lenses whose ACTUAL inputs (view bytes, lens
-version, model, diff base) are byte-identical to the prior round are eligible to skip.
+`frictionCategories` list, a lens's `model`) is a config change, and `pack_fingerprint.py` folds
+the resolved config bytes into EVERY per-lens key (not just `whole`) — so any `eval-config.json`
+change re-runs all lenses, never a silent reuse, even for a lens whose config-derived behavior
+(like `friction`'s `frictionCategories`) isn't reflected in any view file. Only lenses whose
+ACTUAL inputs (view bytes, lens version, model, diff base, resolved config) are byte-identical to
+the prior round are eligible to skip.
 
 **C1 — whole-match fast path.** If `DECISION.reuseAll` is `true` (config unchanged, no lens `.md`
 edited, no evaluator edit, transcript unchanged since the pack was captured — the common case when

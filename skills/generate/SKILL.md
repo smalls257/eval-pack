@@ -351,7 +351,8 @@ design, if the freshly-written CURRENT fingerprint is malformed — that is a re
 surfacing, not a condition to paper over with a fallback.)
 
 **C1 — whole-match fast path.** If `DECISION.reuseAll` is `true`, the fingerprint's `whole` key
-covers every lens's inputs AND the evaluator agent file AND the resolved config (see
+covers every lens's inputs (the resolved config is folded into every per-lens key, so it's covered
+transitively too) AND the evaluator agent file AND the raw transcript bytes (see
 `pack_fingerprint.py compute()`), so nothing observable to any lens or the evaluator has changed.
 Skip ALL lens dispatches AND the Step 4.5 evaluator dispatch entirely; keep the on-disk
 `${PACK_DIR}/analysis.json` and every `${PACK_DIR}/lenses/<skill>.json` as-is. Still write a reused

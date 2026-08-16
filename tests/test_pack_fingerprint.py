@@ -10,12 +10,19 @@ SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "pack_fingerprint.
 
 
 def test_lens_key_flips_on_each_axis():
-    base = pf.lens_key(b"view-bytes", "1.0.0", "sonnet", "HEAD~1")
-    assert pf.lens_key(b"view-bytes-CHANGED", "1.0.0", "sonnet", "HEAD~1") != base
-    assert pf.lens_key(b"view-bytes", "1.0.1", "sonnet", "HEAD~1") != base
-    assert pf.lens_key(b"view-bytes", "1.0.0", "opus", "HEAD~1") != base
-    assert pf.lens_key(b"view-bytes", "1.0.0", "sonnet", "HEAD~2") != base
-    assert pf.lens_key(b"view-bytes", "1.0.0", "sonnet", "HEAD~1") == base  # stable
+    base = pf.lens_key(b"view-bytes", "1.0.0", "sonnet", "HEAD~1", config_bytes=b"config-v1")
+    assert pf.lens_key(b"view-bytes-CHANGED", "1.0.0", "sonnet", "HEAD~1", config_bytes=b"config-v1") != base
+    assert pf.lens_key(b"view-bytes", "1.0.1", "sonnet", "HEAD~1", config_bytes=b"config-v1") != base
+    assert pf.lens_key(b"view-bytes", "1.0.0", "opus", "HEAD~1", config_bytes=b"config-v1") != base
+    assert pf.lens_key(b"view-bytes", "1.0.0", "sonnet", "HEAD~2", config_bytes=b"config-v1") != base
+    assert pf.lens_key(b"view-bytes", "1.0.0", "sonnet", "HEAD~1", config_bytes=b"config-v2") != base
+    assert pf.lens_key(b"view-bytes", "1.0.0", "sonnet", "HEAD~1", config_bytes=b"config-v1") == base  # stable
+
+
+def test_lens_key_config_bytes_defaults_to_empty_and_is_stable():
+    a = pf.lens_key(b"view-bytes", "1.0.0", "sonnet", "HEAD~1")
+    b = pf.lens_key(b"view-bytes", "1.0.0", "sonnet", "HEAD~1", config_bytes=b"")
+    assert a == b
 
 
 def test_decide_reuse_matches_and_mismatches():
@@ -94,7 +101,7 @@ def test_compute_missing_view_file_hashes_empty_bytes_no_crash(tmp_path, monkeyp
     # no views/ dir, no transcript.jsonl at all
     lenses = [{"skill": "ghost-lens", "model": "sonnet", "view": "nonexistent-view"}]
     out = pf.compute(str(pack_dir), lenses, "HEAD~1")
-    assert out["perLens"]["ghost-lens"] == pf.lens_key(b"", "1.0.0", "sonnet", "HEAD~1")
+    assert out["perLens"]["ghost-lens"] == pf.lens_key(b"", "1.0.0", "sonnet", "HEAD~1", config_bytes=b"")
 
 
 def test_whole_key_folds_in_evaluator_bytes(tmp_path, monkeypatch):
@@ -112,6 +119,9 @@ def test_whole_key_folds_in_evaluator_bytes(tmp_path, monkeypatch):
 
 
 def test_whole_key_folds_in_config_bytes(tmp_path, monkeypatch):
+    # A config edit must flip BOTH `whole` AND every per-lens key (Finding 1 fix): some lenses
+    # (e.g. `friction`) read config-derived values not present in any view file, so per-lens
+    # (C2) reuse must not be able to skip a lens whose config-derived behavior changed.
     monkeypatch.setattr(pf.lens_versions, "load_lock", lambda: {"my-lens": {"version": "1.0.0"}})
     pack_dir = tmp_path / "pack"
     pack_dir.mkdir()
@@ -122,7 +132,48 @@ def test_whole_key_folds_in_config_bytes(tmp_path, monkeypatch):
     out_b = pf.compute(str(pack_dir), lenses, "HEAD~1", evaluator_bytes=b"evaluator v1", config_bytes=b"config v2 CHANGED")
 
     assert out_a["whole"] != out_b["whole"]
-    assert out_a["perLens"] == out_b["perLens"]
+    assert out_a["perLens"] != out_b["perLens"]
+
+
+def test_config_bytes_flips_every_per_lens_key_not_just_whole(tmp_path, monkeypatch):
+    # This is the C2 stale-reuse hole: a lens like `friction` reads config-derived values
+    # (frictionCategories) that aren't in any view file. A config edit MUST flip the per-lens
+    # key too, or C2 will silently keep the stale classification.
+    monkeypatch.setattr(pf.lens_versions, "load_lock",
+                         lambda: {"my-lens": {"version": "1.0.0"}, "other-lens": {"version": "2.0.0"}})
+    pack_dir = tmp_path / "pack"
+    pack_dir.mkdir()
+    (pack_dir / "transcript.jsonl").write_text('{"turn": "full"}\n', encoding="utf-8")
+    lenses = [
+        {"skill": "my-lens", "model": "sonnet", "view": "full"},
+        {"skill": "other-lens", "model": "sonnet", "view": "full"},
+    ]
+
+    out_a = pf.compute(str(pack_dir), lenses, "HEAD~1", evaluator_bytes=b"evaluator v1", config_bytes=b"config v1")
+    out_b = pf.compute(str(pack_dir), lenses, "HEAD~1", evaluator_bytes=b"evaluator v1", config_bytes=b"config v2 CHANGED")
+
+    assert out_a["perLens"]["my-lens"] != out_b["perLens"]["my-lens"]
+    assert out_a["perLens"]["other-lens"] != out_b["perLens"]["other-lens"]
+    assert out_a["whole"] != out_b["whole"]
+
+
+def test_transcript_bytes_flip_whole_even_with_no_full_view_lens(tmp_path, monkeypatch):
+    # Belt-and-suspenders for C1: if no configured lens declares the `full` view, a transcript
+    # change could otherwise be fully absorbed by every non-full view and go unnoticed by
+    # `whole`, letting C1 skip the evaluator with stale synthesis inputs.
+    monkeypatch.setattr(pf.lens_versions, "load_lock", lambda: {"my-lens": {"version": "1.0.0"}})
+    pack_dir = tmp_path / "pack"
+    (pack_dir / "views").mkdir(parents=True)
+    (pack_dir / "views" / "conversation.jsonl").write_text('{"turn": 1}\n', encoding="utf-8")
+    pack_dir.joinpath("transcript.jsonl").write_text('{"turn": "full v1"}\n', encoding="utf-8")
+    lenses = [{"skill": "my-lens", "model": "sonnet", "view": "conversation"}]
+
+    out_a = pf.compute(str(pack_dir), lenses, "HEAD~1", evaluator_bytes=b"e", config_bytes=b"c")
+    pack_dir.joinpath("transcript.jsonl").write_text('{"turn": "full v2 CHANGED"}\n', encoding="utf-8")
+    out_b = pf.compute(str(pack_dir), lenses, "HEAD~1", evaluator_bytes=b"e", config_bytes=b"c")
+
+    assert out_a["whole"] != out_b["whole"]
+    assert out_a["perLens"] == out_b["perLens"]  # view file untouched, so per-lens is stable
 
 
 def test_whole_key_stable_when_evaluator_and_config_unchanged(tmp_path, monkeypatch):

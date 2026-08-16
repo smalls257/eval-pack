@@ -14,9 +14,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import lens_versions  # noqa: E402
 
 
-def lens_key(view_bytes, lens_version, model, diff_base):
+def lens_key(view_bytes, lens_version, model, diff_base, config_bytes=b""):
     h = hashlib.sha256()
-    for part in (view_bytes, str(lens_version).encode(), str(model).encode(), str(diff_base).encode()):
+    for part in (view_bytes, str(lens_version).encode(), str(model).encode(), str(diff_base).encode(), config_bytes):
         h.update(hashlib.sha256(part).digest())   # length-framed
     return h.hexdigest()
 
@@ -27,23 +27,37 @@ def _view_bytes(pack_dir, view):
     return p.read_bytes() if p.is_file() else b""
 
 
+def _transcript_bytes(pack_dir):
+    p = Path(pack_dir) / "transcript.jsonl"
+    return p.read_bytes() if p.is_file() else b""
+
+
 def compute(pack_dir, lenses, diff_base, evaluator_bytes=b"", config_bytes=b""):
     """`lenses` = resolved analysisLenses [{skill, model?, ...}] with a resolved `view`.
 
-    `whole` additionally folds in the evaluator agent's bytes and the resolved config's
-    bytes (length-framed, like `lens_key`) — this is what makes the C1 whole-match fast
-    path (skip the evaluator too) safe: a changed evaluator definition or resolved config
-    flips `whole` even when every per-lens key is unchanged. `perLens` itself stays
-    lens-only so per-lens (C2) reuse is unaffected by evaluator/config edits.
+    Every per-lens key folds in the resolved `config_bytes` too: some lenses (e.g. `friction`)
+    read config-derived values (`frictionCategories`) that aren't part of any view file, so a
+    config edit must flip EVERY per-lens key — otherwise C2 (per-lens reuse) silently keeps a
+    stale classification for a lens whose view didn't change but whose config-derived behavior
+    did.
+
+    `whole` additionally folds in the evaluator agent's bytes and the transcript's raw bytes
+    (length-framed, like `lens_key`) — this is what makes the C1 whole-match fast path (skip
+    the evaluator too) safe: a changed evaluator definition or a transcript edit not fully
+    absorbed by any configured view flips `whole` even when every per-lens key is unchanged.
+    (`config_bytes` is already folded into every per-lens key above, so it also flips `whole`
+    via `per`; re-folding it here is redundant but harmless.)
     """
     lock = lens_versions.load_lock()
     per = {}
     for l in lenses:
         skill = l.get("skill")
         ver = (lock.get(skill) or {}).get("version", "?")
-        per[skill] = lens_key(_view_bytes(pack_dir, l.get("view")), ver, l.get("model"), diff_base)
+        per[skill] = lens_key(_view_bytes(pack_dir, l.get("view")), ver, l.get("model"), diff_base,
+                               config_bytes=config_bytes)
     h = hashlib.sha256()
-    for part in (json.dumps(per, sort_keys=True).encode(), evaluator_bytes, config_bytes):
+    for part in (json.dumps(per, sort_keys=True).encode(), evaluator_bytes, config_bytes,
+                 _transcript_bytes(pack_dir)):
         h.update(hashlib.sha256(part).digest())   # length-framed, same technique as lens_key
     whole = h.hexdigest()
     return {"perLens": per, "whole": whole}
