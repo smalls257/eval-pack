@@ -3,7 +3,7 @@ name: requirement-drift
 description: Eval-pack SCORER lens. Reads the session transcript and the diff, compares what the user ORIGINALLY asked for against what was delivered, and scores how well the outcome matched the ask — flagging unmet asks and unrequested scope. Detects the Paper Tiger (met the letter, missed the need).
 tools: Read, Bash, Glob, Grep
 inputs:
-  transcript: conversation
+  transcript: skeleton
 ---
 
 **Output contract** (machine-checked; do not remove):
@@ -17,11 +17,14 @@ and the core evaluator do that.
 
 You are given an absolute PACK_DIR, a REPO_ROOT, and a DIFF_BASE git ref. Do this:
 
-1. Read the transcript at the path you were given as `TRANSCRIPT` (a condensed **conversation
-   view** — user + assistant text + thinking, with tool payloads and structural noise already
-   removed; a header line describes what was dropped). If no `TRANSCRIPT` was provided, read
-   `PACK_DIR/transcript.jsonl`. Extract the user's **opening request** and every explicit ask
-   or acceptance criterion they stated during the session (the *what*, not the *how*).
+1. Read the **skeleton** at `TRANSCRIPT`: every turn's text, tool-call digests, and one-line result
+   summaries (status + first/last line + size) — no bodies. Extract the user's **opening request**
+   and every explicit ask or acceptance criterion they stated during the session (the *what*, not
+   the *how*). When a summary is ambiguous about whether an ask was delivered, or you need to quote
+   the exact ask/delivery text, pull that turn's full body:
+   `"$PYTHON" "$CLAUDE_PLUGIN_ROOT/scripts/pull_turn.py" "$RAW_TRANSCRIPT" <turnId> --field text`.
+   Pull selectively — most asks resolve from the skeleton. If no `TRANSCRIPT`/`RAW_TRANSCRIPT` was
+   given, read `PACK_DIR/transcript.jsonl` directly.
 2. Inspect the actual change: `git -C "$REPO_ROOT" diff --stat "$DIFF_BASE"` and
    `git -C "$REPO_ROOT" diff "$DIFF_BASE"`. If DIFF_BASE is the empty-tree sha, treat the whole
    tree as new.
