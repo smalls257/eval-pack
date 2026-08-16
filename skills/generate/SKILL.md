@@ -418,6 +418,10 @@ requested it; if not, build it now):
         "${PACK_DIR}/views" activity \
         --tool-result-trunc-len "$(jq -r '.toolResultTruncLen // 400' "${PACK_DIR}/eval-config.json")"
 
+If this build fails or the view can't be produced, continue anyway — the evaluator falls back to
+reading `${ABS_PACK_DIR}/transcript.jsonl` directly (its TRANSCRIPT fallback), so a missing
+activity view never blocks the run.
+
 Dispatch the `eval-pack-evaluator` agent with the `Agent` tool, `subagent_type:
 eval-pack-evaluator`. Pass it only the artifact location — not your own reasoning:
 
