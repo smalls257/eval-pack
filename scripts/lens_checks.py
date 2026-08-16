@@ -46,7 +46,15 @@ def evidence_resolution(output, corpus, findings_key="findings", turn_index=None
         if q and q in _norm(turn.get("text")):
             continue
         if turn.get("truncated"):
-            continue  # unverifiable-due-to-truncation: non-penalizing
+            # unverifiable-due-to-truncation: non-penalizing. Safe today only because every
+            # lens with requiresTurnId (currently: sycophancy) restricts evidenceRoles to
+            # "assistant" text, which never truncates — only tool_result blocks (user-role
+            # records) do. A FUTURE requiresTurnId lens whose evidenceRoles includes a
+            # tool-result-bearing role would turn this pass into a fabrication escape hatch:
+            # a quote could be invented and then "excused" by pointing at a truncated turn.
+            # Any such lens must either exclude tool-result roles or this branch must gain
+            # a role-aware guard.
+            continue
         msgs.append("{}[{}] quote not in cited turn {}: {!r}".format(findings_key, i, tid, f.get("quote")))
     return (not msgs, msgs)
 

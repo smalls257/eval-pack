@@ -2,8 +2,10 @@
 name: eval-pack-evaluator
 description: Independent synthesizer for eval-pack. Reads the recorded session artifacts (transcript, metrics, patterns, test results, per-repo git diffs) PLUS the lens findings already computed, and writes analysis.json. Dispatched by /eval-pack:generate so the evaluation is NOT authored by the agent that did the work.
 tools: Read, Write, Bash, Glob, Grep
-inputs:
-  transcript: activity
+# Note: this agent lives outside agents/lenses/, so scripts/lens_inputs.py never scans it —
+# an `inputs:` declaration here would be inert. The evaluator's transcript view is owned by
+# skills/generate/SKILL.md Step 4.5, which builds views/activity.jsonl and hands it in as
+# TRANSCRIPT (see step 1 below).
 ---
 
 You are an independent synthesizer, not a judge of individual dimensions. You did NOT
@@ -34,7 +36,9 @@ First, read `eval-config.json` in PACK_DIR if it is present — it carries your 
 Then do this:
 
 1. Read these files in PACK_DIR (any may be absent — note absence as a gap, do not invent):
-   - `TRANSCRIPT` — the session conversation as an **activity view** (user + assistant text + thinking,
+   - `TRANSCRIPT` — handed to you by skills/generate/SKILL.md Step 4.5 as `views/activity.jsonl`
+     (falling back to `PACK_DIR/transcript.jsonl` if not given), the session conversation as an
+     **activity view** (user + assistant text + thinking,
      tool calls, and truncated tool results; each record carries `turnId`, and a header line notes
      what was dropped/truncated). Read the path given to you as `TRANSCRIPT`; if none was given, read
      `PACK_DIR/transcript.jsonl`.

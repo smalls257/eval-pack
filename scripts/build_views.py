@@ -28,6 +28,10 @@ def main(argv=None):
         print(f"Unknown view(s): {bad}; choose from {transcript_views.VIEWS}", file=sys.stderr)
         return 2
 
+    if not args.transcript.is_file():
+        print(f"Transcript not found: {args.transcript}", file=sys.stderr)
+        return 2
+
     sha = hashlib.sha256(args.transcript.read_bytes()).hexdigest()
     records = merge_sessions._load(args.transcript)
     paths = transcript_views.emit_views(records, args.views, args.out_dir,
