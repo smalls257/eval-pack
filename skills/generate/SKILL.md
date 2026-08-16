@@ -312,10 +312,14 @@ Create the lens output dir: `mkdir -p "${PACK_DIR}/lenses"`.
 
     VIEWS=$("$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/lens_inputs.py" \
         "${CLAUDE_PLUGIN_ROOT}/agents/lenses" "${PACK_DIR}/eval-config.json")
-    # VIEWS is a space-separated set excluding "full"; if empty, skip view building.
-    "$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/build_views.py" \
-        "${PACK_DIR}/transcript.jsonl" "${PACK_DIR}/views" $VIEWS \
-        --tool-result-trunc-len "$(jq -r '.toolResultTruncLen // 400' "${PACK_DIR}/eval-config.json")"
+    # VIEWS is a space-separated set excluding "full"; if empty, skip view building (no-op).
+    # $VIEWS is intentionally left unquoted below — it must word-split into separate
+    # positional args for build_views.py; quoting it would pass one empty/combined arg instead.
+    if [ -n "$VIEWS" ]; then
+        "$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/build_views.py" \
+            "${PACK_DIR}/transcript.jsonl" "${PACK_DIR}/views" $VIEWS \
+            --tool-result-trunc-len "$(jq -r '.toolResultTruncLen // 400' "${PACK_DIR}/eval-config.json")"
+    fi
 
 For each lens, resolve its TRANSCRIPT path: if the lens declares `full` (or declares nothing),
 TRANSCRIPT = `${ABS_PACK_DIR}/transcript.jsonl`; otherwise TRANSCRIPT =
