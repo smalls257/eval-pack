@@ -1,3 +1,4 @@
+import json
 import sys
 from pathlib import Path
 
@@ -54,3 +55,31 @@ def test_activity_drops_structural_noise():
 def test_unknown_view_raises():
     with pytest.raises(ValueError):
         tv.project_record(ASSISTANT, "bogus", 400)
+
+
+def _emit_records():
+    return [
+        {"turnId": 0, "type": "user", "message": {"role": "user", "content": [{"type": "text", "text": "hi"}]}},
+        {"turnId": 1, "type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "content": "Z" * 900}]}},
+        {"turnId": 2, "type": "file-history-snapshot", "message": {}},
+    ]
+
+
+def test_emit_writes_header_then_records(tmp_path):
+    paths = tv.emit_views(_emit_records(), ["conversation"], tmp_path, 400, "abc123")
+    lines = paths["conversation"].read_text().splitlines()
+    header = json.loads(lines[0])
+    assert header["_view"] == "conversation"
+    assert header["_viewVersion"] == tv.VIEW_VERSION
+    assert header["_sourceTranscriptSha256"] == "abc123"
+    # tool_result record + noise record dropped -> counts recorded
+    assert header["_dropped"]["file-history-snapshot"] == 1
+    assert header["_dropped"]["tool_result"] == 1  # a whole record dropped for having only tool_result
+    body = [json.loads(x) for x in lines[1:]]
+    assert [r["turnId"] for r in body] == [0]
+
+
+def test_emit_activity_records_truncation_count(tmp_path):
+    paths = tv.emit_views(_emit_records(), ["activity"], tmp_path, 400, "abc123")
+    header = json.loads(paths["activity"].read_text().splitlines()[0])
+    assert header["_truncated"] == {"toolResultTruncLen": 400, "count": 1}

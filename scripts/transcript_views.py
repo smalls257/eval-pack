@@ -7,8 +7,10 @@ Views (append-only vocabulary):
 """
 import copy
 import json
+from pathlib import Path
 
 VIEWS = ("full", "conversation", "activity")
+VIEW_VERSION = "1.0.0"
 
 # Top-level record types that are pure structure/noise — dropped by every non-full view.
 DROPPABLE_TYPES = frozenset({
@@ -76,3 +78,54 @@ def project_record(record, view, tool_result_trunc_len):
     elif isinstance(content, str):
         pass  # string content is conversational text; keep as-is
     return out
+
+
+def _dropped_reason(record, view):
+    """Why a record was dropped from a non-full view — a type label for the header counts."""
+    t = record.get("type")
+    if t in DROPPABLE_TYPES:
+        return t
+    # dropped because every content block was filtered out — label by the blocks it held
+    msg = record.get("message") or {}
+    content = msg.get("content")
+    if isinstance(content, list):
+        for block in content:
+            if isinstance(block, dict) and block.get("type"):
+                return block["type"]
+    return "empty"
+
+
+def emit_views(records, views, out_dir, tool_result_trunc_len, source_sha256):
+    """Project `records` into each requested view and write one JSONL per view. Returns {view: Path}.
+    The full view is a straight copy (header still prepended for provenance)."""
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    result = {}
+    for view in views:
+        dropped, trunc_count, body = {}, 0, []
+        for rec in records:
+            projected = project_record(rec, view, tool_result_trunc_len)
+            if projected is None:
+                key = _dropped_reason(rec, view)
+                dropped[key] = dropped.get(key, 0) + 1
+                continue
+            if view == "activity":
+                for b in (projected.get("message", {}).get("content") or []):
+                    if isinstance(b, dict) and b.get("_truncated"):
+                        trunc_count += 1
+            body.append(projected)
+        header = {
+            "_view": view,
+            "_viewVersion": VIEW_VERSION,
+            "_sourceTranscriptSha256": source_sha256,
+            "_dropped": dropped,
+            "_truncated": {"toolResultTruncLen": tool_result_trunc_len, "count": trunc_count},
+            "_fullPath": str(out_dir.parent / "transcript.jsonl"),
+        }
+        path = out_dir / (view + ".jsonl")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(json.dumps(header) + "\n")
+            for rec in body:
+                f.write(json.dumps(rec) + "\n")
+        result[view] = path
+    return result
