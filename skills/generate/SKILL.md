@@ -305,10 +305,25 @@ Compute the diff base the same way as Step 0:
 - `REPO_ROOT=$(git rev-parse --show-toplevel)`
 - If `HEAD~1` exists, `DIFF_BASE=HEAD~1`; otherwise `DIFF_BASE=4b825dc642cb6eb9a060e54bf8d69288fbee4904` (empty tree).
 
-Create the lens output dir: `mkdir -p "${PACK_DIR}/lenses"`. Then for each lens
-`{skill, role, model?}`, dispatch it as a SEPARATE subagent over the read-only artifacts. Each
-lens WRITES its result to `${PACK_DIR}/lenses/<id>.json` (the assembler collects these). Pass only
-artifact locations — never your own reasoning.
+Create the lens output dir: `mkdir -p "${PACK_DIR}/lenses"`.
+
+**Build the transcript views (cost lever).** Compute the set of views the enabled lenses declare
+(each lens's frontmatter `inputs.transcript`, default `full`) and materialize only those, once:
+
+    VIEWS=$("$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/lens_inputs.py" \
+        "${CLAUDE_PLUGIN_ROOT}/agents/lenses" "${PACK_DIR}/eval-config.json")
+    # VIEWS is a space-separated set excluding "full"; if empty, skip view building.
+    "$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/build_views.py" \
+        "${PACK_DIR}/transcript.jsonl" "${PACK_DIR}/views" $VIEWS \
+        --tool-result-trunc-len "$(jq -r '.toolResultTruncLen // 400' "${PACK_DIR}/eval-config.json")"
+
+For each lens, resolve its TRANSCRIPT path: if the lens declares `full` (or declares nothing),
+TRANSCRIPT = `${ABS_PACK_DIR}/transcript.jsonl`; otherwise TRANSCRIPT =
+`${ABS_PACK_DIR}/views/<view>.jsonl`.
+
+Then for each lens `{skill, role, model?}`, dispatch it as a SEPARATE subagent over the read-only
+artifacts. Each lens WRITES its result to `${PACK_DIR}/lenses/<id>.json` (the assembler collects
+these). Pass only artifact locations — never your own reasoning.
 
 **Per-lens model (cost/quality tuning):** if a lens entry has a `model` (`opus`|`sonnet`|`haiku`|
 `fable`), pass it as the `Agent` tool's `model` argument for THAT lens's dispatch. If `model` is
@@ -348,8 +363,9 @@ is big (each lens reads it).
 > `subagent_type` suffix.
 
 > Run the `<skill>` lens. PACK_DIR is `${ABS_PACK_DIR}`. REPO_ROOT is `${REPO_ROOT}`. DIFF_BASE is
-> `${DIFF_BASE}`. Read the artifacts, then write your result to
-> `${ABS_PACK_DIR}/lenses/<skill>.json` per your schema.
+> `${DIFF_BASE}`. TRANSCRIPT is `<resolved per-lens transcript path>`. Read the artifacts (read the
+> transcript from TRANSCRIPT), then write your result to `${ABS_PACK_DIR}/lenses/<skill>.json` per
+> your schema.
 
 A **third-party** lens is dispatched as its named skill/agent; instruct it to write the same
 `{skill, role, score|title, rationale|findings}` shape to `lenses/<skill>.json`. A `contributor`

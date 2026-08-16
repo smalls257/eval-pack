@@ -65,3 +65,12 @@ def requested_views(lens_dir, lens_skills):
         else:
             views.add("full")
     return views
+
+
+if __name__ == "__main__":
+    import json as _json, sys as _sys
+    lens_dir, cfg_path = _sys.argv[1], _sys.argv[2]
+    cfg = _json.loads(Path(cfg_path).read_text(encoding="utf-8")) if Path(cfg_path).is_file() else {}
+    skills = [l.get("skill") for l in (cfg.get("analysisLenses") or []) if l.get("skill")]
+    views = requested_views(lens_dir, skills) - {"full"}
+    print(" ".join(sorted(views)))

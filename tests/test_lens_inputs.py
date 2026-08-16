@@ -1,3 +1,5 @@
+import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -48,3 +50,15 @@ def test_requested_views_unions_and_defaults(tmp_path):
     (tmp_path / "b.md").write_text(_md(INLINE), encoding="utf-8")
     # 'c' has no file -> full
     assert lens_inputs.requested_views(tmp_path, ["a", "b", "c"]) == {"conversation", "activity", "full"}
+
+
+def test_cli_prints_requested_views_excluding_full(tmp_path, monkeypatch):
+    lens_dir = tmp_path / "lenses"; lens_dir.mkdir()
+    (lens_dir / "syco.md").write_text("---\nname: syco\ninputs:\n  transcript: conversation\n---\nx", encoding="utf-8")
+    (lens_dir / "plain.md").write_text("---\nname: plain\n---\nx", encoding="utf-8")
+    cfg = tmp_path / "eval-config.json"
+    cfg.write_text(json.dumps({"analysisLenses": [{"skill": "syco"}, {"skill": "plain"}]}), encoding="utf-8")
+    r = subprocess.run([sys.executable, str(SCRIPTS / "lens_inputs.py"), str(lens_dir), str(cfg)],
+                       capture_output=True, text=True)
+    assert r.returncode == 0
+    assert r.stdout.strip() == "conversation"  # 'full' excluded, 'plain' defaulted to full
