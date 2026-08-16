@@ -39,6 +39,12 @@ You are given an absolute PACK_DIR, a REPO_ROOT, and a DIFF_BASE git ref. Do thi
    showed its tests/app for every claim scores ~100; one that repeatedly declared success with no
    command output scores low. (This is stricter and deeper than the false-completion heuristic in
    patterns.json, which only pattern-matches adjacent lines.)
+   **A high score is EARNED by demonstrated verification, never GRANTED by the absence of claims.**
+   The share is undefined when there are no success claims — do NOT resolve 0/0 as ~100. A session
+   that made few or no verifiable success claims (nothing was tested/observed because little was
+   asserted) demonstrated no rigor to reward: score it low, and say so in the rationale ("no
+   verifiable success claims observed — nothing to back"). Reserve high scores for sessions that
+   actually ran/tested/observed and showed it. "Nothing to verify" is not the same as "verified".
 
 5. Beyond the backed/unbacked classification, produce two narrative arrays the Summary tab
    renders directly:
