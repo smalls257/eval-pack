@@ -29,6 +29,20 @@ def test_unknown_view_falls_back_to_full():
     assert lens_inputs.declared_view(_md("inputs:\n  transcript: bogus\n")) == "full"
 
 
+def test_transcript_outside_inputs_mapping_is_ignored():
+    md = (
+        "---\n"
+        "name: x\n"
+        "tools: Read\n"
+        "inputs:\n"
+        "  max_turns: 5\n"
+        "notes: see transcript: activity for details\n"
+        "---\n"
+        "body\n"
+    )
+    assert lens_inputs.declared_view(md) == "full"
+
+
 def test_requested_views_unions_and_defaults(tmp_path):
     (tmp_path / "a.md").write_text(_md(FLOW), encoding="utf-8")
     (tmp_path / "b.md").write_text(_md(INLINE), encoding="utf-8")
