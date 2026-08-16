@@ -410,12 +410,20 @@ flags and synthesizes `completionStatus` / `confidencePercent` / `confidenceNote
 Resolve `PACK_DIR` to an absolute path and capture the repo root before dispatching (reuse
 `ABS_PACK_DIR`, `REPO_ROOT`, `DIFF_BASE` from Step 4 if this is the same run).
 
+Ensure the evaluator's `activity` view exists (it may already have been built in Step 4 if a lens
+requested it; if not, build it now):
+
+    [ -f "${PACK_DIR}/views/activity.jsonl" ] || "$PYTHON" \
+        "${CLAUDE_PLUGIN_ROOT}/scripts/build_views.py" "${PACK_DIR}/transcript.jsonl" \
+        "${PACK_DIR}/views" activity \
+        --tool-result-trunc-len "$(jq -r '.toolResultTruncLen // 400' "${PACK_DIR}/eval-config.json")"
+
 Dispatch the `eval-pack-evaluator` agent with the `Agent` tool, `subagent_type:
 eval-pack-evaluator`. Pass it only the artifact location — not your own reasoning:
 
 > Write the eval-pack analysis. PACK_DIR is `${ABS_PACK_DIR}` (absolute). REPO_ROOT is
-> `${REPO_ROOT}`. DIFF_BASE is `${DIFF_BASE}`.
-> Read eval-config.json (your configuration), transcript.jsonl, metrics.json, patterns.json,
+> `${REPO_ROOT}`. DIFF_BASE is `${DIFF_BASE}`. TRANSCRIPT is `${ABS_PACK_DIR}/views/activity.jsonl`.
+> Read eval-config.json (your configuration), TRANSCRIPT, metrics.json, patterns.json,
 > test-results.json, `lenses.json`, and `lenses/*.json` from PACK_DIR — the lens findings are
 > already computed; ingest them, do not re-derive their verdicts — run git from REPO_ROOT to
 > inspect the diff against DIFF_BASE, and write `${ABS_PACK_DIR}/analysis.json` per your schema.
