@@ -17,6 +17,11 @@ TOOL_RESULT = {"turnId": 2, "type": "user",
                "message": {"role": "user", "content": [
                    {"type": "tool_result", "content": "X" * 5000}]}}
 NOISE = {"turnId": 3, "type": "file-history-snapshot", "message": {}}
+WITH_TRANSPORT_METADATA = {
+    "turnId": 4, "type": "assistant", "timestamp": "2026-08-15T00:00:00Z",
+    "uuid": "u-1", "cwd": "/home/x", "toolUseResult": {"stdout": "huge" * 1000},
+    "message": {"role": "assistant", "content": [{"type": "text", "text": "hi"}]},
+}
 
 
 def test_full_is_identity():
@@ -57,6 +62,33 @@ def test_unknown_view_raises():
         tv.project_record(ASSISTANT, "bogus", 400)
 
 
+def test_conversation_strips_non_essential_top_level_fields():
+    out = tv.project_record(WITH_TRANSPORT_METADATA, "conversation", 400)
+    assert "toolUseResult" not in out
+    assert "uuid" not in out
+    assert "cwd" not in out
+    assert out["turnId"] == 4
+    assert out["type"] == "assistant"
+    assert out["timestamp"] == "2026-08-15T00:00:00Z"
+    assert out["message"]["content"][0]["type"] == "text"
+
+
+def test_activity_strips_non_essential_top_level_fields():
+    out = tv.project_record(WITH_TRANSPORT_METADATA, "activity", 400)
+    assert "toolUseResult" not in out
+    assert "uuid" not in out
+    assert "cwd" not in out
+    assert out["turnId"] == 4
+    assert out["type"] == "assistant"
+    assert out["timestamp"] == "2026-08-15T00:00:00Z"
+
+
+def test_full_view_keeps_top_level_fields_unchanged():
+    out = tv.project_record(WITH_TRANSPORT_METADATA, "full", 400)
+    assert out == WITH_TRANSPORT_METADATA
+    assert out is WITH_TRANSPORT_METADATA
+
+
 def _emit_records():
     return [
         {"turnId": 0, "type": "user", "message": {"role": "user", "content": [{"type": "text", "text": "hi"}]}},
@@ -83,3 +115,9 @@ def test_emit_activity_records_truncation_count(tmp_path):
     paths = tv.emit_views(_emit_records(), ["activity"], tmp_path, 400, "abc123")
     header = json.loads(paths["activity"].read_text().splitlines()[0])
     assert header["_truncated"] == {"toolResultTruncLen": 400, "count": 1}
+
+
+def test_emit_header_records_kept_top_level_fields_for_non_full_view(tmp_path):
+    paths = tv.emit_views(_emit_records(), ["conversation"], tmp_path, 400, "abc123")
+    header = json.loads(paths["conversation"].read_text().splitlines()[0])
+    assert header["_keptTopLevelFields"] == ["turnId", "type", "message", "timestamp"]

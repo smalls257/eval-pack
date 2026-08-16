@@ -22,6 +22,12 @@ DROPPABLE_TYPES = frozenset({
 _CONVERSATION_BLOCKS = frozenset({"text", "thinking"})
 _ACTIVITY_BLOCKS = frozenset({"text", "thinking", "tool_use", "tool_result"})
 
+# Top-level record keys kept by non-full views. Everything else — toolUseResult
+# (Claude Code's untruncated duplicate of every tool result) and transport metadata
+# (uuid, sessionId, cwd, gitBranch, requestId, ...) — is dropped as noise no lens grades.
+_KEEP_TOP_ORDER = ("turnId", "type", "message", "timestamp")
+_KEEP_TOP = frozenset(_KEEP_TOP_ORDER)
+
 
 def _json_len_safe(content):
     try:
@@ -77,7 +83,7 @@ def project_record(record, view, tool_result_trunc_len):
         msg["content"] = projected
     elif isinstance(content, str):
         pass  # string content is conversational text; keep as-is
-    return out
+    return {k: v for k, v in out.items() if k in _KEEP_TOP}
 
 
 def _dropped_reason(record, view):
@@ -121,6 +127,7 @@ def emit_views(records, views, out_dir, tool_result_trunc_len, source_sha256):
             "_dropped": dropped,
             "_truncated": {"toolResultTruncLen": tool_result_trunc_len, "count": trunc_count},
             "_fullPath": str(out_dir.parent / "transcript.jsonl"),
+            "_keptTopLevelFields": list(_KEEP_TOP_ORDER) if view != "full" else None,
         }
         path = out_dir / (view + ".jsonl")
         with open(path, "w", encoding="utf-8") as f:
