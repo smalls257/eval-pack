@@ -3,7 +3,7 @@ name: repo-improvements
 description: Eval-pack CONTRIBUTOR lens. Reads the session transcript and the repo diff and judges how the REPO/codebase itself could be improved — tooling gaps, structural rough edges, and documentation holes surfaced by this session. Does NOT score; it attaches an attributed improvements section to the report.
 tools: Read, Bash, Glob, Grep
 inputs:
-  transcript: skeleton
+  transcript: activity
 ---
 
 You are a contributor lens for eval-pack. You judge one thing only: **what should change about
@@ -13,13 +13,11 @@ lenses and the core evaluator do that. You produce improvement suggestions, not 
 
 You are given an absolute PACK_DIR, a REPO_ROOT, and a DIFF_BASE git ref. Do this:
 
-1. Read the **skeleton** at `TRANSCRIPT`: every turn's text, tool-call digests, and one-line result
-   summaries (status + first/last line + size) — no bodies. Use it to understand what was built and
-   what friction the session hit while navigating or extending the repo. When a summary is
-   ambiguous about what a command actually turned up, pull that turn's full result:
-   `"$PYTHON" "$CLAUDE_PLUGIN_ROOT/scripts/pull_turn.py" "$RAW_TRANSCRIPT" <turnId> --field tool_result`.
-   Pull selectively — most improvement opportunities resolve from the summary. If no
-   `TRANSCRIPT`/`RAW_TRANSCRIPT` was given, read `PACK_DIR/transcript.jsonl` directly.
+1. Read the transcript at the path you were given as `TRANSCRIPT` (a condensed **activity view** —
+   user + assistant text + thinking, tool calls, and truncated tool results, with structural noise
+   already removed; a header line describes what was dropped/truncated). If no `TRANSCRIPT` was
+   provided, read `PACK_DIR/transcript.jsonl`. Use it to understand what was built and what friction
+   the session hit while navigating or extending the repo.
 2. Inspect the actual change. Prefer `PACK_DIR/repo-diffs.json` if it exists; otherwise run
    `git -C "$REPO_ROOT" diff "$DIFF_BASE"` (and `--stat` first if the full diff is large). If
    DIFF_BASE is the empty-tree sha, treat the whole tree as new.

@@ -297,7 +297,7 @@ class TestLensGates(unittest.TestCase):
             self.assertEqual(biz["display"], "both")  # configured 'both' wins over the 'card' decoy
 
     def test_first_party_lens_gets_locked_version(self):
-        # 'review' has a lockfile entry (1.0.2); a first-party lens with no configured
+        # 'review' has a lockfile entry (1.0.3); a first-party lens with no configured
         # version inherits the trusted locked value onto its result.
         with tempfile.TemporaryDirectory() as d:
             pack = Path(d)
@@ -311,7 +311,7 @@ class TestLensGates(unittest.TestCase):
             self._cfg(d, [{"skill": "review", "role": "contributor"}])
             out = assemble_lenses.assemble(d)
             review = next(c for c in out["contributors"] if c["skill"] == "review")
-            self.assertEqual(review["version"], "1.0.2")  # from the lockfile
+            self.assertEqual(review["version"], "1.0.3")  # from the lockfile
 
     def test_config_version_overrides_lockfile(self):
         # A configured version pins/overrides the locked value for that skill.
@@ -327,7 +327,7 @@ class TestLensGates(unittest.TestCase):
             self._cfg(d, [{"skill": "review", "role": "contributor", "version": "2.5.0"}])
             out = assemble_lenses.assemble(d)
             review = next(c for c in out["contributors"] if c["skill"] == "review")
-            self.assertEqual(review["version"], "2.5.0")  # config wins over lockfile 1.0.2
+            self.assertEqual(review["version"], "2.5.0")  # config wins over lockfile 1.0.3
 
     def test_lens_self_declared_version_is_stripped(self):
         # A lens's lenses/<skill>.json is LLM-authored (untrusted). A version it
@@ -345,7 +345,7 @@ class TestLensGates(unittest.TestCase):
             self._cfg(d, [{"skill": "review", "role": "contributor"}])
             out = assemble_lenses.assemble(d)
             review = next(c for c in out["contributors"] if c["skill"] == "review")
-            self.assertEqual(review["version"], "1.0.2")  # trusted lockfile, not the decoy
+            self.assertEqual(review["version"], "1.0.3")  # trusted lockfile, not the decoy
             self.assertNotEqual(review["version"], "9.9.9")
 
     def test_write_outputs_idempotent_on_rerun(self):

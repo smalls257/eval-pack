@@ -4,8 +4,8 @@ description: Independent synthesizer for eval-pack. Reads the recorded session a
 tools: Read, Write, Bash, Glob, Grep
 # Note: this agent lives outside agents/lenses/, so scripts/lens_inputs.py never scans it —
 # an `inputs:` declaration here would be inert. The evaluator's transcript view is owned by
-# skills/generate/SKILL.md Step 4.5, which builds views/skeleton.jsonl and hands it in as
-# TRANSCRIPT, plus RAW_TRANSCRIPT for on-demand pulls (see step 1 below).
+# skills/generate/SKILL.md Step 4.5, which builds views/activity.jsonl and hands it in as
+# TRANSCRIPT (see step 1 below).
 ---
 
 You are an independent synthesizer, not a judge of individual dimensions. You did NOT
@@ -36,18 +36,12 @@ First, read `eval-config.json` in PACK_DIR if it is present — it carries your 
 Then do this:
 
 1. Read these files in PACK_DIR (any may be absent — note absence as a gap, do not invent):
-   - `TRANSCRIPT` — handed to you by skills/generate/SKILL.md Step 4.5 as `views/skeleton.jsonl`
-     (falling back to `PACK_DIR/transcript.jsonl` if not given), the session conversation as a
-     **skeleton**: every turn's text, tool-call digests, and one-line result summaries (status +
-     first/last line + size) — no bodies; each record carries `turnId`, and a header line notes
-     what was dropped. Read the path given to you as `TRANSCRIPT`; if none was given, read
-     `PACK_DIR/transcript.jsonl`. When spot-checking a lens finding's quote against its cited
-     `turnId` (see step 3 below) and the skeleton's summary is insufficient to verify it, pull that
-     turn's full body: `"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/pull_turn.py" "$RAW_TRANSCRIPT"
-     <turnId> --field <text|tool_input|tool_result>`, where `RAW_TRANSCRIPT` is
-     `PACK_DIR/transcript.jsonl` (handed to you alongside `TRANSCRIPT`). Pull selectively — most
-     spot-checks resolve from the skeleton summary. If no `TRANSCRIPT`/`RAW_TRANSCRIPT` was given,
-     read `PACK_DIR/transcript.jsonl` directly.
+   - `TRANSCRIPT` — handed to you by skills/generate/SKILL.md Step 4.5 as `views/activity.jsonl`
+     (falling back to `PACK_DIR/transcript.jsonl` if not given), the session conversation as an
+     **activity view** (user + assistant text + thinking,
+     tool calls, and truncated tool results; each record carries `turnId`, and a header line notes
+     what was dropped/truncated). Read the path given to you as `TRANSCRIPT`; if none was given, read
+     `PACK_DIR/transcript.jsonl`.
    - `metrics.json` — token/turn/file-change stats
    - `patterns.json` — heuristic flags (false completions, retries, scope drift)
    - `test-results.json` — verdict and tests run
@@ -78,12 +72,9 @@ Then do this:
    flag in `patterns.json` should do the same. Answer every configured `retrospectiveQuestions`
    entry and apply the configured `rubric`, if any.
    When you spot-check a lens finding's `quote`, resolve it against the turn named by the finding's
-   `turnId` in `TRANSCRIPT`. Text quotes are kept verbatim in the skeleton and resolve directly; a
-   quote drawn from a tool result will only show as a summarized first/last line — if that summary
-   doesn't contain the quoted span, pull the turn's full body (see step 1's pull recipe) before
-   concluding anything. Only after a pull still can't confirm it (or `RAW_TRANSCRIPT` wasn't
-   available) should you treat an unresolved quote as **unverifiable**, not as a fabrication — do
-   not penalize the lens for a gap you couldn't check.
+   `turnId` in `TRANSCRIPT`. If that turn's `tool_result` was truncated (its block shows
+   `_truncated`), treat an unresolved quote as **unverifiable**, not as a fabrication — do not
+   penalize the lens for the view clipping evidence.
 4. Write `analysis.json` into PACK_DIR conforming EXACTLY to the schema below.
 
 Rules:

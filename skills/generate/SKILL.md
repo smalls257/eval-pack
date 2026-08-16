@@ -430,46 +430,27 @@ flags and synthesizes `completionStatus` / `confidencePercent` / `confidenceNote
 Resolve `PACK_DIR` to an absolute path and capture the repo root before dispatching (reuse
 `ABS_PACK_DIR`, `REPO_ROOT`, `DIFF_BASE` from Step 4 if this is the same run).
 
-Ensure the evaluator's `skeleton` view exists (it may already have been built in Step 4 if a lens
+Ensure the evaluator's `activity` view exists (it may already have been built in Step 4 if a lens
 requested it; if not, build it now):
 
-    [ -f "${PACK_DIR}/views/skeleton.jsonl" ] || "$PYTHON" \
+    [ -f "${PACK_DIR}/views/activity.jsonl" ] || "$PYTHON" \
         "${CLAUDE_PLUGIN_ROOT}/scripts/build_views.py" "${PACK_DIR}/transcript.jsonl" \
-        "${PACK_DIR}/views" skeleton \
+        "${PACK_DIR}/views" activity \
         --tool-result-trunc-len "$(jq -r '.toolResultTruncLen // 400' "${PACK_DIR}/eval-config.json")"
 
 If this build fails or the view can't be produced, continue anyway — the evaluator falls back to
 reading `${ABS_PACK_DIR}/transcript.jsonl` directly (its TRANSCRIPT fallback), so a missing
-skeleton view never blocks the run.
-
-**Pre-turnId fallback.** If `${ABS_PACK_DIR}/transcript.jsonl` lacks a `turnId` on its first data
-record (a pack built via the context-reconstruction fallback in Step 1), do NOT hand the evaluator
-the skeleton view — pull-by-turnId can't work; resolve TRANSCRIPT to the raw
-`${ABS_PACK_DIR}/transcript.jsonl` instead, and omit RAW_TRANSCRIPT and the pull recipe from the
-dispatch prompt below. Look-back never breaks; it just degrades to reading the whole transcript.
-Otherwise resolve TRANSCRIPT to `${ABS_PACK_DIR}/views/skeleton.jsonl`.
+activity view never blocks the run.
 
 Dispatch the `eval-pack-evaluator` agent with the `Agent` tool, `subagent_type:
 eval-pack-evaluator`. Pass it only the artifact location — not your own reasoning:
 
 > Write the eval-pack analysis. PACK_DIR is `${ABS_PACK_DIR}` (absolute). REPO_ROOT is
-> `${REPO_ROOT}`. DIFF_BASE is `${DIFF_BASE}`. TRANSCRIPT is `<resolved TRANSCRIPT path>`.
+> `${REPO_ROOT}`. DIFF_BASE is `${DIFF_BASE}`. TRANSCRIPT is `${ABS_PACK_DIR}/views/activity.jsonl`.
 > Read eval-config.json (your configuration), TRANSCRIPT, metrics.json, patterns.json,
 > test-results.json, `lenses.json`, and `lenses/*.json` from PACK_DIR — the lens findings are
 > already computed; ingest them, do not re-derive their verdicts — run git from REPO_ROOT to
 > inspect the diff against DIFF_BASE, and write `${ABS_PACK_DIR}/analysis.json` per your schema.
-
-If TRANSCRIPT resolved to the skeleton view (the pre-turnId fallback did not apply), append the
-pull recipe to that dispatch prompt so the evaluator knows how to fetch full turn bodies on demand:
-
-> TRANSCRIPT is `${ABS_PACK_DIR}/views/skeleton.jsonl` (a skeleton — every turn's text, tool-call
-> digests, and one-line result summaries; no bodies). RAW_TRANSCRIPT is
-> `${ABS_PACK_DIR}/transcript.jsonl`. To fetch a turn's full body when a summary is insufficient to
-> verify a lens finding's quote, run `"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/pull_turn.py"
-> "$RAW_TRANSCRIPT" <turnId> --field <text|tool_input|tool_result>`. Pull selectively.
-
-If the pre-turnId fallback applied, the dispatch prompt is unchanged — no RAW_TRANSCRIPT, no pull
-recipe.
 
 Wait for the agent to finish. Confirm `${ABS_PACK_DIR}/analysis.json` exists and has a
 `title`. If it is missing or empty, the evaluator failed — re-dispatch once; if it
