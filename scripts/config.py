@@ -81,6 +81,8 @@ DEFAULTS = {
     "falseCompletionWindow": 1,
     # Truncation length for quoted claim/response text in patterns.json.
     "claimTruncLen": 120,
+    # Truncation length for tool_result payloads in the `activity` transcript view.
+    "toolResultTruncLen": 400,
     # Per-flag severity overrides: {flagId: "red"|"amber"|"green"|"off"}. Empty = built-in levels.
     "flagSeverities": {},
     # Pipeline options, unified from the legacy pluginConfigs home. The
@@ -129,6 +131,7 @@ _TYPES = {
     "detectionPatterns": dict,
     "falseCompletionWindow": int,
     "claimTruncLen": int,
+    "toolResultTruncLen": int,
     "flagSeverities": dict,
     "outputDir": str,
     "analysis": bool,
@@ -400,6 +403,9 @@ def validate(cfg):
     n = cfg.get("skillArgsMaxLen")
     if isinstance(n, int) and not isinstance(n, bool) and n < 0:
         errors.append("skillArgsMaxLen: must be >= 0, got {}".format(n))
+    m = cfg.get("toolResultTruncLen")
+    if isinstance(m, int) and not isinstance(m, bool) and m < 0:
+        errors.append("toolResultTruncLen: must be >= 0, got {}".format(m))
     dp = cfg.get("detectionPatterns")
     if isinstance(dp, dict):
         for group, pats in dp.items():

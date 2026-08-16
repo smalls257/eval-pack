@@ -386,6 +386,19 @@ class TestSkillArgsMaxLenBound(unittest.TestCase):
             self.assertEqual(cfg["frictionCategories"], ["a", "b"])
 
 
+class TestToolResultTruncLen(unittest.TestCase):
+    def test_default(self):
+        self.assertEqual(config.read_config()["toolResultTruncLen"], 400)
+
+    def test_negative_rejected(self):
+        errors = config.validate({**config.DEFAULTS, "toolResultTruncLen": -1})
+        self.assertTrue(any("toolResultTruncLen" in e for e in errors))
+
+    def test_wrong_type_rejected(self):
+        errors = config.validate({**config.DEFAULTS, "toolResultTruncLen": "big"})
+        self.assertTrue(any("toolResultTruncLen" in e for e in errors))
+
+
 class TestExtendsConfinement(unittest.TestCase):
     def test_parent_escape_rejected(self):
         with tempfile.TemporaryDirectory() as outer:

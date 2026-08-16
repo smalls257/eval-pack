@@ -277,6 +277,11 @@
       "default": 120,
       "description": "Truncation length for quoted claims in patterns.json."
     },
+    "toolResultTruncLen": {
+      "type": "integer",
+      "default": 400,
+      "description": "Truncation length for tool_result payloads in the `activity` transcript view."
+    },
     "flagSeverities": {
       "type": "object",
       "default": {},
