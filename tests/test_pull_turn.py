@@ -49,3 +49,50 @@ def test_cli_missing_transcript_exits_2(tmp_path):
     r = subprocess.run([sys.executable, str(SCRIPTS/"pull_turn.py"), str(missing), "6", "--field", "text"],
                        capture_output=True, text=True)
     assert r.returncode == 2 and r.stderr.strip()
+
+def test_pull_batch_one_scan_returns_each(tmp_path):
+    p = _t(tmp_path)   # existing fixture with turnId 5 (assistant) + 6 (tool_result)
+    got = pull_turn.pull_batch(p, [5, 6], field="text")
+    assert "done" in got[5]                 # turn 5 text
+    assert 6 in got                         # turn 6 present (empty text ok)
+
+def test_pull_batch_reports_missing(tmp_path):
+    p = _t(tmp_path)
+    got = pull_turn.pull_batch(p, [6, 99], field="tool_result")
+    assert 6 in got and 99 not in got       # 99 absent, not fabricated
+
+def test_pull_batch_all_missing_returns_empty(tmp_path):
+    p = _t(tmp_path)
+    got = pull_turn.pull_batch(p, [98, 99], field="text")
+    assert got == {}
+
+def test_cli_ids_labeled_output(tmp_path):
+    p = _t(tmp_path)
+    r = subprocess.run([sys.executable, str(SCRIPTS/"pull_turn.py"), str(p),
+                        "--ids", "5,6", "--field", "text"], capture_output=True, text=True)
+    assert r.returncode == 0
+    assert '"5"' in r.stdout and '"6"' in r.stdout   # JSON-object output keyed by id
+    parsed = json.loads(r.stdout)
+    assert "done" in parsed["5"]
+
+def test_cli_ids_partial_hit_is_success(tmp_path):
+    p = _t(tmp_path)
+    r = subprocess.run([sys.executable, str(SCRIPTS/"pull_turn.py"), str(p),
+                        "--ids", "6,99", "--field", "tool_result"], capture_output=True, text=True)
+    assert r.returncode == 0
+    parsed = json.loads(r.stdout)
+    assert "6" in parsed and "99" not in parsed
+    assert "99" in r.stderr
+
+def test_cli_ids_all_missing_exits_nonzero(tmp_path):
+    p = _t(tmp_path)
+    r = subprocess.run([sys.executable, str(SCRIPTS/"pull_turn.py"), str(p),
+                        "--ids", "98,99", "--field", "text"], capture_output=True, text=True)
+    assert r.returncode != 0
+    assert "98" in r.stderr and "99" in r.stderr
+
+def test_cli_ids_and_positional_turn_id_mutually_exclusive(tmp_path):
+    p = _t(tmp_path)
+    r = subprocess.run([sys.executable, str(SCRIPTS/"pull_turn.py"), str(p), "5",
+                        "--ids", "5,6", "--field", "text"], capture_output=True, text=True)
+    assert r.returncode != 0

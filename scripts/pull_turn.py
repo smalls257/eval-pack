@@ -31,14 +31,13 @@ def _record(transcript_path, turn_id):
     raise KeyError("turnId {} not found in {}".format(turn_id, transcript_path))
 
 
-def pull(transcript_path, turn_id, field=None):
-    o = _record(transcript_path, turn_id)
+def _extract_field(record, field):
     if field is None:
-        return json.dumps(o)
+        return json.dumps(record)
     block_type = _FIELD_BLOCK.get(field)
     if block_type is None:
         raise ValueError("unknown field {!r}".format(field))
-    msg = o.get("message") or {}
+    msg = record.get("message") or {}
     content = msg.get("content")
     if isinstance(content, str):
         return content if field == "text" else ""
@@ -60,12 +59,61 @@ def pull(transcript_path, turn_id, field=None):
     return "\n".join(parts)
 
 
+def pull(transcript_path, turn_id, field=None):
+    o = _record(transcript_path, turn_id)
+    return _extract_field(o, field)
+
+
+def pull_batch(transcript_path, turn_ids, field=None):
+    """Scan the transcript once, returning {turnId: body} for every id present.
+
+    Ids not found in the transcript are simply absent from the returned dict —
+    callers must check membership rather than assume every requested id resolved.
+    """
+    wanted = set(turn_ids)
+    found = {}
+    with open(transcript_path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                o = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if o.get("_view"):
+                continue
+            tid = o.get("turnId")
+            if tid in wanted:
+                found[tid] = _extract_field(o, field)
+                if len(found) == len(wanted):
+                    break
+    return found
+
+
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Pull a turn's full body by turnId")
+    ap = argparse.ArgumentParser(description="Pull one turn, or a batch of turns, by turnId")
     ap.add_argument("transcript", type=Path)
-    ap.add_argument("turn_id", type=int)
+    group = ap.add_mutually_exclusive_group(required=True)
+    group.add_argument("turn_id", type=int, nargs="?", default=None)
+    group.add_argument("--ids", help="comma-separated turnIds for batch mode, e.g. 12,47,301")
     ap.add_argument("--field", choices=sorted(_FIELD_BLOCK))
     args = ap.parse_args(argv)
+
+    if args.ids is not None:
+        requested = [int(tid) for tid in args.ids.split(",")]
+        try:
+            found = pull_batch(args.transcript, requested, field=args.field)
+        except FileNotFoundError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        missing = [tid for tid in requested if tid not in found]
+        if missing:
+            print("turnId(s) not found: {}".format(", ".join(str(m) for m in missing)),
+                  file=sys.stderr)
+        sys.stdout.write(json.dumps({str(tid): body for tid, body in found.items()}))
+        return 2 if not found else 0
+
     try:
         sys.stdout.write(pull(args.transcript, args.turn_id, field=args.field))
         return 0
