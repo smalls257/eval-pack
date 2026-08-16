@@ -22,6 +22,9 @@ You are given an absolute PACK_DIR, a REPO_ROOT, and a DIFF_BASE git ref. Do thi
    summary usually shows whether a backing command ran and how it ended. When a summary is
    ambiguous, or you must quote the evidence, pull that turn's full result:
    `"$PYTHON" "$CLAUDE_PLUGIN_ROOT/scripts/pull_turn.py" "$RAW_TRANSCRIPT" <turnId> --field tool_result`.
+   If you need several turns' full bodies, collect their turnIds and pull them in **one** call:
+   `"$PYTHON" "$CLAUDE_PLUGIN_ROOT/scripts/pull_turn.py" "$RAW_TRANSCRIPT" --ids 12,47,301 --field
+   tool_result` — not one at a time.
    Pull selectively — most claims resolve from the summary. If no `TRANSCRIPT`/`RAW_TRANSCRIPT` was
    given, read `PACK_DIR/transcript.jsonl` directly. Find every **claim of success or completion**
    the agent made — e.g. "done", "fixed", "tests pass", "it works", "verified", "the bug is resolved".

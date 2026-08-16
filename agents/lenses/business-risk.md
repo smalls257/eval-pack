@@ -23,6 +23,9 @@ You are given an absolute PACK_DIR, a REPO_ROOT, and a DIFF_BASE git ref. Do thi
    for whom, and why. When a summary is ambiguous about what actually shipped, or you need to
    quote a turn's full text to ground a risk claim, pull that turn's full body:
    `"$PYTHON" "$CLAUDE_PLUGIN_ROOT/scripts/pull_turn.py" "$RAW_TRANSCRIPT" <turnId> --field text`.
+   If you need several turns' full bodies, collect their turnIds and pull them in **one** call:
+   `"$PYTHON" "$CLAUDE_PLUGIN_ROOT/scripts/pull_turn.py" "$RAW_TRANSCRIPT" --ids 12,47,301 --field
+   text` — not one at a time.
    Pull selectively — most of the picture resolves from the skeleton. If no
    `TRANSCRIPT`/`RAW_TRANSCRIPT` was given, read `PACK_DIR/transcript.jsonl` directly.
 2. Inspect the actual change. Prefer `PACK_DIR/repo-diffs.json` if it exists; otherwise run
