@@ -27,15 +27,25 @@ def _view_bytes(pack_dir, view):
     return p.read_bytes() if p.is_file() else b""
 
 
-def compute(pack_dir, lenses, diff_base):
-    """`lenses` = resolved analysisLenses [{skill, model?, ...}] with a resolved `view`."""
+def compute(pack_dir, lenses, diff_base, evaluator_bytes=b"", config_bytes=b""):
+    """`lenses` = resolved analysisLenses [{skill, model?, ...}] with a resolved `view`.
+
+    `whole` additionally folds in the evaluator agent's bytes and the resolved config's
+    bytes (length-framed, like `lens_key`) — this is what makes the C1 whole-match fast
+    path (skip the evaluator too) safe: a changed evaluator definition or resolved config
+    flips `whole` even when every per-lens key is unchanged. `perLens` itself stays
+    lens-only so per-lens (C2) reuse is unaffected by evaluator/config edits.
+    """
     lock = lens_versions.load_lock()
     per = {}
     for l in lenses:
         skill = l.get("skill")
         ver = (lock.get(skill) or {}).get("version", "?")
         per[skill] = lens_key(_view_bytes(pack_dir, l.get("view")), ver, l.get("model"), diff_base)
-    whole = hashlib.sha256(json.dumps(per, sort_keys=True).encode()).hexdigest()
+    h = hashlib.sha256()
+    for part in (json.dumps(per, sort_keys=True).encode(), evaluator_bytes, config_bytes):
+        h.update(hashlib.sha256(part).digest())   # length-framed, same technique as lens_key
+    whole = h.hexdigest()
     return {"perLens": per, "whole": whole}
 
 
@@ -75,15 +85,19 @@ def _run_decide(prior_path, current_path):
 
 
 def _run_compute(pack_dir, config_path, diff_base):
-    cfg = json.loads(Path(config_path).read_text(encoding="utf-8"))
+    config_bytes = Path(config_path).read_bytes()
+    cfg = json.loads(config_bytes.decode("utf-8"))
     lenses = cfg.get("analysisLenses") or []
     # resolve each lens's declared view (reuse lens_inputs.declared_view over its .md)
     import lens_inputs
-    lens_dir = Path(__file__).resolve().parent.parent / "agents" / "lenses"
+    repo_root = Path(__file__).resolve().parent.parent
+    lens_dir = repo_root / "agents" / "lenses"
     for l in lenses:
         md = lens_dir / (l.get("skill", "") + ".md")
         l["view"] = lens_inputs.declared_view(md.read_text(encoding="utf-8")) if md.is_file() else "full"
-    out = compute(pack_dir, lenses, diff_base)
+    evaluator_path = repo_root / "agents" / "eval-pack-evaluator.md"
+    evaluator_bytes = evaluator_path.read_bytes() if evaluator_path.is_file() else b""
+    out = compute(pack_dir, lenses, diff_base, evaluator_bytes=evaluator_bytes, config_bytes=config_bytes)
     (Path(pack_dir) / "pack-fingerprint.json").write_text(json.dumps(out, indent=2), encoding="utf-8")
     print("pack-fingerprint.json: {} lenses".format(len(out["perLens"])))
     return 0

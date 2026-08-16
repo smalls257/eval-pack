@@ -97,6 +97,48 @@ def test_compute_missing_view_file_hashes_empty_bytes_no_crash(tmp_path, monkeyp
     assert out["perLens"]["ghost-lens"] == pf.lens_key(b"", "1.0.0", "sonnet", "HEAD~1")
 
 
+def test_whole_key_folds_in_evaluator_bytes(tmp_path, monkeypatch):
+    monkeypatch.setattr(pf.lens_versions, "load_lock", lambda: {"my-lens": {"version": "1.0.0"}})
+    pack_dir = tmp_path / "pack"
+    pack_dir.mkdir()
+    (pack_dir / "transcript.jsonl").write_text('{"turn": "full"}\n', encoding="utf-8")
+    lenses = [{"skill": "my-lens", "model": "sonnet", "view": "full"}]
+
+    out_a = pf.compute(str(pack_dir), lenses, "HEAD~1", evaluator_bytes=b"evaluator v1", config_bytes=b"config v1")
+    out_b = pf.compute(str(pack_dir), lenses, "HEAD~1", evaluator_bytes=b"evaluator v2 CHANGED", config_bytes=b"config v1")
+
+    assert out_a["whole"] != out_b["whole"]
+    assert out_a["perLens"] == out_b["perLens"]
+
+
+def test_whole_key_folds_in_config_bytes(tmp_path, monkeypatch):
+    monkeypatch.setattr(pf.lens_versions, "load_lock", lambda: {"my-lens": {"version": "1.0.0"}})
+    pack_dir = tmp_path / "pack"
+    pack_dir.mkdir()
+    (pack_dir / "transcript.jsonl").write_text('{"turn": "full"}\n', encoding="utf-8")
+    lenses = [{"skill": "my-lens", "model": "sonnet", "view": "full"}]
+
+    out_a = pf.compute(str(pack_dir), lenses, "HEAD~1", evaluator_bytes=b"evaluator v1", config_bytes=b"config v1")
+    out_b = pf.compute(str(pack_dir), lenses, "HEAD~1", evaluator_bytes=b"evaluator v1", config_bytes=b"config v2 CHANGED")
+
+    assert out_a["whole"] != out_b["whole"]
+    assert out_a["perLens"] == out_b["perLens"]
+
+
+def test_whole_key_stable_when_evaluator_and_config_unchanged(tmp_path, monkeypatch):
+    monkeypatch.setattr(pf.lens_versions, "load_lock", lambda: {"my-lens": {"version": "1.0.0"}})
+    pack_dir = tmp_path / "pack"
+    pack_dir.mkdir()
+    (pack_dir / "transcript.jsonl").write_text('{"turn": "full"}\n', encoding="utf-8")
+    lenses = [{"skill": "my-lens", "model": "sonnet", "view": "full"}]
+
+    out_a = pf.compute(str(pack_dir), lenses, "HEAD~1", evaluator_bytes=b"evaluator v1", config_bytes=b"config v1")
+    out_b = pf.compute(str(pack_dir), lenses, "HEAD~1", evaluator_bytes=b"evaluator v1", config_bytes=b"config v1")
+
+    assert out_a["whole"] == out_b["whole"]
+    assert out_a["perLens"] == out_b["perLens"]
+
+
 def test_view_bytes_path_convention(tmp_path):
     pack_dir = tmp_path / "pack"
     (pack_dir / "views").mkdir(parents=True)

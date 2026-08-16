@@ -78,7 +78,50 @@ fi
 If every configured lens declares `full` (or no `inputs.transcript`), `$VIEWS` is empty and this
 block is a no-op — no `views/` dir, no `build_views.py` call.
 
-Then dispatch every lens configured in `analysisLenses` EXACTLY as generate Step 4 specifies,
+**Delta reuse — compute the fingerprint and decide what to skip.** Same gate as generate Step 4,
+same reason: the pack dir was just restored from the zip and may already carry a
+`pack-fingerprint.json` from the round that produced it, so preserve it BEFORE recomputing or the
+comparison degenerates to prior-equals-current and nothing would ever re-run:
+
+```bash
+if [ -f "${PACK_DIR}/pack-fingerprint.json" ]; then
+    mv "${PACK_DIR}/pack-fingerprint.json" "${PACK_DIR}/pack-fingerprint.prev.json"
+fi
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/pack_fingerprint.py" "${PACK_DIR}" \
+    --config "${PACK_DIR}/eval-config.json" --diff-base "${DIFF_BASE}"
+DECISION=$("$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/pack_fingerprint.py" \
+    --decide "${PACK_DIR}/pack-fingerprint.prev.json" "${PACK_DIR}/pack-fingerprint.json" 2>/dev/null \
+    || echo '{"reuseAll": false, "reuse": [], "rerun": []}')
+```
+
+**Fail-safe:** if no prior `pack-fingerprint.json` existed (or it was unreadable), `--decide`
+already returns `reuseAll: false` with an empty `reuse` set — dispatch ALL lenses and the
+evaluator, never reuse on uncertainty.
+
+This is exactly the point of `tune`: editing `.eval-pack.json` (a rubric, a stance, a
+`frictionCategories` list, a lens's `model`) is a config change, and `resolve_config.py` folds the
+whole resolved config into the fingerprint's `whole` key — so a config edit correctly forces a
+re-run rather than being silently reused. Only lenses whose ACTUAL inputs (view bytes, lens
+version, model, diff base) are byte-identical to the prior round are eligible to skip.
+
+**C1 — whole-match fast path.** If `DECISION.reuseAll` is `true` (config unchanged, no lens `.md`
+edited, no evaluator edit, transcript unchanged since the pack was captured — the common case when
+`tune` is invoked for something unrelated, e.g. re-rendering), skip ALL lens dispatches, the
+`assemble_lenses.py` call, AND the evaluator dispatch below; keep the on-disk `analysis.json` and
+`lenses/*.json`/`lenses.json` as-is (nothing changed, so nothing needs re-assembling). Write reused
+cost sidecars (`{"tokens": 0, "reused": true}`) for every configured lens plus
+`eval-pack-evaluator` (if `analysis` is enabled), still run `pack_cost.py` to refresh
+`pack-cost.json`, then go straight to Step 4 (re-render).
+
+**C2 — per-lens match.** Otherwise, for each configured lens: if its `skill` is in
+`DECISION.reuse` AND `${PACK_DIR}/lenses/<skill>.json` exists, skip dispatching it — keep the
+on-disk result — and write its cost sidecar as `{"tokens": 0, "reused": true}`. Dispatch every
+other lens (in `DECISION.rerun`) normally, with its real cost sidecar. The evaluator ALWAYS
+re-runs in this branch (only C1 skips it), since lens outputs it synthesizes from may have changed.
+
+Then, for each configured lens: **apply the C2 reuse check above first** — if it's skipped, keep
+its on-disk `lenses/<skill>.json` and its already-written `reused: true` cost sidecar, and move on.
+Otherwise dispatch it, EXACTLY as generate Step 4 specifies for a non-skipped lens,
 including its per-lens `TRANSCRIPT` resolution: declared view → `${ABS_PACK_DIR}/views/<view>.jsonl`;
 `full` or no declared view → `${ABS_PACK_DIR}/transcript.jsonl` (unchanged from today — the
 non-skeleton, full-view re-eval path still just reads the recorded transcript). For a `skeleton`
@@ -119,6 +162,13 @@ If the invocation names a single lens — a `lens=<skill>` argument, or a clear 
 "tune only the sycophancy lens" — set `LENS=<skill>` and follow this path instead of re-running
 every configured lens in Step 3. It is the fast loop for iterating on ONE lens's rubric/prompt: it
 dispatches only that lens and reuses everything else already on disk from the prior round.
+
+**Minor refinement:** this mode has always unconditionally dispatched `LENS`, since the whole point
+was iterating on that lens. Now that Step 3 computes a fingerprint anyway, if `LENS` itself is in
+`DECISION.reuse` (its declared view, lens version, model, and diff base are all byte-identical to
+the prior round — e.g. the invocation targeted the wrong lens, or was re-run with no edit), it too
+may be skipped with the same reused-cost-sidecar treatment. This is optional — dispatching it
+unconditionally (today's behavior) is always safe, just occasionally redundant.
 
 1. **Validate.** Read the resolved `analysisLenses` from `${PACK_DIR}/eval-config.json`. If `LENS`
    is not among the configured `skill` values, STOP with a precise error: `lens '<skill>' is not in

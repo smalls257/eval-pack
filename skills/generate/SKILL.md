@@ -307,6 +307,49 @@ Compute the diff base the same way as Step 0:
 
 Create the lens output dir: `mkdir -p "${PACK_DIR}/lenses"`.
 
+**Delta reuse — compute the fingerprint and decide what to skip.** The pack dir PERSISTS across
+runs of the same session (a re-generate), so a `pack-fingerprint.json` from the previous run may
+already be sitting in `${PACK_DIR}`. `pack_fingerprint.py` WRITES `pack-fingerprint.json` when it
+computes — if you compute the fresh one first, you clobber the prior and every later comparison
+becomes prior-equals-current, which would always report full reuse and nothing would ever re-run.
+So preserve the prior BEFORE computing:
+
+```bash
+if [ -f "${PACK_DIR}/pack-fingerprint.json" ]; then
+    mv "${PACK_DIR}/pack-fingerprint.json" "${PACK_DIR}/pack-fingerprint.prev.json"
+fi
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/pack_fingerprint.py" "${PACK_DIR}" \
+    --config "${PACK_DIR}/eval-config.json" --diff-base "${DIFF_BASE}"
+DECISION=$("$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/pack_fingerprint.py" \
+    --decide "${PACK_DIR}/pack-fingerprint.prev.json" "${PACK_DIR}/pack-fingerprint.json" 2>/dev/null \
+    || echo '{"reuseAll": false, "reuse": [], "rerun": []}')
+```
+
+**Fail-safe:** if `${PACK_DIR}/pack-fingerprint.prev.json` does not exist (first-ever generate for
+this pack), or it is unreadable, `--decide` already returns `reuseAll: false` with an empty
+`reuse` set — dispatch ALL lenses and the evaluator, never reuse on uncertainty. A fresh generate
+is therefore byte-identical to today's full-dispatch behavior.
+
+**C1 — whole-match fast path.** If `DECISION.reuseAll` is `true`, the fingerprint's `whole` key
+covers every lens's inputs AND the evaluator agent file AND the resolved config (see
+`pack_fingerprint.py compute()`), so nothing observable to any lens or the evaluator has changed.
+Skip ALL lens dispatches AND the Step 4.5 evaluator dispatch entirely; keep the on-disk
+`${PACK_DIR}/analysis.json` and every `${PACK_DIR}/lenses/<skill>.json` as-is. Still write a reused
+cost sidecar for every configured lens PLUS `eval-pack-evaluator` (if `analysis` is enabled) —
+`{"skill": "<skill>", "tokens": 0, "model": "n/a (reused)", "reused": true}` — so the ledger shows
+the saved spend. Then skip the rest of Step 4 (view building, lens dispatch loop,
+`assemble_lenses.py`) and, within Step 4.5, everything except the **Aggregate cost** sub-step
+(still run `pack_cost.py` — see that step's C1 note), then proceed to Step 5.
+
+**C2 — per-lens match.** Otherwise (`reuseAll` is `false`), for each configured lens: if its
+`skill` is in `DECISION.reuse` AND `${PACK_DIR}/lenses/<skill>.json` already exists on disk, SKIP
+dispatching that lens — keep its on-disk result — and write its cost sidecar as
+`{"skill": "<skill>", "tokens": 0, "model": "n/a (reused)", "reused": true}` instead of the normal
+cost sidecar. Every other lens (in `DECISION.rerun`, or not present on disk despite being listed as
+reusable) dispatches normally below, with its normal cost sidecar. The Step 4.5 evaluator ALWAYS
+re-runs in this branch — its inputs are the lens outputs, which may have changed even when only
+some lenses re-ran.
+
 **Build the transcript views (cost lever).** Compute the set of views the enabled lenses declare
 (each lens's frontmatter `inputs.transcript`, default `full`) and materialize only those, once:
 
@@ -327,9 +370,12 @@ TRANSCRIPT = `${ABS_PACK_DIR}/transcript.jsonl`; otherwise TRANSCRIPT =
 RAW_TRANSCRIPT = `${ABS_PACK_DIR}/transcript.jsonl` — the pull source. For non-skeleton lenses,
 omit it.
 
-Then for each lens `{skill, role, model?}`, dispatch it as a SEPARATE subagent over the read-only
-artifacts. Each lens WRITES its result to `${PACK_DIR}/lenses/<id>.json` (the assembler collects
-these). Pass only artifact locations — never your own reasoning.
+Then for each lens `{skill, role, model?}`: **first apply the C2 reuse check from above** — if the
+skill is in `DECISION.reuse` and `${PACK_DIR}/lenses/<skill>.json` already exists, skip this lens's
+dispatch entirely (keep the on-disk file, write the `reused: true` cost sidecar) and move to the
+next lens. Otherwise dispatch it as a SEPARATE subagent over the read-only artifacts. Each
+dispatched lens WRITES its result to `${PACK_DIR}/lenses/<id>.json` (the assembler collects these).
+Pass only artifact locations — never your own reasoning.
 
 **Per-lens model (cost/quality tuning):** if a lens entry has a `model` (`opus`|`sonnet`|`haiku`|
 `fable`), pass it as the `Agent` tool's `model` argument for THAT lens's dispatch. If `model` is
@@ -398,10 +444,13 @@ reaches the verdict only through the declared `verdictAggregation` rule. If a le
 malformed output, leave a note in `lenses/<skill>.json` — the assembler quarantines it as a
 failure and the eval continues (never crashes, never silently vanishes).
 
-After EVERY lens subagent returns — first-party or third-party — record its cost: write
-`${ABS_PACK_DIR}/lenses/<skill>.cost.json` = `{"skill": "<skill>", "tokens": <the subagent_tokens
-from the Agent result>, "model": "<the model used>", "reused": false}`. This is a mechanical copy
-of the integer the Agent result reported — do not compute it.
+After EVERY lens subagent that was actually DISPATCHED returns — first-party or third-party —
+record its cost: write `${ABS_PACK_DIR}/lenses/<skill>.cost.json` = `{"skill": "<skill>", "tokens":
+<the subagent_tokens from the Agent result>, "model": "<the model used>", "reused": false}`. This
+is a mechanical copy of the integer the Agent result reported — do not compute it. For a lens
+SKIPPED under C2 reuse, its cost sidecar was already written when the skip decision was made
+(`{"tokens": 0, "reused": true}`) — do not overwrite it with a dispatch cost since it was not
+dispatched.
 
 Then assemble the results and compute the aggregated verdict with the tested script (the math is
 not done by hand — that keeps the verdict auditable):
@@ -420,6 +469,14 @@ bounded to a known, can-still-fail rule at resolve time (G3); lenses are config-
 failures degrade to quarantined notes, and the core ran without them (G4, isolated).
 
 ## Step 4.5: Analyze (independent evaluator synthesizes lens findings)
+
+**Skip the dispatch, contract-gate, and disabled-stub sub-steps below if the C1 whole-match fast
+path fired above** (`DECISION.reuseAll` was `true`) — the on-disk `${PACK_DIR}/analysis.json` is
+kept as-is, and its cost sidecar was already stamped `reused: true` when C1 fired. Jump straight to
+the **Aggregate cost** sub-step near the end of Step 4.5 (still run it — it turns the reused
+sidecars into `pack-cost.json` so the report shows the saved spend), then proceed to Step 5.
+Otherwise, continue below exactly as before (the normal path, including the common case where
+`analysisLenses` is empty or C2 reused only some lenses).
 
 The analysis must NOT be written by you — you did the work, and a self-graded
 evaluation is not trustworthy evidence. Dispatch an independent evaluator instead.
