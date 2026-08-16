@@ -1,34 +1,34 @@
 {
   "business-risk": {
-    "sha256": "b6ca729aaa128f3e201079ae508bc7b5d8b2bc88b15dd9d3038ec5c2f1a65022",
-    "version": "1.0.1"
+    "sha256": "559a6d25b9c0d43ea1f3f837c6954c66a5ea7861ff434517b99694afca34f78c",
+    "version": "1.0.2"
   },
   "friction": {
-    "sha256": "2532026320d880d327a13abdb19433f1ceb674e348542ac5e7bab1cc3d71d848",
-    "version": "1.0.0"
-  },
-  "repo-improvements": {
-    "sha256": "40423d64f8d93b67817c5c17ca54df53b2be9b5eb77de5dfa525130149f6a7b5",
-    "version": "1.0.0"
-  },
-  "requirement-drift": {
-    "sha256": "73712c110ccd78c6183349be642c0307f6f6ae8209c6320c61815e061482e9b5",
+    "sha256": "adecefe6745887bdef909db2b875c45dc50a6ca36472d42e0cc7c866964a4482",
     "version": "1.0.1"
   },
+  "repo-improvements": {
+    "sha256": "23edeb61d5fca1c8695377ea8c842b8a2834305c380c8f612abde4667208ba83",
+    "version": "1.0.1"
+  },
+  "requirement-drift": {
+    "sha256": "ec215e30dcf1088f8094ce9e918ecd1019a22ff09a9dfa27f35090c5ea1c5297",
+    "version": "1.0.2"
+  },
   "review": {
-    "sha256": "5a5c73a2d0b2ada805132e098679a3ca4fb456fcf0b52d848e5f5e4e396fa9d3",
-    "version": "1.0.0"
+    "sha256": "2a2ca903a87f0491967272f57d1a21eb8aae6a29ca3ba1e7be0ff32be56fc213",
+    "version": "1.0.1"
   },
   "sycophancy": {
     "sha256": "a802c0812a5bfc22b577f8a9e3f91311b372b1c620685f0e3e1c7c0a779de6bf",
     "version": "2.4.2"
   },
   "user-improvements": {
-    "sha256": "fa976af3623d3116f73d45d68a2975f4556cc6807ae12238873071904010f164",
-    "version": "2.6.0"
+    "sha256": "a67588344de50a438d567f00b3ef1e509ff00c5e9fca49454ea701c76bad1810",
+    "version": "2.6.1"
   },
   "verification-rigor": {
-    "sha256": "e3051f3e4d547784739bc2587031a391b68d979c4e46b1b6faf60d233a33d993",
-    "version": "1.0.1"
+    "sha256": "364c2751f8be15793ab32ebbf2db9235d11ba080211d28ecc6fbcc2355fba94a",
+    "version": "1.0.2"
   }
 }

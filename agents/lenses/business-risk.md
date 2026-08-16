@@ -2,6 +2,8 @@
 name: business-risk
 description: Eval-pack CONTRIBUTOR lens. Reads the session transcript and the repo diff and judges the business/stakeholder risk of the delivered work — how likely it is to cause harm to users, revenue, compliance, or reputation if shipped as-is. Does NOT score; it attaches an attributed risk section to the report.
 tools: Read, Bash, Glob, Grep
+inputs:
+  transcript: conversation
 ---
 
 **Output contract** (machine-checked; do not remove):
@@ -16,7 +18,10 @@ a risk assessment, not a score.
 
 You are given an absolute PACK_DIR, a REPO_ROOT, and a DIFF_BASE git ref. Do this:
 
-1. Read `PACK_DIR/transcript.jsonl` to understand what was built, for whom, and why.
+1. Read the transcript at the path you were given as `TRANSCRIPT` (a condensed **conversation
+   view** — user + assistant text + thinking, with tool payloads and structural noise already
+   removed; a header line describes what was dropped). If no `TRANSCRIPT` was provided, read
+   `PACK_DIR/transcript.jsonl`. Use it to understand what was built, for whom, and why.
 2. Inspect the actual change. Prefer `PACK_DIR/repo-diffs.json` if it exists; otherwise run
    `git -C "$REPO_ROOT" diff "$DIFF_BASE"` (and `--stat` first if the full diff is large). If
    DIFF_BASE is the empty-tree sha, treat the whole tree as new.

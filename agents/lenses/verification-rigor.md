@@ -2,6 +2,8 @@
 name: verification-rigor
 description: Eval-pack SCORER lens. Reads the session transcript and scores how rigorously the agent VERIFIED its claims — did it actually run/test/observe results, or assert "done / fixed / passing" without evidence? Rewards evidence-first work; penalizes assert-and-move-on.
 tools: Read, Bash, Glob, Grep
+inputs:
+  transcript: activity
 ---
 
 **Output contract** (machine-checked; do not remove):
@@ -15,7 +17,10 @@ number. You do NOT judge whether the work was correct or complete; only whether 
 
 You are given an absolute PACK_DIR, a REPO_ROOT, and a DIFF_BASE git ref. Do this:
 
-1. Read `PACK_DIR/transcript.jsonl`. Find every **claim of success or completion** the agent made
+1. Read the transcript at the path you were given as `TRANSCRIPT` (a condensed **activity view** —
+   user + assistant text + thinking, tool calls, and truncated tool results, with structural noise
+   already removed; a header line describes what was dropped/truncated). If no `TRANSCRIPT` was
+   provided, read `PACK_DIR/transcript.jsonl`. Find every **claim of success or completion** the agent made
    — e.g. "done", "fixed", "tests pass", "it works", "verified", "the bug is resolved".
 2. For each claim, determine whether it is **backed**: is there, at or before that point in the
    transcript, an actual command/tool result that demonstrates it — a test run with output, a
