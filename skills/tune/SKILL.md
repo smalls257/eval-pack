@@ -46,8 +46,52 @@ Non-zero exit: STOP and show stderr verbatim.
 "$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/detect_patterns.py" "${PACK_DIR}/transcript.jsonl" "${PACK_DIR}" --config "${PACK_DIR}/eval-config.json"
 ```
 
-First run the lens step EXACTLY as `skills/generate/SKILL.md` Step 4 specifies — dispatch every
-lens configured in `analysisLenses` (or skip cleanly if empty), then:
+Read `analysisLenses` from `${PACK_DIR}/eval-config.json`. If it is empty, skip lens dispatch
+entirely (the Airplane Test) and go straight to `assemble_lenses.py` below. Otherwise resolve the
+same identifiers generate Step 4 does:
+
+```bash
+ABS_PACK_DIR=$(cd "${PACK_DIR}" && pwd)
+REPO_ROOT=$(git rev-parse --show-toplevel)
+if git rev-parse HEAD~1 >/dev/null 2>&1; then
+    DIFF_BASE="HEAD~1"
+else
+    DIFF_BASE="4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+fi
+```
+
+**Build the transcript views (cost lever)** — the same block generate Step 4 uses, so a tune re-run
+gets the same token savings as the original run:
+
+```bash
+VIEWS=$("$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/lens_inputs.py" \
+    "${CLAUDE_PLUGIN_ROOT}/agents/lenses" "${PACK_DIR}/eval-config.json")
+# $VIEWS is intentionally left unquoted below — it must word-split into separate
+# positional args for build_views.py; quoting it would pass one empty/combined arg instead.
+if [ -n "$VIEWS" ]; then
+    "$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/build_views.py" \
+        "${PACK_DIR}/transcript.jsonl" "${PACK_DIR}/views" $VIEWS \
+        --tool-result-trunc-len "$(jq -r '.toolResultTruncLen // 400' "${PACK_DIR}/eval-config.json")"
+fi
+```
+
+If every configured lens declares `full` (or no `inputs.transcript`), `$VIEWS` is empty and this
+block is a no-op — no `views/` dir, no `build_views.py` call.
+
+Then dispatch every lens configured in `analysisLenses` EXACTLY as generate Step 4 specifies,
+including its per-lens `TRANSCRIPT` resolution: declared view → `${ABS_PACK_DIR}/views/<view>.jsonl`;
+`full` or no declared view → `${ABS_PACK_DIR}/transcript.jsonl` (unchanged from today — the
+non-skeleton, full-view re-eval path still just reads the recorded transcript). For a `skeleton`
+lens, also pass `RAW_TRANSCRIPT = ${ABS_PACK_DIR}/transcript.jsonl` and append the pull_turn recipe
+to its dispatch prompt, exactly as generate Step 4's skeleton addendum does. Non-skeleton lenses'
+dispatch prompt is unchanged — no `RAW_TRANSCRIPT`, no pull recipe.
+
+**Pre-turnId fallback.** If `${PACK_DIR}/transcript.jsonl` lacks `turnId` (check the first data
+record for a `turnId` key — a pack recorded before the turnId change), a `skeleton` lens cannot
+pull turn bodies by id. In that case pass that lens's `TRANSCRIPT` as the raw
+`${ABS_PACK_DIR}/transcript.jsonl` directly (skip the skeleton view and RAW_TRANSCRIPT/pull recipe
+for it) — it reads the full transcript like a `full` lens would. Look-back never breaks; it just
+degrades to reading the whole transcript for that one lens.
 
 ```bash
 "$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/assemble_lenses.py" "${PACK_DIR}"
@@ -87,10 +131,19 @@ dispatches only that lens and reuses everything else already on disk from the pr
    cleaned), restore it from the existing zip exactly as Step 1 does — `rm -rf "$PACK_DIR" && unzip
    -qo "$ZIP" -d "$OUTPUT_DIR"` — then continue.
 
-3. **Dispatch ONLY the target lens.** Follow Step 3's dispatch mechanics for that one lens only —
-   same `subagent_type` (the lens's `skill`), same `PACK_DIR`/`REPO_ROOT`/`DIFF_BASE` arguments, and
-   the lens's configured `model` if it has one. It overwrites `${PACK_DIR}/lenses/<LENS>.json`. Do
-   NOT dispatch the other configured lenses — that is the entire point of this mode.
+3. **Build the view, then dispatch ONLY the target lens.** Before dispatching, run Step 3's
+   view-build block (`lens_inputs.py` + `build_views.py`, guarded by `[ -n "$VIEWS" ]`) so the
+   target lens's declared view exists — a harmless no-op if it declares `full`, or if the view is
+   already on disk from the prior round (rebuilding just overwrites it with the same content).
+   Then follow Step 3's dispatch mechanics for that one lens only — same `subagent_type` (the
+   lens's `skill`), same `PACK_DIR`/`REPO_ROOT`/`DIFF_BASE` arguments, the lens's configured
+   `model` if it has one, and the same per-lens `TRANSCRIPT` resolution (declared view →
+   `${ABS_PACK_DIR}/views/<view>.jsonl`; `full`/none → `${ABS_PACK_DIR}/transcript.jsonl`). If it
+   is a `skeleton` lens, also pass `RAW_TRANSCRIPT = ${ABS_PACK_DIR}/transcript.jsonl` plus the
+   pull_turn recipe — or, if `${PACK_DIR}/transcript.jsonl` lacks `turnId`, apply the pre-turnId
+   fallback above (pass `TRANSCRIPT` as the raw transcript instead). It overwrites
+   `${PACK_DIR}/lenses/<LENS>.json`. Do NOT dispatch the other configured lenses — that is the
+   entire point of this mode.
 
 4. **Reuse the rest.** Do NOT re-run the other lenses, and do NOT re-dispatch the evaluator — reuse
    the on-disk `analysis.json` as-is. Note: if `LENS` is a `scorer`, `assemble_lenses.py`
