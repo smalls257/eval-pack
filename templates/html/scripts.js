@@ -240,9 +240,30 @@ function renderStats(data) {
     ? subagentTokensByModel.map(r => ({ label: shortModelName(r.model), value: formatNumber(r.totalTokens) }))
     : [{ label: 'Total', value: formatNumber(m.subagentTotalTokens) }];
 
+  const packCost = data.packCost || {};
+  const perLens = Array.isArray(packCost.perLens) ? packCost.perLens : [];
+  const costItems = perLens.map(row => {
+    if (row.tokens == null) {
+      return { label: row.skill, value: 'gap: ' + (row.gap || 'no cost recorded') };
+    }
+    const reusedSuffix = row.reused ? ' (reused)' : '';
+    return { label: row.skill, value: formatNumber(row.tokens) + reusedSuffix };
+  });
+  if (packCost.evaluatorTokens != null) {
+    costItems.push({ label: 'Evaluator', value: formatNumber(packCost.evaluatorTokens) });
+  }
+  if (packCost.totalTokens != null) {
+    costItems.push({ label: 'Total', value: formatNumber(packCost.totalTokens) });
+  }
+  const packCostGaps = Array.isArray(packCost.gaps) ? packCost.gaps : [];
+  if (packCostGaps.length > 0) {
+    costItems.push({ label: 'Gaps', value: packCostGaps.join(', ') });
+  }
+
   const groups = [
     { heading: 'Controller tokens', items: tokenItems },
     { heading: 'Subagent tokens',   items: subagentItems },
+    ...(costItems.length > 0 ? [{ heading: 'Cost of this pack', items: costItems }] : []),
     {
       heading: 'Session',
       items: [

@@ -721,6 +721,7 @@ def main():
         "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "analysis": read_json(pack_dir / "analysis.json"),
         "metrics": read_json(pack_dir / "metrics.json"),
+        "packCost": read_json(pack_dir / "pack-cost.json"),
         "patterns": read_json(pack_dir / "patterns.json"),
         "testResults": read_json(pack_dir / "test-results.json"),
         "tools": read_json(pack_dir / "tools.json"),
