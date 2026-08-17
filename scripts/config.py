@@ -81,6 +81,8 @@ DEFAULTS = {
     "falseCompletionWindow": 1,
     # Truncation length for quoted claim/response text in patterns.json.
     "claimTruncLen": 120,
+    # Truncation length for tool_result payloads in the `activity` transcript view.
+    "toolResultTruncLen": 400,
     # Per-flag severity overrides: {flagId: "red"|"amber"|"green"|"off"}. Empty = built-in levels.
     "flagSeverities": {},
     # Pipeline options, unified from the legacy pluginConfigs home. The
@@ -129,6 +131,7 @@ _TYPES = {
     "detectionPatterns": dict,
     "falseCompletionWindow": int,
     "claimTruncLen": int,
+    "toolResultTruncLen": int,
     "flagSeverities": dict,
     "outputDir": str,
     "analysis": bool,
@@ -159,6 +162,11 @@ CARD_STYLES = ("hero", "list")
 # Model tiers a lens's subagent may be pinned to (cost/quality tuning). Mirrors the Agent
 # tool's model aliases; a lens with no model inherits the session model.
 LENS_MODELS = ("opus", "sonnet", "haiku", "fable")
+
+# Reasoning-effort levels a lens's subagent may be pinned to (output-token/cost tuning).
+# Orthogonal to model: model picks the tier, effort picks how hard it thinks. Mirrors the
+# Agent tool's effort levels; a lens with no effort inherits the session effort.
+LENS_EFFORTS = ("low", "medium", "high", "xhigh", "max")
 
 # Allowed per-flag severity overrides.
 FLAG_LEVELS = ("red", "amber", "green", "off")
@@ -390,6 +398,9 @@ def validate(cfg):
             if isinstance(lens, dict) and "model" in lens and lens.get("model") not in LENS_MODELS:
                 errors.append("analysisLenses[{}]: model must be one of: {}".format(
                     i, ", ".join(repr(m) for m in LENS_MODELS)))
+            if isinstance(lens, dict) and "effort" in lens and lens.get("effort") not in LENS_EFFORTS:
+                errors.append("analysisLenses[{}]: effort must be one of: {}".format(
+                    i, ", ".join(repr(e) for e in LENS_EFFORTS)))
             if isinstance(lens, dict) and "cardStyle" in lens and lens.get("cardStyle") not in CARD_STYLES:
                 errors.append("analysisLenses[{}]: cardStyle must be one of: {}".format(
                     i, ", ".join(repr(m) for m in CARD_STYLES)))
@@ -400,6 +411,9 @@ def validate(cfg):
     n = cfg.get("skillArgsMaxLen")
     if isinstance(n, int) and not isinstance(n, bool) and n < 0:
         errors.append("skillArgsMaxLen: must be >= 0, got {}".format(n))
+    m = cfg.get("toolResultTruncLen")
+    if isinstance(m, int) and not isinstance(m, bool) and m < 0:
+        errors.append("toolResultTruncLen: must be >= 0, got {}".format(m))
     dp = cfg.get("detectionPatterns")
     if isinstance(dp, dict):
         for group, pats in dp.items():

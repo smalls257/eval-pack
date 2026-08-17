@@ -1,34 +1,34 @@
 {
   "business-risk": {
-    "sha256": "b6ca729aaa128f3e201079ae508bc7b5d8b2bc88b15dd9d3038ec5c2f1a65022",
-    "version": "1.0.1"
+    "sha256": "17bf7715c8a51fc86e867f38e38649834c1ff78d05fc74fd142c84c00266097a",
+    "version": "1.0.4"
   },
   "friction": {
-    "sha256": "2532026320d880d327a13abdb19433f1ceb674e348542ac5e7bab1cc3d71d848",
-    "version": "1.0.0"
+    "sha256": "adecefe6745887bdef909db2b875c45dc50a6ca36472d42e0cc7c866964a4482",
+    "version": "1.0.3"
   },
   "repo-improvements": {
-    "sha256": "40423d64f8d93b67817c5c17ca54df53b2be9b5eb77de5dfa525130149f6a7b5",
-    "version": "1.0.0"
+    "sha256": "23edeb61d5fca1c8695377ea8c842b8a2834305c380c8f612abde4667208ba83",
+    "version": "1.0.3"
   },
   "requirement-drift": {
-    "sha256": "73712c110ccd78c6183349be642c0307f6f6ae8209c6320c61815e061482e9b5",
-    "version": "1.0.1"
+    "sha256": "9129460532f63f1b61c37a8d25520e5b303a438de4c8d48dab560c9173a263dd",
+    "version": "1.0.4"
   },
   "review": {
-    "sha256": "5a5c73a2d0b2ada805132e098679a3ca4fb456fcf0b52d848e5f5e4e396fa9d3",
-    "version": "1.0.0"
+    "sha256": "2a2ca903a87f0491967272f57d1a21eb8aae6a29ca3ba1e7be0ff32be56fc213",
+    "version": "1.0.3"
   },
   "sycophancy": {
-    "sha256": "43765b9ba22a19fa53654545fc97a2e8071cbb41e6b21dd8435f37ec1f0ca046",
-    "version": "2.5.0"
+    "sha256": "cdf870953779a1490dca32643c5ea93888bddb82d5289a22d40b6ffbf1399f27",
+    "version": "2.5.1"
   },
   "user-improvements": {
-    "sha256": "13e461d8f24c04113cde9ac74a163c78d50e05641726c357ced16703401d35f3",
-    "version": "2.10.0"
+    "sha256": "92c1cafe8e0f31fe533cc7bfe76b284cce2097ac94e23bdccacf8cbcff8e2575",
+    "version": "2.11.0"
   },
   "verification-rigor": {
-    "sha256": "e3051f3e4d547784739bc2587031a391b68d979c4e46b1b6faf60d233a33d993",
-    "version": "1.0.1"
+    "sha256": "89b10f4a92da7e8b0cf34e436be8c3e1ed909231d67c5a7ca451af986c49113b",
+    "version": "1.0.5"
   }
 }

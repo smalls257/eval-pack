@@ -10,16 +10,52 @@ def _norm(s):
     return _WS.sub(" ", (s or "")).strip()
 
 
-def evidence_resolution(output, corpus, findings_key="findings"):
-    """Atomic provenance: every evidential finding's quote must appear verbatim in the corpus."""
+def evidence_resolution(output, corpus, findings_key="findings", turn_index=None, require_turn_id=False):
+    """Atomic provenance for every evidential finding's quote.
+
+    Resolution mode is per-finding:
+      * finding has `turnId` and `turn_index` is provided -> resolve the quote against THAT
+        turn's retained text. Absent from an UNtruncated turn = failure; absent from a
+        TRUNCATED turn = 'unverifiable' (the view clipped the span) and PASSES, never a
+        hallucination charge; a turnId not in the index = failure.
+      * finding has no `turnId` -> legacy whole-`corpus` substring match.
+    `require_turn_id` makes a missing turnId on an evidential finding a failure (opt-in per lens)."""
     hay = _norm(corpus)
     msgs = []
     for i, f in enumerate(output.get(findings_key) or []):
         if not f.get("evidential", True):
             continue
         q = _norm(f.get("quote"))
-        if not q or q not in hay:
-            msgs.append("{}[{}] quote unresolved: {!r}".format(findings_key, i, f.get("quote")))
+        tid = f.get("turnId")
+        if tid is None:
+            if require_turn_id:
+                msgs.append("{}[{}] missing turnId".format(findings_key, i))
+                continue
+            if not q or q not in hay:
+                msgs.append("{}[{}] quote unresolved: {!r}".format(findings_key, i, f.get("quote")))
+            continue
+        if turn_index is None:
+            # turnId cited but no index available -> fall back to whole corpus
+            if not q or q not in hay:
+                msgs.append("{}[{}] quote unresolved: {!r}".format(findings_key, i, f.get("quote")))
+            continue
+        turn = turn_index.get(tid)
+        if turn is None:
+            msgs.append("{}[{}] cites unknown turn {!r}".format(findings_key, i, tid))
+            continue
+        if q and q in _norm(turn.get("text")):
+            continue
+        if turn.get("truncated"):
+            # unverifiable-due-to-truncation: non-penalizing. Safe today only because every
+            # lens with requiresTurnId (currently: sycophancy) restricts evidenceRoles to
+            # "assistant" text, which never truncates — only tool_result blocks (user-role
+            # records) do. A FUTURE requiresTurnId lens whose evidenceRoles includes a
+            # tool-result-bearing role would turn this pass into a fabrication escape hatch:
+            # a quote could be invented and then "excused" by pointing at a truncated turn.
+            # Any such lens must either exclude tool-result roles or this branch must gain
+            # a role-aware guard.
+            continue
+        msgs.append("{}[{}] quote not in cited turn {}: {!r}".format(findings_key, i, tid, f.get("quote")))
     return (not msgs, msgs)
 
 

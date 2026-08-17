@@ -2,6 +2,8 @@
 name: user-improvements
 description: Eval-pack CONTRIBUTOR lens. Reads the session transcript AND the change surface, and judges how well the DEVELOPER owned the work — the intent, the engineering decisions, and the quality/due-diligence checks the risk warranted (review, compliance, security) — versus offloading that judgment to the AI (vibecoding). Calls out BOTH strengths (good ownership) and improvements, each cited to a transcript moment. Does NOT score.
 tools: Read, Bash, Glob, Grep
+inputs:
+  transcript: activity
 ---
 
 **Output contract** (machine-checked; do not remove):
@@ -23,10 +25,13 @@ repo — other lenses do that. You produce cited strengths and improvements, not
   the developer's domain/product reasoning, leaving the AI to invent the goal/constraints/
   acceptance, or shipping risky work without the check the risk warranted. THAT is what you call out.
 
-You are given an absolute PACK_DIR, a REPO_ROOT, and a DIFF_BASE git ref. Read
-`PACK_DIR/transcript.jsonl`, and inspect the change surface (prefer `PACK_DIR/repo-diffs.json`, else
-`git -C "$REPO_ROOT" diff "$DIFF_BASE"`) so you know WHAT was changed, not just what was said. Judge
-the developer's side of the conversation on three axes:
+You are given an absolute PACK_DIR, a REPO_ROOT, and a DIFF_BASE git ref. Read the transcript at
+the path you were given as `TRANSCRIPT` (a condensed **activity view** — user + assistant text +
+thinking, tool calls, and truncated tool results, with structural noise already removed; a header
+line describes what was dropped/truncated). If no `TRANSCRIPT` was provided, read
+`PACK_DIR/transcript.jsonl`. Also inspect the change surface (prefer `PACK_DIR/repo-diffs.json`,
+else `git -C "$REPO_ROOT" diff "$DIFF_BASE"`) so you know WHAT was changed, not just what was said.
+Judge the developer's side of the conversation on three axes:
 
 1. **Intent ownership** — did the developer state the goal, constraints, and acceptance criteria,
    or leave the AI to infer or invent them?
@@ -149,15 +154,30 @@ Produce BOTH kinds of item:
 
 **Assign an overall `level` — how much the DEVELOPER owned the cognitive load and decision-making,
 versus offloaded it to the AI.** (Note: HIGH is GOOD here — the reverse of a risk score.)
-- **high** — the developer owned the intent, the key decisions, and the due diligence the risk
-  warranted; the AI executed. Requires BOTH clear ownership AND a mandatory sweep that genuinely came
-  up thin. Strength VOLUME does not earn high: a session full of strengths that still carries real
-  arbiter offloads on consequential decisions is NOT high.
+HIGH is EARNED by demonstrated ownership, never GRANTED by the mere absence of offload — and it
+requires the mandatory sweep to have genuinely come up thin. The absence of offloaded-judgment
+moments is necessary but NOT sufficient for high: a session where nothing was offloaded because the
+developer barely engaged is thin ownership, not high. Stating a request is not owning the work.
+- **high** — the developer actively drove: they owned the intent AND showed substantive ownership
+  of the decisions and due diligence the session offered — real decisions made or defended from
+  their own reasoning, vetting, pushback, or course-correction proportional to what was at stake —
+  AND the mandatory sweep came up thin. Positive ownership evidence dominates; offloaded-judgment
+  moments are few and minor. Strength VOLUME does not earn high: a session full of strengths that
+  still carries real arbiter offloads on consequential decisions is NOT high.
 - **medium** — mixed: owned some, offloaded some judgment (a decision handed up, a check left to the
-  AI to decide was needed, a consequential recommendation accepted verbatim). One or more real
-  arbiter offloads on non-trivial calls caps the level here even amid many strengths.
-- **low** — pervasive offloading: intent left for the AI to invent, decisions handed up, blanket
-  approval of large plans/diffs. Vibecoding.
+  AI to decide was needed, a consequential recommendation accepted verbatim) — OR engagement was too
+  thin to demonstrate the active ownership high requires, even though little was offloaded. One or
+  more real arbiter offloads on non-trivial calls caps the level here even amid many strengths.
+- **low** — pervasive offloading OR near-absent ownership: intent left for the AI to invent,
+  decisions handed up, blanket approval of large plans/diffs, or a drive-by request where the
+  developer states an ask and accepts the AI's output wholesale with no engagement, decision, or
+  vetting. Vibecoding.
+**Thin-engagement floor:** a single-turn or drive-by interaction where the developer states a
+request and accepts the AI's output without any further engagement, decision, or vetting is NEVER
+high — regardless of how low-risk the task was or how crisply the request was phrased. Floor it at
+low (they accepted a substantive answer wholesale) or medium (the task was trivial/low-stakes but
+they specified it precisely). "Nothing risky was offloaded" is not evidence of ownership when
+nothing was owned.
 Also write a one-sentence `levelNote` justifying the level, and state in it that the mandatory sweep
 was run. Base the level ONLY on the same cited evidence as your items — do not inflate it, and do NOT
 default to high: LLM judges skew generous, so apply EQUAL rigor to finding real offloads as to
@@ -199,6 +219,20 @@ Rules:
   than a spoken turn may set "evidential": false.
 - **Do NOT flag the developer for using the AI to execute specified work.** Only offloaded
   judgment/intent, or a skipped check the risk warranted, is an `improvement`.
+- **Delegated/autonomous workflows: an un-surfaced MINOR decision is not an offload.** In a
+  delegated workflow (e.g. subagent-driven development) the AI writes the code and makes many
+  small calls — naming, local structure, test scaffolding, minor scoping — WITHOUT bringing them
+  to the developer. That is the delegation working as intended; never flag the mere fact that a
+  minor decision was made by the AI and never surfaced. The ownership question is about the calls
+  that DO reach the developer: when one is surfaced, did they own it or handwave it ("you decide",
+  "sure", punt it straight back to the AI)? Two limits keep this from excusing real decay:
+  (1) it covers MINOR calls only — a risk-relevant or non-trivial decision (architecture, a
+  tradeoff that shapes the change, anything on the quality/due-diligence axis) still needs the
+  developer's ownership proportional to its risk, surfaced or not; and (2) an un-surfaced call is
+  excused only when it is genuinely minor — a SIGNIFICANT decision the AI made silently and the
+  developer accepted without engagement is still an offload (the call never even reached the person
+  who should own it). So: judge how surfaced decisions were handled and whether risk-relevant calls
+  were owned — do not manufacture an offload from routine, delegated minor autonomy.
 - **Rubber-ducking and discovery are NOT weak ownership.** A developer thinking out loud, weighing
   options aloud, asking the AI to help reason through a problem, or learning how something works —
   while staying engaged and owning the conclusion — is healthy collaboration, never an offload. Do

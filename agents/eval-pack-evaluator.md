@@ -2,6 +2,10 @@
 name: eval-pack-evaluator
 description: Independent synthesizer for eval-pack. Reads the recorded session artifacts (transcript, metrics, patterns, test results, per-repo git diffs) PLUS the lens findings already computed, and writes analysis.json. Dispatched by /eval-pack:generate so the evaluation is NOT authored by the agent that did the work.
 tools: Read, Write, Bash, Glob, Grep
+# Note: this agent lives outside agents/lenses/, so scripts/lens_inputs.py never scans it —
+# an `inputs:` declaration here would be inert. The evaluator's transcript view is owned by
+# skills/generate/SKILL.md Step 4.5, which builds views/activity.jsonl and hands it in as
+# TRANSCRIPT (see step 1 below).
 ---
 
 You are an independent synthesizer, not a judge of individual dimensions. You did NOT
@@ -32,7 +36,12 @@ First, read `eval-config.json` in PACK_DIR if it is present — it carries your 
 Then do this:
 
 1. Read these files in PACK_DIR (any may be absent — note absence as a gap, do not invent):
-   - `transcript.jsonl` — the full session conversation
+   - `TRANSCRIPT` — handed to you by skills/generate/SKILL.md Step 4.5 as `views/activity.jsonl`
+     (falling back to `PACK_DIR/transcript.jsonl` if not given), the session conversation as an
+     **activity view** (user + assistant text + thinking,
+     tool calls, and truncated tool results; each record carries `turnId`, and a header line notes
+     what was dropped/truncated). Read the path given to you as `TRANSCRIPT`; if none was given, read
+     `PACK_DIR/transcript.jsonl`.
    - `metrics.json` — token/turn/file-change stats
    - `patterns.json` — heuristic flags (false completions, retries, scope drift)
    - `test-results.json` — verdict and tests run
@@ -62,6 +71,10 @@ Then do this:
    `unproven` claims should pull confidence down and be named in `confidenceNotes`; a red/amber
    flag in `patterns.json` should do the same. Answer every configured `retrospectiveQuestions`
    entry and apply the configured `rubric`, if any.
+   When you spot-check a lens finding's `quote`, resolve it against the turn named by the finding's
+   `turnId` in `TRANSCRIPT`. If that turn's `tool_result` was truncated (its block shows
+   `_truncated`), treat an unresolved quote as **unverifiable**, not as a fabrication — do not
+   penalize the lens for the view clipping evidence.
 4. Write `analysis.json` into PACK_DIR conforming EXACTLY to the schema below.
 
 Rules:

@@ -305,16 +305,100 @@ Compute the diff base the same way as Step 0:
 - `REPO_ROOT=$(git rev-parse --show-toplevel)`
 - If `HEAD~1` exists, `DIFF_BASE=HEAD~1`; otherwise `DIFF_BASE=4b825dc642cb6eb9a060e54bf8d69288fbee4904` (empty tree).
 
-Create the lens output dir: `mkdir -p "${PACK_DIR}/lenses"`. Then for each lens
-`{skill, role, model?}`, dispatch it as a SEPARATE subagent over the read-only artifacts. Each
-lens WRITES its result to `${PACK_DIR}/lenses/<id>.json` (the assembler collects these). Pass only
-artifact locations — never your own reasoning.
+Create the lens output dir: `mkdir -p "${PACK_DIR}/lenses"`.
+
+**Build the transcript views (cost lever).** Compute the set of views the enabled lenses declare
+(each lens's frontmatter `inputs.transcript`, default `full`) and materialize only those, once:
+
+    VIEWS=$("$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/lens_inputs.py" \
+        "${CLAUDE_PLUGIN_ROOT}/agents/lenses" "${PACK_DIR}/eval-config.json")
+    # VIEWS is a space-separated set excluding "full"; if empty, skip view building (no-op).
+    # $VIEWS is intentionally left unquoted below — it must word-split into separate
+    # positional args for build_views.py; quoting it would pass one empty/combined arg instead.
+    if [ -n "$VIEWS" ]; then
+        "$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/build_views.py" \
+            "${PACK_DIR}/transcript.jsonl" "${PACK_DIR}/views" $VIEWS \
+            --tool-result-trunc-len "$(jq -r '.toolResultTruncLen // 400' "${PACK_DIR}/eval-config.json")"
+    fi
+
+**Delta reuse — compute the fingerprint and decide what to skip.** This MUST run AFTER the view
+build above, never before: `pack_fingerprint.py` hashes each lens's ACTUAL input bytes off
+`${PACK_DIR}/views/<view>.jsonl`, and those files were just rewritten from the current
+`transcript.jsonl`. Computing the fingerprint first would hash the STALE prior-run view files —
+byte-identical to what the prior fingerprint already recorded — and falsely mark a view-scoped
+lens reusable even though the transcript changed underneath it. The pack dir also PERSISTS across
+runs of the same session (a re-generate), so a `pack-fingerprint.json` from the previous run may
+already be sitting in `${PACK_DIR}`. `pack_fingerprint.py` WRITES `pack-fingerprint.json` when it
+computes — if you compute the fresh one first, you clobber the prior and every later comparison
+becomes prior-equals-current, which would always report full reuse and nothing would ever re-run.
+So preserve the prior BEFORE computing:
+
+```bash
+if [ -f "${PACK_DIR}/pack-fingerprint.json" ]; then
+    mv "${PACK_DIR}/pack-fingerprint.json" "${PACK_DIR}/pack-fingerprint.prev.json"
+fi
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/pack_fingerprint.py" "${PACK_DIR}" \
+    --config "${PACK_DIR}/eval-config.json" --diff-base "${DIFF_BASE}"
+DECISION=$("$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/pack_fingerprint.py" \
+    --decide "${PACK_DIR}/pack-fingerprint.prev.json" "${PACK_DIR}/pack-fingerprint.json")
+```
+
+**Fail-safe:** if `${PACK_DIR}/pack-fingerprint.prev.json` does not exist (first-ever generate for
+this pack), or it is unreadable, `--decide` already returns `reuseAll: false` with an empty
+`reuse` set — dispatch ALL lenses and the evaluator, never reuse on uncertainty. A fresh generate
+is therefore byte-identical to today's full-dispatch behavior. (`--decide` hard-fails loudly, by
+design, if the freshly-written CURRENT fingerprint is malformed — that is a real bug worth
+surfacing, not a condition to paper over with a fallback.)
+
+**C1 — whole-match fast path.** If `DECISION.reuseAll` is `true`, the fingerprint's `whole` key
+covers every lens's inputs (the resolved config is folded into every per-lens key, so it's covered
+transitively too) AND the evaluator agent file AND the raw transcript bytes (see
+`pack_fingerprint.py compute()`), so nothing observable to any lens or the evaluator has changed.
+Skip ALL lens dispatches AND the Step 4.5 evaluator dispatch entirely; keep the on-disk
+`${PACK_DIR}/analysis.json` and every `${PACK_DIR}/lenses/<skill>.json` as-is. Still write a reused
+cost sidecar for every configured lens PLUS `eval-pack-evaluator` (if `analysis` is enabled) —
+`{"skill": "<skill>", "tokens": 0, "model": "n/a (reused)", "reused": true}` — so the ledger shows
+the saved spend. Then skip the rest of Step 4 (the lens dispatch loop, `assemble_lenses.py`) and,
+within Step 4.5, everything except the **Aggregate cost** sub-step (still run `pack_cost.py` — see
+that step's C1 note), then proceed to Step 5.
+
+**C2 — per-lens match.** Otherwise (`reuseAll` is `false`), for each configured lens: if its
+`skill` is in `DECISION.reuse` AND `${PACK_DIR}/lenses/<skill>.json` already exists on disk, SKIP
+dispatching that lens — keep its on-disk result — and write its cost sidecar as
+`{"skill": "<skill>", "tokens": 0, "model": "n/a (reused)", "reused": true}` instead of the normal
+cost sidecar. Every other lens (in `DECISION.rerun`, or not present on disk despite being listed as
+reusable) dispatches normally below, with its normal cost sidecar. The Step 4.5 evaluator ALWAYS
+re-runs in this branch — its inputs are the lens outputs, which may have changed even when only
+some lenses re-ran.
+
+For each lens, resolve its TRANSCRIPT path: if the lens declares `full` (or declares nothing),
+TRANSCRIPT = `${ABS_PACK_DIR}/transcript.jsonl`; otherwise TRANSCRIPT =
+`${ABS_PACK_DIR}/views/<view>.jsonl`. If the lens's declared view is `skeleton`, also pass
+RAW_TRANSCRIPT = `${ABS_PACK_DIR}/transcript.jsonl` — the pull source. For non-skeleton lenses,
+omit it.
+
+Then for each lens `{skill, role, model?, effort?}`: **first apply the C2 reuse check from above** — if the
+skill is in `DECISION.reuse` and `${PACK_DIR}/lenses/<skill>.json` already exists, skip this lens's
+dispatch entirely (keep the on-disk file, write the `reused: true` cost sidecar) and move to the
+next lens. Otherwise dispatch it as a SEPARATE subagent over the read-only artifacts. Each
+dispatched lens WRITES its result to `${PACK_DIR}/lenses/<id>.json` (the assembler collects these).
+Pass only artifact locations — never your own reasoning.
 
 **Per-lens model (cost/quality tuning):** if a lens entry has a `model` (`opus`|`sonnet`|`haiku`|
 `fable`), pass it as the `Agent` tool's `model` argument for THAT lens's dispatch. If `model` is
 absent, omit the argument so the lens inherits the session model. This lets you run judgment-heavy
 lenses on `opus` and mechanical ones on `haiku`/`sonnet` — a large cost lever when the transcript
 is big (each lens reads it).
+
+**Per-lens effort (output-token/cost tuning):** if a lens entry has an `effort`
+(`low`|`medium`|`high`|`xhigh`|`max`), pass it as the `Agent` tool's `effort` argument for THAT
+lens's dispatch. If `effort` is absent, omit the argument so the lens inherits the session effort.
+Effort is orthogonal to `model` (set either, both, or neither): model picks the tier, effort picks
+how hard it reasons — the lever on OUTPUT tokens (dominant on smaller sessions where input is
+already cheap). Lower effort on lenses that grade from clear signal; keep it high on
+discovery/synthesis lenses. (Effort lives in `analysisLenses`, so changing it is a config change
+that `pack_fingerprint.py` folds into every per-lens key — a re-run correctly re-dispatches the
+affected lens rather than reusing a stale result.)
 
 **First-party lenses** ship with eval-pack; dispatch each with the `Agent` tool using the matching
 `subagent_type`, passing `PACK_DIR` (absolute), `REPO_ROOT`, and `DIFF_BASE`:
@@ -348,8 +432,27 @@ is big (each lens reads it).
 > `subagent_type` suffix.
 
 > Run the `<skill>` lens. PACK_DIR is `${ABS_PACK_DIR}`. REPO_ROOT is `${REPO_ROOT}`. DIFF_BASE is
-> `${DIFF_BASE}`. Read the artifacts, then write your result to
-> `${ABS_PACK_DIR}/lenses/<skill>.json` per your schema.
+> `${DIFF_BASE}`. TRANSCRIPT is `<resolved per-lens transcript path>`. Read the artifacts (read the
+> transcript from TRANSCRIPT), then write your result to `${ABS_PACK_DIR}/lenses/<skill>.json` per
+> your schema.
+
+If the lens's declared view is `skeleton`, append the pull recipe to that dispatch prompt so the
+lens knows how to fetch full turn bodies on demand:
+
+> TRANSCRIPT is `${ABS_PACK_DIR}/views/skeleton.jsonl` (a skeleton — every turn's text, tool-call
+> digests, and one-line result summaries; no bodies). RAW_TRANSCRIPT is
+> `${ABS_PACK_DIR}/transcript.jsonl`. To read a turn's full body, run `"$PYTHON"
+> "${CLAUDE_PLUGIN_ROOT}/scripts/pull_turn.py" "$RAW_TRANSCRIPT" <turnId> --field
+> <text|thinking|tool_input|tool_result>`. Pull selectively.
+
+Non-skeleton lenses' dispatch prompt is unchanged — they receive only the generic prompt above,
+with no RAW_TRANSCRIPT and no pull recipe.
+
+**Pre-turnId fallback.** If `${ABS_PACK_DIR}/transcript.jsonl` lacks a `turnId` on its first data
+record (a pack built via the context-reconstruction fallback in Step 1), do NOT hand a skeleton
+lens the skeleton view — pull-by-turnId can't work; pass its `TRANSCRIPT` as the raw
+`${ABS_PACK_DIR}/transcript.jsonl` instead, so it reads the full transcript directly. Look-back
+never breaks; it just degrades to reading the whole transcript for that one lens.
 
 A **third-party** lens is dispatched as its named skill/agent; instruct it to write the same
 `{skill, role, score|title, rationale|findings}` shape to `lenses/<skill>.json`. A `contributor`
@@ -357,6 +460,14 @@ adds an attributed section and MUST NOT touch the verdict; a `scorer` returns a 
 reaches the verdict only through the declared `verdictAggregation` rule. If a lens errors or writes
 malformed output, leave a note in `lenses/<skill>.json` — the assembler quarantines it as a
 failure and the eval continues (never crashes, never silently vanishes).
+
+After EVERY lens subagent that was actually DISPATCHED returns — first-party or third-party —
+record its cost: write `${ABS_PACK_DIR}/lenses/<skill>.cost.json` = `{"skill": "<skill>", "tokens":
+<the subagent_tokens from the Agent result>, "model": "<the model used>", "reused": false}`. This
+is a mechanical copy of the integer the Agent result reported — do not compute it. For a lens
+SKIPPED under C2 reuse, its cost sidecar was already written when the skip decision was made
+(`{"tokens": 0, "reused": true}`) — do not overwrite it with a dispatch cost since it was not
+dispatched.
 
 Then assemble the results and compute the aggregated verdict with the tested script (the math is
 not done by hand — that keeps the verdict auditable):
@@ -376,6 +487,14 @@ failures degrade to quarantined notes, and the core ran without them (G4, isolat
 
 ## Step 4.5: Analyze (independent evaluator synthesizes lens findings)
 
+**Skip the dispatch, contract-gate, and disabled-stub sub-steps below if the C1 whole-match fast
+path fired above** (`DECISION.reuseAll` was `true`) — the on-disk `${PACK_DIR}/analysis.json` is
+kept as-is, and its cost sidecar was already stamped `reused: true` when C1 fired. Jump straight to
+the **Aggregate cost** sub-step near the end of Step 4.5 (still run it — it turns the reused
+sidecars into `pack-cost.json` so the report shows the saved spend), then proceed to Step 5.
+Otherwise, continue below exactly as before (the normal path, including the common case where
+`analysisLenses` is empty or C2 reused only some lenses).
+
 The analysis must NOT be written by you — you did the work, and a self-graded
 evaluation is not trustworthy evidence. Dispatch an independent evaluator instead.
 
@@ -390,12 +509,24 @@ flags and synthesizes `completionStatus` / `confidencePercent` / `confidenceNote
 Resolve `PACK_DIR` to an absolute path and capture the repo root before dispatching (reuse
 `ABS_PACK_DIR`, `REPO_ROOT`, `DIFF_BASE` from Step 4 if this is the same run).
 
+Ensure the evaluator's `activity` view exists (it may already have been built in Step 4 if a lens
+requested it; if not, build it now):
+
+    [ -f "${PACK_DIR}/views/activity.jsonl" ] || "$PYTHON" \
+        "${CLAUDE_PLUGIN_ROOT}/scripts/build_views.py" "${PACK_DIR}/transcript.jsonl" \
+        "${PACK_DIR}/views" activity \
+        --tool-result-trunc-len "$(jq -r '.toolResultTruncLen // 400' "${PACK_DIR}/eval-config.json")"
+
+If this build fails or the view can't be produced, continue anyway — the evaluator falls back to
+reading `${ABS_PACK_DIR}/transcript.jsonl` directly (its TRANSCRIPT fallback), so a missing
+activity view never blocks the run.
+
 Dispatch the `eval-pack-evaluator` agent with the `Agent` tool, `subagent_type:
 eval-pack-evaluator`. Pass it only the artifact location — not your own reasoning:
 
 > Write the eval-pack analysis. PACK_DIR is `${ABS_PACK_DIR}` (absolute). REPO_ROOT is
-> `${REPO_ROOT}`. DIFF_BASE is `${DIFF_BASE}`.
-> Read eval-config.json (your configuration), transcript.jsonl, metrics.json, patterns.json,
+> `${REPO_ROOT}`. DIFF_BASE is `${DIFF_BASE}`. TRANSCRIPT is `${ABS_PACK_DIR}/views/activity.jsonl`.
+> Read eval-config.json (your configuration), TRANSCRIPT, metrics.json, patterns.json,
 > test-results.json, `lenses.json`, and `lenses/*.json` from PACK_DIR — the lens findings are
 > already computed; ingest them, do not re-derive their verdicts — run git from REPO_ROOT to
 > inspect the diff against DIFF_BASE, and write `${ABS_PACK_DIR}/analysis.json` per your schema.
@@ -404,6 +535,11 @@ Wait for the agent to finish. Confirm `${ABS_PACK_DIR}/analysis.json` exists and
 `title`. If it is missing or empty, the evaluator failed — re-dispatch once; if it
 fails again, stop and tell the user the analysis step failed. Do NOT write the
 analysis yourself as a fallback — that reintroduces the bias this step exists to remove.
+
+After the evaluator subagent returns, record its cost the same way as each lens: write
+`${ABS_PACK_DIR}/lenses/eval-pack-evaluator.cost.json` = `{"skill": "eval-pack-evaluator",
+"tokens": <the subagent_tokens from the Agent result>, "model": "<the model used>", "reused":
+false}`. Mechanical copy of the reported integer — do not compute it.
 
 Then run the deterministic contract gate — it checks the analysis and test results against the
 resolved config (retrospective answers, rubric band, test-command proof, and — now that lenses
@@ -442,6 +578,26 @@ pack.mkdir(parents=True, exist_ok=True)
 }), encoding="utf-8")
 PY
 ```
+
+**Aggregate cost (runs in both branches above).** Combine every lens/evaluator cost sidecar into
+one deterministic file — never computed by hand, only aggregated from the sidecars each dispatch
+already wrote:
+
+Build the expected-skills list by RE-READING `analysisLenses` from `${PACK_DIR}/eval-config.json`
+— the same source Step 4 read, not memory of what you dispatched ~180 lines earlier — and take each
+entry's `skill`, plus `eval-pack-evaluator` if analysis was enabled (omit it if analysis was
+disabled — it was never dispatched, so expecting it would manufacture a false gap). Join them with
+commas (no surrounding spaces needed — the script strips whitespace and drops empty tokens) and
+pass as `--expect-skills`; this is the fail-safe that turns a lens or evaluator that crashed before
+writing its sidecar into a recorded gap instead of a silent omission:
+
+```bash
+"$PYTHON" "${CLAUDE_PLUGIN_ROOT}/scripts/pack_cost.py" "${PACK_DIR}" \
+  --expect-skills "<comma-joined list of the dispatched lens skills plus eval-pack-evaluator>"
+```
+
+This writes `${PACK_DIR}/pack-cost.json` — `perLens`, `evaluatorTokens`, `totalTokens`, and any
+`gaps` — which the report reads to show cost per lens and in total.
 
 ## Step 5: Render HTML
 

@@ -2,6 +2,8 @@
 name: business-risk
 description: Eval-pack CONTRIBUTOR lens. Reads the session transcript and the repo diff and judges the business/stakeholder risk of the delivered work — how likely it is to cause harm to users, revenue, compliance, or reputation if shipped as-is. Does NOT score; it attaches an attributed risk section to the report.
 tools: Read, Bash, Glob, Grep
+inputs:
+  transcript: skeleton
 ---
 
 **Output contract** (machine-checked; do not remove):
@@ -16,7 +18,16 @@ a risk assessment, not a score.
 
 You are given an absolute PACK_DIR, a REPO_ROOT, and a DIFF_BASE git ref. Do this:
 
-1. Read `PACK_DIR/transcript.jsonl` to understand what was built, for whom, and why.
+1. Read the **skeleton** at `TRANSCRIPT`: every turn's text, tool-call digests, and one-line result
+   summaries (status + first/last line + size) — no bodies. Use it to understand what was built,
+   for whom, and why. When a summary is ambiguous about what actually shipped, or you need to
+   quote a turn's full text to ground a risk claim, pull that turn's full body:
+   `"$PYTHON" "$CLAUDE_PLUGIN_ROOT/scripts/pull_turn.py" "$RAW_TRANSCRIPT" <turnId> --field text`.
+   If you need several turns' full bodies, collect their turnIds and pull them in **one** call:
+   `"$PYTHON" "$CLAUDE_PLUGIN_ROOT/scripts/pull_turn.py" "$RAW_TRANSCRIPT" --ids 12,47,301 --field
+   text` — not one at a time.
+   Pull selectively — most of the picture resolves from the skeleton. If no
+   `TRANSCRIPT`/`RAW_TRANSCRIPT` was given, read `PACK_DIR/transcript.jsonl` directly.
 2. Inspect the actual change. Prefer `PACK_DIR/repo-diffs.json` if it exists; otherwise run
    `git -C "$REPO_ROOT" diff "$DIFF_BASE"` (and `--stat` first if the full diff is large). If
    DIFF_BASE is the empty-tree sha, treat the whole tree as new.

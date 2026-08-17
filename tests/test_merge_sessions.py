@@ -64,5 +64,27 @@ class MergeTests(unittest.TestCase):
             self.assertEqual([e["uuid"] for e in merged], ["u1", "u2"])
 
 
+def test_merge_assigns_monotonic_turnid(tmp_path):
+    p = tmp_path / "s.jsonl"
+    p.write_text(
+        '{"uuid":"b","timestamp":"2026-01-01T00:00:02Z","type":"assistant"}\n'
+        '{"uuid":"a","timestamp":"2026-01-01T00:00:01Z","type":"user"}\n',
+        encoding="utf-8",
+    )
+    entries = merge_sessions.merge([p])
+    # sorted by timestamp: a then b
+    assert [e["turnId"] for e in entries] == [0, 1]
+    assert [e["uuid"] for e in entries] == ["a", "b"]
+
+def test_turnid_is_assigned_after_sort_even_without_timestamps(tmp_path):
+    p = tmp_path / "s.jsonl"
+    p.write_text(
+        '{"uuid":"x","type":"user"}\n{"uuid":"y","type":"assistant"}\n',
+        encoding="utf-8",
+    )
+    entries = merge_sessions.merge([p])
+    assert [e["turnId"] for e in entries] == [0, 1]
+
+
 if __name__ == "__main__":
     unittest.main()
