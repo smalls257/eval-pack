@@ -100,7 +100,7 @@ freshly-written CURRENT fingerprint is malformed — a real bug worth surfacing,
 paper over with a shell fallback.)
 
 This is exactly the point of `tune`: editing `.eval-pack.json` (a rubric, a stance, a
-`frictionCategories` list, a lens's `model`) is a config change, and `pack_fingerprint.py` folds
+`frictionCategories` list, a lens's `model` or `effort`) is a config change, and `pack_fingerprint.py` folds
 the resolved config bytes into EVERY per-lens key (not just `whole`) — so any `eval-config.json`
 change re-runs all lenses, never a silent reuse, even for a lens whose config-derived behavior
 (like `friction`'s `frictionCategories`) isn't reflected in any view file. Only lenses whose
@@ -190,7 +190,7 @@ unconditionally (today's behavior) is always safe, just occasionally redundant.
    already on disk from the prior round (rebuilding just overwrites it with the same content).
    Then follow Step 3's dispatch mechanics for that one lens only — same `subagent_type` (the
    lens's `skill`), same `PACK_DIR`/`REPO_ROOT`/`DIFF_BASE` arguments, the lens's configured
-   `model` if it has one, and the same per-lens `TRANSCRIPT` resolution (declared view →
+   `model` and `effort` if it has them, and the same per-lens `TRANSCRIPT` resolution (declared view →
    `${ABS_PACK_DIR}/views/<view>.jsonl`; `full`/none → `${ABS_PACK_DIR}/transcript.jsonl`). If it
    is a `skeleton` lens, also pass `RAW_TRANSCRIPT = ${ABS_PACK_DIR}/transcript.jsonl` plus the
    pull_turn recipe — or, if `${PACK_DIR}/transcript.jsonl` lacks `turnId`, apply the pre-turnId

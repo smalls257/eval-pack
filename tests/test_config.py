@@ -251,6 +251,20 @@ class TestLensKeys(unittest.TestCase):
         self.assertEqual(config.validate({"analysisLenses": [
             {"skill": "x", "role": "scorer"}]}), [])
 
+    def test_lens_effort_must_be_valid_level(self):
+        for e in ("low", "medium", "high", "xhigh", "max"):
+            self.assertEqual(config.validate({"analysisLenses": [
+                {"skill": "x", "role": "scorer", "effort": e}]}), [])
+        errs = config.validate({"analysisLenses": [
+            {"skill": "x", "role": "scorer", "effort": "turbo"}]})
+        self.assertTrue(any("effort" in e for e in errs))
+        # omitted effort is valid (lens inherits the session effort)
+        self.assertEqual(config.validate({"analysisLenses": [
+            {"skill": "x", "role": "scorer"}]}), [])
+        # effort is orthogonal to model — both together validate
+        self.assertEqual(config.validate({"analysisLenses": [
+            {"skill": "x", "role": "scorer", "model": "haiku", "effort": "low"}]}), [])
+
 
 class TestCosmeticKeys(unittest.TestCase):
     def test_new_defaults(self):

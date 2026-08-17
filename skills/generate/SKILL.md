@@ -377,7 +377,7 @@ TRANSCRIPT = `${ABS_PACK_DIR}/transcript.jsonl`; otherwise TRANSCRIPT =
 RAW_TRANSCRIPT = `${ABS_PACK_DIR}/transcript.jsonl` — the pull source. For non-skeleton lenses,
 omit it.
 
-Then for each lens `{skill, role, model?}`: **first apply the C2 reuse check from above** — if the
+Then for each lens `{skill, role, model?, effort?}`: **first apply the C2 reuse check from above** — if the
 skill is in `DECISION.reuse` and `${PACK_DIR}/lenses/<skill>.json` already exists, skip this lens's
 dispatch entirely (keep the on-disk file, write the `reused: true` cost sidecar) and move to the
 next lens. Otherwise dispatch it as a SEPARATE subagent over the read-only artifacts. Each
@@ -389,6 +389,16 @@ Pass only artifact locations — never your own reasoning.
 absent, omit the argument so the lens inherits the session model. This lets you run judgment-heavy
 lenses on `opus` and mechanical ones on `haiku`/`sonnet` — a large cost lever when the transcript
 is big (each lens reads it).
+
+**Per-lens effort (output-token/cost tuning):** if a lens entry has an `effort`
+(`low`|`medium`|`high`|`xhigh`|`max`), pass it as the `Agent` tool's `effort` argument for THAT
+lens's dispatch. If `effort` is absent, omit the argument so the lens inherits the session effort.
+Effort is orthogonal to `model` (set either, both, or neither): model picks the tier, effort picks
+how hard it reasons — the lever on OUTPUT tokens (dominant on smaller sessions where input is
+already cheap). Lower effort on lenses that grade from clear signal; keep it high on
+discovery/synthesis lenses. (Effort lives in `analysisLenses`, so changing it is a config change
+that `pack_fingerprint.py` folds into every per-lens key — a re-run correctly re-dispatches the
+affected lens rather than reusing a stale result.)
 
 **First-party lenses** ship with eval-pack; dispatch each with the `Agent` tool using the matching
 `subagent_type`, passing `PACK_DIR` (absolute), `REPO_ROOT`, and `DIFF_BASE`:

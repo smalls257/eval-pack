@@ -163,6 +163,11 @@ CARD_STYLES = ("hero", "list")
 # tool's model aliases; a lens with no model inherits the session model.
 LENS_MODELS = ("opus", "sonnet", "haiku", "fable")
 
+# Reasoning-effort levels a lens's subagent may be pinned to (output-token/cost tuning).
+# Orthogonal to model: model picks the tier, effort picks how hard it thinks. Mirrors the
+# Agent tool's effort levels; a lens with no effort inherits the session effort.
+LENS_EFFORTS = ("low", "medium", "high", "xhigh", "max")
+
 # Allowed per-flag severity overrides.
 FLAG_LEVELS = ("red", "amber", "green", "off")
 
@@ -393,6 +398,9 @@ def validate(cfg):
             if isinstance(lens, dict) and "model" in lens and lens.get("model") not in LENS_MODELS:
                 errors.append("analysisLenses[{}]: model must be one of: {}".format(
                     i, ", ".join(repr(m) for m in LENS_MODELS)))
+            if isinstance(lens, dict) and "effort" in lens and lens.get("effort") not in LENS_EFFORTS:
+                errors.append("analysisLenses[{}]: effort must be one of: {}".format(
+                    i, ", ".join(repr(e) for e in LENS_EFFORTS)))
             if isinstance(lens, dict) and "cardStyle" in lens and lens.get("cardStyle") not in CARD_STYLES:
                 errors.append("analysisLenses[{}]: cardStyle must be one of: {}".format(
                     i, ", ".join(repr(m) for m in CARD_STYLES)))
