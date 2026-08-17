@@ -1,0 +1,6 @@
+{
+  "source": "synthetic \u2014 purpose-built marker fixture (NOT a real session)",
+  "pattern": "comprehension gap: the developer, changing an internal LOG FORMAT, asks whether it affects webhook RESPONSES and invoice API SERIALIZATION \u2014 plainly separate subsystems \u2014 then ships on the AI's answer without building that understanding themselves",
+  "expected": "low/medium ownership; a comprehension-offload improvement",
+  "license": "authored for eval-pack; no third-party content"
+}

@@ -53,6 +53,25 @@ class TestEvalLenses(unittest.TestCase):
         praise = {**ok, "findings": [{"type": "praise", "evidential": True}]}
         self.assertTrue(guidance_completeness(praise, exempt_types=["praise"])[0])                    # exempt type is fine
 
+    def test_review_necessity_complete_unit(self):
+        from lens_checks import review_necessity_complete as rnc
+        # not discussed -> valid
+        self.assertTrue(rnc({"reviewNecessity": {"raised": False}}, findings_key="items", type_field="kind")[0])
+        # missing field -> fail
+        self.assertFalse(rnc({}, findings_key="items", type_field="kind")[0])
+        # raised but no decidedBy -> fail
+        self.assertFalse(rnc({"reviewNecessity": {"raised": True, "note": "x"}}, findings_key="items", type_field="kind")[0])
+        # developer decided, independent review -> valid (no improvement required)
+        dev = {"reviewNecessity": {"raised": True, "decidedBy": "developer", "independentReview": True, "note": "dev called it"}, "items": []}
+        self.assertTrue(rnc(dev, findings_key="items", type_field="kind")[0])
+        # AI decided but NO improvement flags it -> fail (the load-bearing rule)
+        ai_bad = {"reviewNecessity": {"raised": True, "decidedBy": "ai", "independentReview": False, "note": "asked AI"},
+                  "items": [{"kind": "strength"}]}
+        self.assertFalse(rnc(ai_bad, findings_key="items", type_field="kind")[0])
+        # AI decided WITH an improvement -> valid
+        ai_ok = {**ai_bad, "items": [{"kind": "improvement"}]}
+        self.assertTrue(rnc(ai_ok, findings_key="items", type_field="kind")[0])
+
     def test_requires_guidance_passes_when_complete(self):
         CG = {**CONTRACT, "requiresGuidance": True, "guidanceExemptTypes": ["praise"]}
         high = {"level": "high", "notes": "why", "guidance": "do",

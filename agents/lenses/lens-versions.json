@@ -20,12 +20,12 @@
     "version": "1.0.3"
   },
   "sycophancy": {
-    "sha256": "7ffebb274db577653a2745b95c6caf980a97beee617c744a80ca3df37282a1b1",
-    "version": "2.4.4"
+    "sha256": "cdf870953779a1490dca32643c5ea93888bddb82d5289a22d40b6ffbf1399f27",
+    "version": "2.5.1"
   },
   "user-improvements": {
-    "sha256": "0999ec18bb55019ffa957521ca1046248e2acbfa72f11fe659188b6b88e70fae",
-    "version": "2.6.5"
+    "sha256": "92c1cafe8e0f31fe533cc7bfe76b284cce2097ac94e23bdccacf8cbcff8e2575",
+    "version": "2.11.0"
   },
   "verification-rigor": {
     "sha256": "89b10f4a92da7e8b0cf34e436be8c3e1ed909231d67c5a7ca451af986c49113b",

@@ -22,12 +22,43 @@
   },
   "vibecoded-research-offload": {
     "level": {
-      "max": "low"
+      "min": "high"
     }
   },
   "vibe-2": {
     "level": {
+      "min": "medium",
+      "max": "medium"
+    }
+  },
+  "arbiter-offload-verbatim": {
+    "level": {
       "max": "low"
+    },
+    "findings": {
+      "include": [
+        "improvement"
+      ]
+    }
+  },
+  "comprehension-gap": {
+    "level": {
+      "max": "low"
+    },
+    "findings": {
+      "include": [
+        "improvement"
+      ]
+    }
+  },
+  "review-delegation-knowledge-gap": {
+    "level": {
+      "max": "low"
+    },
+    "findings": {
+      "include": [
+        "improvement"
+      ]
     }
   }
 }

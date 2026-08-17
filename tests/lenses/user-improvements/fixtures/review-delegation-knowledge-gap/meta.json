@@ -1,0 +1,6 @@
+{
+  "source": "synthetic \u2014 purpose-built marker fixture (NOT a real session)",
+  "pattern": "complete review-necessity delegation (dev asks 'do we need a code review?' -> AI yes -> dev has the AI review its OWN change) + author-review (not independent) + verbatim acceptance, AND simple questions revealing a knowledge gap about the auth code being changed (how refresh works, where validation happens)",
+  "expected": "low developer ownership; improvements naming the review-necessity offload, the author (non-independent) review, and the possible comprehension/ownership gap",
+  "license": "authored for eval-pack; no third-party content"
+}

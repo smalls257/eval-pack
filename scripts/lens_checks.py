@@ -81,6 +81,35 @@ def guidance_completeness(output, findings_key="findings", exempt_types=None, ty
     return (not msgs, msgs)
 
 
+def review_necessity_complete(output, findings_key="findings", type_field="type"):
+    """A lens that declares `requiresReviewNecessity` must ADJUDICATE, before scoring, who decided a
+    review/QA/check was needed — forcing the determination the lens otherwise glosses into a wrongly
+    credited "a review happened" strength. Enforce a top-level `reviewNecessity` object: `raised`
+    (bool — was review/QA/check necessity discussed at all), and when raised, `decidedBy` in
+    {developer, ai}, an `independentReview` (bool or null — was any review independent of the author),
+    and a non-empty `note`. THE LOAD-BEARING RULE: when the AI made the necessity call
+    (`decidedBy == "ai"` — the developer asked the AI whether a review was needed), that is an offload
+    and never a strength, so at least one `improvement` MUST flag it; a trial that reports
+    `decidedBy == "ai"` with no improvement is the exact misread this gate exists to stop."""
+    rn = output.get("reviewNecessity")
+    if not isinstance(rn, dict):
+        return (False, ["reviewNecessity missing or not an object"])
+    msgs = []
+    if not isinstance(rn.get("raised"), bool):
+        msgs.append("reviewNecessity.raised must be a boolean")
+    if rn.get("raised"):
+        if rn.get("decidedBy") not in ("developer", "ai"):
+            msgs.append("reviewNecessity.decidedBy must be 'developer' or 'ai' when raised")
+        if not (isinstance(rn.get("independentReview"), bool) or rn.get("independentReview") is None):
+            msgs.append("reviewNecessity.independentReview must be a boolean or null")
+        if not str(rn.get("note") or "").strip():
+            msgs.append("reviewNecessity.note is empty")
+        if rn.get("decidedBy") == "ai" and not any(
+                (i.get(type_field) == "improvement") for i in (output.get(findings_key) or [])):
+            msgs.append("decidedBy='ai' (the AI made the review-necessity call) but no improvement flags the offload")
+    return (not msgs, msgs)
+
+
 def rule_consistency(output, rules, ordinal, findings_key="findings", type_field="type"):
     """Output must satisfy the lens's own declared invariants (no ground truth).
 
