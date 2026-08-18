@@ -50,6 +50,10 @@ def assemble(pack_dir):
     results = []
     if lens_dir.is_dir():
         for f in sorted(lens_dir.glob("*.json")):
+            if f.name.endswith(".cost.json"):
+                continue  # cost sidecars live in lenses/ (pack_cost.py globs them) but are NOT
+                          # lens results — treating one as a result mis-reports a real success as
+                          # a contract failure.
             try:
                 r = json.loads(f.read_text(encoding="utf-8"))
                 r.setdefault("skill", f.stem)
@@ -182,9 +186,13 @@ def write_outputs(pack_dir, out):
     cfg_path = pack / "eval-config.json"
     cfg = config.read_config(str(cfg_path)) if cfg_path.is_file() else config.read_config()
     new_flags = _lens_flags(out, cfg.get("flagSeverities") or {})
-    if not new_flags:
-        return
     ppath = pack / "patterns.json"
+    # Idempotency: the strip of prior-run lens flags must run UNCONDITIONALLY, not only when
+    # there are new flags to append — otherwise a run that went from failing to clean (empty
+    # new_flags) leaves stale lensFailed/lensVerdict flags behind. Only skip when there is
+    # genuinely nothing to do: no new flags AND no patterns.json to strip from.
+    if not new_flags and not ppath.is_file():
+        return
     try:
         patterns = json.loads(ppath.read_text(encoding="utf-8")) if ppath.is_file() else {"flags": []}
     except json.JSONDecodeError as exc:
