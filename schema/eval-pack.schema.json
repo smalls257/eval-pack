@@ -101,49 +101,61 @@
     "analysisLenses": {
       "type": "array",
       "items": {
-        "type": "object",
-        "properties": {
-          "skill": {
-            "type": "string"
-          },
-          "role": {
+        "description": "A lens entry, or a leading merge sentinel: \"!extend\" keeps the default roster and adds/retunes (entries collapse per skill, last wins); \"!replace\" is a synonym for the default replace behavior.",
+        "anyOf": [
+          {
             "type": "string",
             "enum": [
-              "contributor",
-              "scorer"
+              "!extend",
+              "!replace"
             ]
           },
-          "template": {
-            "type": "string",
-            "description": "Repo-relative path to an HTML template (mustache-lite) controlling how this lens renders. Markup is trusted (repo file, resolve-time confined); interpolated values are always HTML-escaped."
-          },
-          "display": {
-            "type": "string",
-            "enum": [
-              "card",
-              "tab",
-              "both"
-            ],
-            "description": "How this lens renders: 'card' = compact header card, 'tab' = its own nav tab, 'both' = a summary card up top AND a detail tab. Default 'tab' for generic lenses."
-          },
-          "version": {
-            "type": "string",
-            "description": "Version label for this lens, shown in the report. For first-party lenses it defaults from agents/lenses/lens-versions.json; set it here to pin/override or to version a third-party lens."
-          },
-          "model": {
-            "type": "string",
-            "enum": [
-              "opus",
-              "sonnet",
-              "haiku",
-              "fable"
-            ],
-            "description": "Optional model tier for THIS lens's subagent (cost/quality tuning). Omit to inherit the session model. Put judgment-heavy lenses on 'opus' and mechanical ones on 'haiku'/'sonnet' to cut cost."
+          {
+            "type": "object",
+            "properties": {
+              "skill": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "contributor",
+                  "scorer"
+                ]
+              },
+              "template": {
+                "type": "string",
+                "description": "Repo-relative path to an HTML template (mustache-lite) controlling how this lens renders. Markup is trusted (repo file, resolve-time confined); interpolated values are always HTML-escaped."
+              },
+              "display": {
+                "type": "string",
+                "enum": [
+                  "card",
+                  "tab",
+                  "both"
+                ],
+                "description": "How this lens renders: 'card' = compact header card, 'tab' = its own nav tab, 'both' = a summary card up top AND a detail tab. Default 'tab' for generic lenses."
+              },
+              "version": {
+                "type": "string",
+                "description": "Version label for this lens, shown in the report. For first-party lenses it defaults from agents/lenses/lens-versions.json; set it here to pin/override or to version a third-party lens."
+              },
+              "model": {
+                "type": "string",
+                "enum": [
+                  "opus",
+                  "sonnet",
+                  "haiku",
+                  "fable"
+                ],
+                "description": "Optional model tier for THIS lens's subagent (cost/quality tuning). Omit to inherit the session model. Put judgment-heavy lenses on 'opus' and mechanical ones on 'haiku'/'sonnet' to cut cost."
+              }
+            },
+            "required": [
+              "skill",
+              "role"
+            ]
           }
-        },
-        "required": [
-          "skill",
-          "role"
         ]
       },
       "default": [
@@ -182,7 +194,7 @@
           "role": "scorer"
         }
       ],
-      "description": "Extension lenses that contribute analysis or feed the verdict."
+      "description": "Lens roster: the lenses that run. Supplying this list REPLACES the default roster (that is how a bundled lens is turned off; [] runs none). Start with \"!extend\" to keep the defaults and add or retune one."
     },
     "verdictAggregation": {
       "type": "string",

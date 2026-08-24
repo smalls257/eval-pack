@@ -137,7 +137,9 @@ example); `redaction` in particular REQUIRES the JSON form once a pattern has a 
 list value uses comma shorthand for simple tokens (`"a,b,c"`). File-layer lists (`.eval-pack.json`
 / `.eval-pack.local.json`) ADD to the defaults; start a list with `"!replace"` to replace them
 instead (e.g. `["!replace", "ci-flake", "review-latency"]`) — a leading `"!replace"` in an env
-JSON list is honored the same way.
+JSON list is honored the same way. `analysisLenses` is the exception: it is a lens **roster**, so
+supplying one REPLACES the defaults (that is how you turn a bundled lens off — an empty list runs
+none). Start it with `"!extend"` to keep the defaults and add or retune a lens instead.
 
 Key groups below (full per-key reference: [`docs/configuration.md`](docs/configuration.md); types:
 `schema/eval-pack.schema.json`):

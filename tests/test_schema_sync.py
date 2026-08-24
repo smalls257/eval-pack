@@ -25,7 +25,9 @@ class TestSchemaSync(unittest.TestCase):
 
     def test_display_enum_matches_config_display_modes(self):
         schema = json.loads((ROOT / "schema" / "eval-pack.schema.json").read_text())
-        enum = schema["properties"]["analysisLenses"]["items"]["properties"]["display"]["enum"]
+        # items is anyOf[merge-sentinel string, lens object] — the object arm holds the fields.
+        lens_obj = schema["properties"]["analysisLenses"]["items"]["anyOf"][1]
+        enum = lens_obj["properties"]["display"]["enum"]
         self.assertEqual(list(enum), list(config.DISPLAY_MODES))
 
     def test_schema_types_and_defaults_match(self):

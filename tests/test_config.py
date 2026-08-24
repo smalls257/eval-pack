@@ -384,6 +384,88 @@ class TestUnifiedKeys(unittest.TestCase):
         self.assertIs(rendered_off["includeRenderedTranscript"], False)
 
 
+class TestLensRosterMerge(unittest.TestCase):
+    """analysisLenses is a ROSTER (a selection), not an accumulating list.
+
+    Additive merge made lens selection non-subtractive: a repo that listed the two lenses
+    it wanted still resolved to all eight, and the six it never asked for surfaced as red
+    'Lens failed: configured lens produced no output' cards. Selection must mean selection.
+    """
+
+    def _skills(self, cfg):
+        return [lens["skill"] for lens in cfg["analysisLenses"]]
+
+    def test_project_roster_replaces_defaults(self):
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, ".eval-pack.json", {"analysisLenses": [
+                {"skill": "review", "role": "contributor"},
+                {"skill": "requirement-drift", "role": "scorer"}]})
+            cfg = config.load_config(d, env={})
+        self.assertEqual(self._skills(cfg), ["review", "requirement-drift"])
+
+    def test_empty_roster_means_no_lenses(self):
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, ".eval-pack.json", {"analysisLenses": []})
+            cfg = config.load_config(d, env={})
+        self.assertEqual(cfg["analysisLenses"], [])
+
+    def test_extend_sentinel_keeps_defaults_and_appends(self):
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, ".eval-pack.json", {"analysisLenses": [
+                "!extend", {"skill": "security-review", "role": "contributor"}]})
+            cfg = config.load_config(d, env={})
+        self.assertEqual(len(cfg["analysisLenses"]), 9)
+        self.assertEqual(self._skills(cfg)[-1], "security-review")
+        self.assertNotIn("!extend", cfg["analysisLenses"])
+
+    def test_extend_override_of_a_default_lens_does_not_duplicate(self):
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, ".eval-pack.json", {"analysisLenses": [
+                "!extend", {"skill": "review", "role": "contributor", "model": "haiku"}]})
+            cfg = config.load_config(d, env={})
+        by_skill = [l for l in cfg["analysisLenses"] if l["skill"] == "review"]
+        self.assertEqual(len(by_skill), 1)
+        self.assertEqual(by_skill[0]["model"], "haiku")
+        self.assertEqual(len(cfg["analysisLenses"]), 8)
+
+    def test_replace_sentinel_still_accepted_and_consumed(self):
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, ".eval-pack.json", {"analysisLenses": [
+                "!replace", {"skill": "review", "role": "contributor"}]})
+            cfg = config.load_config(d, env={})
+        self.assertEqual(self._skills(cfg), ["review"])
+
+    def test_last_entry_wins_within_one_roster(self):
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, ".eval-pack.json", {"analysisLenses": [
+                {"skill": "review", "role": "contributor"},
+                {"skill": "review", "role": "contributor", "model": "opus"}]})
+            cfg = config.load_config(d, env={})
+        self.assertEqual(cfg["analysisLenses"],
+                         [{"skill": "review", "role": "contributor", "model": "opus"}])
+
+    def test_local_layer_roster_replaces_project_roster(self):
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, ".eval-pack.json", {"analysisLenses": [
+                {"skill": "review", "role": "contributor"}]})
+            _write(d, ".eval-pack.local.json", {"analysisLenses": [
+                {"skill": "friction", "role": "contributor"}]})
+            cfg = config.load_config(d, env={})
+        self.assertEqual(self._skills(cfg), ["friction"])
+
+    def test_other_lists_stay_additive(self):
+        with tempfile.TemporaryDirectory() as d:
+            _write(d, ".eval-pack.json", {"frictionCategories": ["flakiness"]})
+            cfg = config.load_config(d, env={})
+        self.assertIn("tooling", cfg["frictionCategories"])
+        self.assertIn("flakiness", cfg["frictionCategories"])
+
+    def test_literal_extend_survivor_is_a_validation_error(self):
+        errs = config.validate({"analysisLenses": [
+            {"skill": "review", "role": "contributor"}, "!extend"]})
+        self.assertTrue(any("!extend" in e for e in errs))
+
+
 if __name__ == "__main__":
     unittest.main()
 

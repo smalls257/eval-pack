@@ -41,6 +41,13 @@ bundled DEFAULTS  <  extends presets  <  .eval-pack.json  <  .eval-pack.local.js
   to** the lower layer. To replace instead, make `"!replace"` the **first** element:
   `["!replace", "ci-flake", "review-latency"]`. A literal `"!replace"` anywhere else in a resolved
   list is an error.
+- **Roster keys** (`analysisLenses`): a roster names a *selection*, so a file- or env-layer roster
+  **replaces** the default one — listing two lenses runs exactly those two. To keep the defaults and
+  add or retune one, make `"!extend"` the **first** element:
+  `["!extend", {"skill": "review", "role": "contributor", "model": "haiku"}]` — entries collapse per
+  `skill`, last one winning, so an override never dispatches the same lens twice. A leading
+  `"!replace"` is accepted as a synonym for the default behavior. A literal sentinel anywhere else
+  in a resolved list is an error. `"analysisLenses": []` means **no lenses**, not "the defaults".
 - **Dict keys** (e.g. `detectionPatterns`, `rubric`, `messages`, `flagSeverities`): a dict
   **replaces wholesale** — supply every entry you want. (So overriding `detectionPatterns` means
   providing all of `done`/`correction`/`retry`.)
@@ -94,7 +101,7 @@ violation halts the pipeline before the report renders.
 
 | Key | Type | Default | Notes |
 |-----|------|---------|-------|
-| `analysisLenses` | list of objects | the 8 bundled lenses | Each: `{ "skill": str, "role": "contributor"\|"scorer", "display"?: "card"\|"tab"\|"both", "template"?: str, "version"?: str, "model"?: "opus"\|"sonnet"\|"haiku"\|"fable" }`. |
+| `analysisLenses` | roster (list of objects) | the 8 bundled lenses | Each: `{ "skill": str, "role": "contributor"\|"scorer", "display"?: "card"\|"tab"\|"both", "template"?: str, "version"?: str, "model"?: "opus"\|"sonnet"\|"haiku"\|"fable" }`. |
 
 - `role`: **scorer** returns a 0–100 `score` that reaches the verdict only through
   `verdictAggregation`; **contributor** adds an attributed report section and never touches the score.
@@ -109,6 +116,10 @@ violation halts the pipeline before the report renders.
   `user-improvements`, `review`) on `opus` and mechanical ones (`friction`, `requirement-drift`,
   `verification-rigor`) on `haiku`/`sonnet`. (Lens dispatch is skill-orchestrated, so the model is
   honored by the generate skill obeying the config — same trust level as the rest of lens dispatch.)
+
+This list is a **roster**: whatever you set is exactly what runs (see "How lists and dicts merge").
+To drop a bundled lens, list the ones you want without it; to keep the defaults and add or retune
+one, lead with `"!extend"`.
 
 A configured lens that writes no output becomes a red "Lens failed" flag (it can't silently vanish);
 a failing lens never crashes the eval. Default lenses:
@@ -215,6 +226,7 @@ also the privacy-safe posture for attaching a pack to a public PR.)
 ```json
 {
   "analysisLenses": [
+    "!extend",
     { "skill": "acme-security-lens", "role": "scorer", "display": "both",
       "template": ".eval-pack/templates/security.html" }
   ],
