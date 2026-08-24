@@ -368,5 +368,62 @@ class TestLensGates(unittest.TestCase):
             self.assertEqual(retry["count"], 7)  # detect flags survive untouched
 
 
+class TestCostSidecarAndIdempotency(unittest.TestCase):
+    def test_cost_sidecar_not_treated_as_lens_result(self):
+        # BUG 1: lenses/*.json glob also matched <skill>.cost.json, loading the sidecar as a
+        # lens result -> contract failure for a lens that actually succeeded.
+        with tempfile.TemporaryDirectory() as d:
+            pack = _pack(d, lenses={
+                "review": {"role": "contributor", "title": "Review", "findings": ["ok"]}})
+            (pack / "lenses" / "review.cost.json").write_text(
+                json.dumps({"skill": "review", "tokens": 1234, "model": "opus", "reused": False}),
+                encoding="utf-8")
+            out = assemble_lenses.assemble(d)
+            self.assertEqual(len(out["contributors"]), 1)
+            self.assertEqual(out["failures"], [])
+            self.assertFalse(any(f.get("skill") == "review" for f in out["failures"]))
+
+    def test_malformed_lens_still_fails_despite_sidecar_exclusion(self):
+        # BUG 1 negative: excluding sidecars must NOT hide a genuinely broken lens result.
+        with tempfile.TemporaryDirectory() as d:
+            pack = _pack(d, lenses={},
+                         analysis_lenses=[{"skill": "review", "role": "contributor"}])
+            (pack / "lenses" / "review.json").write_text("{not json", encoding="utf-8")
+            (pack / "lenses" / "review.cost.json").write_text(
+                json.dumps({"skill": "review", "tokens": 10, "model": "opus", "reused": False}),
+                encoding="utf-8")
+            out = assemble_lenses.assemble(d)
+            self.assertTrue(any(f.get("skill") == "review" for f in out["failures"]))
+
+    def test_clean_rerun_strips_stale_lens_flags_keeps_others(self):
+        # BUG 2: a run that goes from failing to clean must strip prior lensFailed/lensVerdict,
+        # but leave non-lens flags (a green cleanPass) intact.
+        with tempfile.TemporaryDirectory() as d:
+            pack = _pack(d, lenses={
+                "review": {"role": "contributor", "title": "R", "findings": ["ok"]}})
+            (pack / "patterns.json").write_text(json.dumps({"flags": [
+                {"id": "lensFailed", "level": "red", "label": "stale from a prior run"},
+                {"id": "cleanPass", "level": "green", "label": "all good"}]}), encoding="utf-8")
+            out = assemble_lenses.assemble(d)  # clean: zero failures, no verdict flag
+            assemble_lenses.write_outputs(d, out)
+            ids = [f["id"] for f in json.loads(
+                (pack / "patterns.json").read_text(encoding="utf-8"))["flags"]]
+            self.assertNotIn("lensFailed", ids)   # stale lens flag stripped unconditionally
+            self.assertIn("cleanPass", ids)        # non-lens flag survives
+
+    def test_write_outputs_idempotent_no_flag_duplication(self):
+        # BUG 2: running assemble twice with the same failing result must not duplicate flags.
+        with tempfile.TemporaryDirectory() as d:
+            pack = _pack(d, lenses={},
+                         analysis_lenses=[{"skill": "broken", "role": "scorer"}])
+            (pack / "lenses" / "broken.json").write_text("{not json", encoding="utf-8")
+            (pack / "patterns.json").write_text(json.dumps({"flags": []}), encoding="utf-8")
+            out = assemble_lenses.assemble(d)  # one failure -> one lensFailed
+            assemble_lenses.write_outputs(d, out)
+            assemble_lenses.write_outputs(d, out)  # second run over the same result
+            flags = json.loads((pack / "patterns.json").read_text(encoding="utf-8"))["flags"]
+            self.assertEqual(sum(1 for f in flags if f["id"] == "lensFailed"), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

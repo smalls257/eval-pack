@@ -149,6 +149,11 @@ _META_KEYS = {"extends", "$schema"}
 # so env overrides for these MUST be JSON arrays.
 _COMMA_UNSAFE_KEYS = {"redaction"}
 
+# List keys that name a SELECTION rather than an accumulation: a layer that supplies one
+# replaces the base roster instead of adding to it, so a lens can actually be deselected.
+# Opt back into additive merge with a leading "!extend".
+_ROSTER_LISTS = {"analysisLenses"}
+
 # Allowed verdict aggregation rules (shared with scripts/aggregate.py).
 AGGREGATION_RULES = ("core", "min", "mean")
 
@@ -210,10 +215,34 @@ def _strip_meta(d):
     return {k: v for k, v in d.items() if k not in _META_KEYS}
 
 
+def _dedupe_by_skill(lenses):
+    """Collapse a lens roster to one entry per skill, LAST occurrence winning.
+
+    Roster entries are dicts, so plain value-dedupe can't see that
+    {"skill": "review", "model": "haiku"} and the default {"skill": "review"} are the
+    same lens — it would keep both and dispatch review twice. Non-dict junk passes
+    through untouched so validate() can report it as the config error it is.
+    """
+    out, index = [], {}
+    for lens in lenses:
+        skill = lens.get("skill") if isinstance(lens, dict) else None
+        if skill is None:
+            out.append(lens)
+            continue
+        if skill in index:
+            out[index[skill]] = lens
+        else:
+            index[skill] = len(out)
+            out.append(lens)
+    return out
+
+
 def _overlay(base, layer):
     for k, v in layer.items():
         if isinstance(v, list) and isinstance(base.get(k), list):
-            if v and v[0] == "!replace":
+            if k in _ROSTER_LISTS:
+                base[k] = _merge_roster(base[k], v)
+            elif v and v[0] == "!replace":
                 # explicit replace: user opts out of additive merge for this list
                 base[k] = list(v[1:])
             else:
@@ -221,6 +250,23 @@ def _overlay(base, layer):
         else:
             base[k] = v
     return base
+
+
+def _merge_roster(base, layer):
+    """A roster is a SELECTION, so a layer that names lenses REPLACES the base roster.
+
+    Additive merge (right for redaction patterns and friction categories, which accumulate)
+    is wrong here: it made deselection impossible, so a repo asking for two lenses still got
+    all eight and the six it never asked for rendered as red "configured lens produced no
+    output" failures. Leading "!extend" opts back into additive merge (defaults plus yours,
+    per-skill overrides collapsing); leading "!replace" is accepted as a no-op synonym for
+    the default so configs written against the old sentinel keep working.
+    """
+    if layer and layer[0] == "!extend":
+        return _dedupe_by_skill(list(base) + list(layer[1:]))
+    if layer and layer[0] == "!replace":
+        return _dedupe_by_skill(list(layer[1:]))
+    return _dedupe_by_skill(list(layer))
 
 
 def _copy_default(v):
@@ -273,6 +319,10 @@ def _coerce(raw, typ, key):
                     key, typ.__name__, type(val).__name__))
             # Dedupe to match the file-layer list-merge semantics (consistency).
             if typ is list:
+                if key in _ROSTER_LISTS:
+                    # Rosters merge in _apply_env, which can see the base — that is the only
+                    # place "!extend" is meaningful, so leave the sentinel for it to consume.
+                    return val
                 if val and val[0] == "!replace":
                     # env values replace anyway — consume the sentinel so it can never
                     # leak into a resolved list as literal data
@@ -305,7 +355,11 @@ def _apply_env(cfg, env):
     for key, typ in _TYPES.items():
         raw = env.get("CLAUDE_PLUGIN_OPTION_" + key)
         if raw not in (None, ""):
-            cfg[key] = _coerce(raw, typ, key)
+            val = _coerce(raw, typ, key)
+            if key in _ROSTER_LISTS and isinstance(val, list) and isinstance(cfg.get(key), list):
+                cfg[key] = _merge_roster(cfg[key], val)
+            else:
+                cfg[key] = val
     return cfg
 
 
@@ -438,6 +492,11 @@ def validate(cfg):
                 "{}: literal '!replace' in resolved list — in a file layer the sentinel must "
                 "be the FIRST element (or omitted); for an env override use the JSON-array "
                 "form, which consumes it (env values replace anyway)".format(k))
+        elif typ is list and isinstance(cfg.get(k), list) and "!extend" in cfg[k]:
+            errors.append(
+                "{}: literal '!extend' in resolved list — the sentinel must be the FIRST "
+                "element, and is only meaningful on a roster key ({})".format(
+                    k, ", ".join(sorted(_ROSTER_LISTS))))
         elif typ is dict and isinstance(cfg.get(k), dict):
             # Dicts replace wholesale — the list sentinel is meaningless inside them and
             # would compile into detection regexes as literal text. Fail loud.
