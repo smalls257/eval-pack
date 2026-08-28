@@ -93,3 +93,25 @@ def test_cli_expect_skills_all_empty_value_behaves_like_no_flag(tmp_path):
     assert rc == 0
     out = json.loads((tmp_path / "pack-cost.json").read_text(encoding="utf-8"))
     assert out["gaps"] == []
+
+
+def test_sidecar_survives_assembly_so_cost_still_aggregates(tmp_path):
+    # Guards the WRONG fix for the sidecar/lens-result collision: relocating sidecars out of
+    # lenses/ would silence the spurious lens failure and silently zero the cost ledger, since
+    # pack_cost globs lenses/*.cost.json. The assembler must exclude, not relocate.
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import assemble_lenses
+
+    (tmp_path / "eval-config.json").write_text(json.dumps(
+        {"analysisLenses": [{"skill": "review", "role": "contributor"}]}), encoding="utf-8")
+    (tmp_path / "lenses").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "lenses" / "review.json").write_text(json.dumps(
+        {"role": "contributor", "title": "Review", "findings": ["ok"]}), encoding="utf-8")
+    _sidecar(tmp_path, "review", 4242, model="opus")
+
+    out = assemble_lenses.assemble(str(tmp_path))
+    assemble_lenses.write_outputs(str(tmp_path), out)
+
+    assert not any(f.get("skill") == "review" for f in out["failures"])
+    cost = pack_cost.aggregate(tmp_path)
+    assert {e["skill"]: e["tokens"] for e in cost["perLens"]} == {"review": 4242}
